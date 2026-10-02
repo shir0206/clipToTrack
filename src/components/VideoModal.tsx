@@ -2,10 +2,10 @@ import { useEffect, useRef, type CSSProperties } from 'react';
 import type { Clip } from './types';
 import SvgIcon from './SvgIcon';
 
-type Props = { clip: Clip; onClose: () => void };
+type Props = { clip: Clip; onClose: () => void; onProgress?: (frac: number) => void };
 
 /** Large player for one clip. Esc / backdrop click / ✕ closes it. */
-export default function VideoModal({ clip, onClose }: Props) {
+export default function VideoModal({ clip, onClose, onProgress }: Props) {
   const closeBtn = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -26,7 +26,9 @@ export default function VideoModal({ clip, onClose }: Props) {
             <SvgIcon name="close" size={16} />
           </button>
         </div>
-        <video className="ctt-modal-video" src={clip.videoUrl} poster={clip.thumbnail} controls autoPlay playsInline />
+        <video className="ctt-modal-video" src={clip.videoUrl} poster={clip.thumbnail} controls autoPlay playsInline
+          onTimeUpdate={(e) => e.currentTarget.duration && onProgress?.(e.currentTarget.currentTime / e.currentTarget.duration)}
+        />
       </div>
     </div>
   );

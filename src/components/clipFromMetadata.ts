@@ -181,6 +181,17 @@ export function clipFromMetadata(raw: unknown, index = 1): Clip {
     gpsQuality,
     coordinates,
     samples,
+    addedAt: 0, // overwritten by useClips
+    sort: {
+      date: Date.parse(gps.startUtc ?? file?.createdUtc ?? '') || undefined,
+      duration: isNum(file?.durationSec) ? file!.durationSec : undefined,
+      distance: isNum(gps.totalDistanceM) ? gps.totalDistanceM : undefined,
+      speed: isNum(gps.speed3dKmh?.max) ? gps.speed3dKmh!.max : undefined,
+      altitude:
+        isNum(gps.altitudeM?.min) && isNum(gps.altitudeM?.max)
+          ? gps.altitudeM!.max - gps.altitudeM!.min
+          : undefined,
+    },
     details: buildDetails(m as ClipMetadata),
   };
 }

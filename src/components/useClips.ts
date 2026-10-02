@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clipFromMetadata, type ClipMetadata } from './clipFromMetadata';
 import { extractGoProMetadata } from './extractGoProMetadata';
 import { captureThumbnail } from './videoThumbnail';
-import type { Clip } from './types';
+import type { Clip, UploadProgress } from './types';
 
 const STORAGE_KEY = 'clip-to-track:clips:v1';
 /** 10 Hz GPS on a long clip would blow the ~5 MB localStorage quota, so stored tracks are capped. */
 const MAX_TRACK_POINTS = 2000;
 
 /** What we keep per clip. The MP4 itself can't live in localStorage, so videoUrl is session-only. */
-type Entry = { metadata: ClipMetadata; thumbnail?: string; videoUrl?: string };
-type Stored = Pick<Entry, 'metadata' | 'thumbnail'>;
+type Entry = { metadata: ClipMetadata; thumbnail?: string; videoUrl?: string; addedAt: number };
+type Stored = Pick<Entry, 'metadata' | 'thumbnail'> & { addedAt?: number };
 
 /** Cap the track length (all per-point fields are kept for the hover bubble). Summary stats are untouched. */
 function compact(m: ClipMetadata): ClipMetadata {
@@ -24,7 +24,7 @@ function load(): Entry[] {
   try {
     const arr: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
     if (!Array.isArray(arr)) return [];
-    return (arr as Stored[]).filter((e) => {
+    return (arr as Stored[]).map((e) => ({ ...e, addedAt: e.addedAt ?? 0 })).filter((e) => {
       try {
         clipFromMetadata(e.metadata);
         return true;
@@ -43,6 +43,7 @@ export function useClips() {
   const [entries, setEntries] = useState<Entry[]>(load);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
 
   // Clip = pure function of the stored metadata (+ session-only video URL)
   const clips: Clip[] = useMemo(
@@ -51,6 +52,7 @@ export function useClips() {
         ...clipFromMetadata(e.metadata, i + 1),
         thumbnail: e.thumbnail,
         videoUrl: e.videoUrl,
+        addedAt: e.addedAt,
       })),
     [entries],
   );
@@ -58,7 +60,7 @@ export function useClips() {
   // persist (JSON only — no video blobs)
   useEffect(() => {
     try {
-      const stored: Stored[] = entries.map(({ metadata, thumbnail }) => ({ metadata, thumbnail }));
+      const stored: Stored[] = entries.map(({ metadata, thumbnail, addedAt }) => ({ metadata, thumbnail, addedAt }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     } catch {
       setError('Browser storage is full — clips will be lost on reload. Remove some clips.');
@@ -85,17 +87,23 @@ export function useClips() {
     const added: (Entry & { id: string })[] = [];
     const errors: string[] = [];
 
-    for (const file of files) {
+    for (let n = 0; n < files.length; n++) {
+      const file = files[n];
+      const base = { name: file.name, n: n + 1, of: files.length };
+      setProgress({ ...base, phase: 'index', frac: null });
       try {
         if (/\.json$/i.test(file.name)) {
           const metadata = compact(JSON.parse(await file.text()));
-          added.push({ metadata, id: clipFromMetadata(metadata).id });
+          added.push({ metadata, id: clipFromMetadata(metadata).id, addedAt: Date.now() });
         } else {
-          const metadata = compact(await extractGoProMetadata(file));
+          const metadata = compact(await extractGoProMetadata(file, (p) =>
+            setProgress({ ...base, phase: p.phase, frac: p.phase === 'telemetry' && p.total ? p.done / p.total : null }),
+          ));
           const id = clipFromMetadata(metadata).id; // validates too
           const videoUrl = URL.createObjectURL(file);
+          setProgress({ ...base, phase: 'thumbnail', frac: null });
           const thumbnail = await captureThumbnail(videoUrl);
-          added.push({ metadata, thumbnail, videoUrl, id });
+          added.push({ metadata, thumbnail, videoUrl, id, addedAt: Date.now() });
         }
       } catch (e) {
         errors.push(`${file.name}: ${message(e)}`);
@@ -113,12 +121,20 @@ export function useClips() {
             metadata: next.metadata,
             thumbnail: next.thumbnail ?? old?.thumbnail,
             videoUrl: next.videoUrl ?? old?.videoUrl,
+            addedAt: next.addedAt,
           });
         }
         return [...byId.values()];
       });
+    setProgress(null);
     setBusy(false);
     return added[0]?.id;
+  }, []);
+
+  /** Removes one clip from state and (via the persist effect) from localStorage; its object URL is revoked too. */
+  const remove = useCallback((id: string) => {
+    setEntries((prev) => prev.filter((e) => clipFromMetadata(e.metadata).id !== id));
+    setError(null);
   }, []);
 
   const clear = useCallback(() => {
@@ -126,5 +142,5 @@ export function useClips() {
     setError(null);
   }, []);
 
-  return { clips, error, busy, addFiles, clear };
+  return { clips, error, busy, progress, addFiles, remove, clear };
 }

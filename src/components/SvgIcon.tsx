@@ -2,7 +2,8 @@ import type { ReactNode, SVGProps } from 'react';
 
 export type IconName =
   | 'play' | 'pause' | 'stop' | 'maximize' | 'close' | 'upload' | 'trash'
-  | 'clock' | 'route' | 'gauge' | 'mountain' | 'camera' | 'gps' | 'info' | 'chevron';
+  | 'clock' | 'route' | 'gauge' | 'mountain' | 'camera' | 'gps' | 'info' | 'chevron'
+  | 'arrowUp' | 'arrowDown' | 'eye' | 'eyeOff' | 'layers' | 'ruler' | 'download' | 'search' | 'fit' | 'chart' | 'sliders';
 
 const solid = { fill: 'currentColor', stroke: 'none' } as const;
 
@@ -54,6 +55,27 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   chevron: <path d="m6 9 6 6 6-6" />,
+  arrowUp: <path d="M12 19V5M5 12l7-7 7 7" />,
+  arrowDown: <path d="M12 5v14M19 12l-7 7-7-7" />,
+  eye: (
+    <>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  eyeOff: <path d="M9.9 4.24A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a10 10 0 0 0 5.4-1.6M2 2l20 20" />,
+  layers: <path d="m12 2 10 5-10 5L2 7l10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />,
+  ruler: <path d="M21.3 8.7 8.7 21.3a1 1 0 0 1-1.4 0l-4.6-4.6a1 1 0 0 1 0-1.4L15.3 2.7a1 1 0 0 1 1.4 0l4.6 4.6a1 1 0 0 1 0 1.4zM7.5 10.5l2 2M10.5 7.5l2 2M13.5 4.5l2 2M4.5 13.5l2 2" />,
+  download: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </>
+  ),
+  fit: <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />,
+  chart: <path d="M3 3v18h18M7 14l4-4 4 4 5-6" />,
+  sliders: <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />,
 };
 
 type Props = { name: IconName; size?: number } & Omit<SVGProps<SVGSVGElement>, 'name'>;

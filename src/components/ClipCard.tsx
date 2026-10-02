@@ -11,6 +11,12 @@ type Props = {
   onTogglePlay: () => void;
   onStop: () => void;
   onMaximize: () => void;
+  hidden: boolean;
+  onToggleHidden: () => void;
+  /** 0..1 position of the video while playing (null = cleared); drives the map playhead */
+  onProgress: (frac: number | null) => void;
+  /** removes the clip from the map and from localStorage */
+  onDelete: () => void;
 };
 
 const UNPLAYABLE =
@@ -25,7 +31,12 @@ export default function ClipCard({
   onTogglePlay,
   onStop,
   onMaximize,
+  hidden,
+  onToggleHidden,
+  onProgress,
+  onDelete,
 }: Props) {
+  const [confirming, setConfirming] = useState(false);
   const stop = (fn: () => void) => (e: React.MouseEvent) => {
     e.stopPropagation();
     fn();
@@ -37,6 +48,22 @@ export default function ClipCard({
   useEffect(() => {
     onStopRef.current = onStop;
   });
+
+  const onProgressRef = useRef(onProgress);
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  });
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!playing || !v) return;
+    let raf = 0;
+    const tick = () => {
+      if (v.duration) onProgressRef.current(v.currentTime / v.duration);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing]);
 
   // `playing` (owned by the parent) is the single source of truth; the <video> just follows it
   useEffect(() => {
@@ -60,6 +87,7 @@ export default function ClipCard({
       v.pause();
       v.currentTime = 0;
     }
+    onProgress(null);
     onStop();
   };
   const handleToggle = () => {
@@ -81,7 +109,7 @@ export default function ClipCard({
       aria-selected={selected}
       tabIndex={0}
       aria-label={`Select track ${clip.index} ${clip.title}`}
-      className={`ctt-card${selected ? ' is-selected' : ''}${playing ? ' is-playing' : ''}`}
+      className={`ctt-card${selected ? ' is-selected' : ''}${playing ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
       style={{ '--c': clip.color } as CSSProperties}
       onClick={onSelect}
       onKeyDown={(e) => {
@@ -108,6 +136,7 @@ export default function ClipCard({
             playsInline
             onEnded={() => {
               if (videoRef.current) videoRef.current.currentTime = 0;
+              onProgress(null);
               onStop();
             }}
             onError={() => {
@@ -158,9 +187,34 @@ export default function ClipCard({
           >
             <SvgIcon name="maximize" size={14} />
           </button>
+          <button
+            className="ctt-btn ctt-btn-spacer"
+            aria-label={`${hidden ? 'Show' : 'Hide'} ${clip.title} on map`}
+            aria-pressed={hidden}
+            title={hidden ? 'Show on map' : 'Hide on map'}
+            onClick={stop(onToggleHidden)}
+          >
+            <SvgIcon name={hidden ? 'eyeOff' : 'eye'} size={15} />
+          </button>
+          <button
+            className="ctt-btn"
+            aria-label={`Delete ${clip.title}`}
+            title="Delete clip"
+            aria-expanded={confirming}
+            onClick={stop(() => setConfirming((c) => !c))}
+          >
+            <SvgIcon name="trash" size={14} />
+          </button>
           {playing && <span className="ctt-playing">Playing</span>}
           {!clip.videoUrl && <span className="ctt-hint">Re-add the MP4 to play</span>}
         </div>
+        {confirming && (
+          <div className="ctt-confirm" role="alertdialog" aria-label={`Delete ${clip.title}?`} onClick={(e) => e.stopPropagation()}>
+            <span>Remove from map and saved data?</span>
+            <button className="ctt-confirm-yes" autoFocus onClick={stop(onDelete)}>Delete</button>
+            <button className="ctt-confirm-no" onClick={stop(() => setConfirming(false))}>Cancel</button>
+          </div>
+        )}
         {videoError && (
           <p className="ctt-video-error" role="status">
             {videoError}

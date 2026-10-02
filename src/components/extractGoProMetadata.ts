@@ -284,9 +284,75 @@ const iso = (ms: number, withMs = true) => {
 const label = (w: number) =>
   w >= 7600 ? '8K' : w >= 5000 ? '5.3K' : w >= 3700 ? '4K' : w >= 2600 ? '2.7K' : w >= 1900 ? '1080p' : w >= 1200 ? '720p' : '';
 
+// ───────────────────────── telemetry reading ─────────────────────────
+
+export type ExtractProgress = { phase: 'index' | 'telemetry'; done: number; total: number };
+
+// GoPro interleaves one small gpmd chunk with ~1 s of video, so the chunks are far apart.
+// Merging them into "a few huge slices" would read the whole video, so instead we
+//  1) merge chunks that really are close together (<= MAX_GAP) into one slice (<= MAX_RANGE), and
+//  2) read the remaining slices in parallel (POOL at a time) instead of one-by-one.
+const MAX_GAP = 64 * 1024;
+const MAX_RANGE = 4 * 1024 * 1024;
+const POOL = 8;
+
+type Item = { offset: number; size: number; idx: number };
+type Slice = { start: number; end: number; items: Item[] };
+
+function planSlices(samples: { offset: number; size: number }[]): Slice[] {
+  const sorted: Item[] = samples.map((s, idx) => ({ ...s, idx })).sort((a, b) => a.offset - b.offset);
+  const out: Slice[] = [];
+  for (const it of sorted) {
+    const last = out[out.length - 1];
+    const end = it.offset + it.size;
+    if (last && it.offset - last.end <= MAX_GAP && end - last.start <= MAX_RANGE) {
+      last.items.push(it);
+      last.end = Math.max(last.end, end);
+    } else out.push({ start: it.offset, end, items: [it] });
+  }
+  return out;
+}
+
+async function pool<T>(items: T[], limit: number, fn: (t: T) => Promise<void>) {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) await fn(items[next++]);
+    }),
+  );
+}
+
+async function readTelemetry(
+  file: Blob,
+  samples: { offset: number; size: number }[],
+  meta: { device?: string },
+  onProgress?: (p: ExtractProgress) => void,
+): Promise<RawSample[]> {
+  const slices = planSlices(samples);
+  const perSample: RawSample[][] = samples.map(() => []); // keeps the original time order
+  const total = samples.length;
+  let done = 0;
+  let lastTick = 0;
+  onProgress?.({ phase: 'telemetry', done: 0, total });
+
+  await pool(slices, POOL, async (sl) => {
+    const buf = await file.slice(sl.start, sl.end).arrayBuffer();
+    for (const it of sl.items)
+      parseGpmf(buf.slice(it.offset - sl.start, it.offset - sl.start + it.size), perSample[it.idx], meta);
+    done += sl.items.length;
+    const now = performance.now();
+    if (done === total || now - lastTick > 100) {
+      lastTick = now; // throttled so the UI isn't re-rendered hundreds of times
+      onProgress?.({ phase: 'telemetry', done, total });
+    }
+  });
+  return perSample.flat();
+}
+
 // ───────────────────────── public API ─────────────────────────
 
-export async function extractGoProMetadata(file: File): Promise<ClipMetadata> {
+export async function extractGoProMetadata(file: File, onProgress?: (p: ExtractProgress) => void): Promise<ClipMetadata> {
+  onProgress?.({ phase: 'index', done: 0, total: 1 });
   const moov = await readTopLevelBox(file, 'moov');
   const dv = new DataView(moov);
   const root: Box = { type: 'moov', start: 0, hdr: 0, size: moov.byteLength };
@@ -317,10 +383,8 @@ export async function extractGoProMetadata(file: File): Promise<ClipMetadata> {
   if (video?.timescale) durationSec = video.duration / video.timescale;
 
   // telemetry samples (a few KB each, ~1 per second of video)
-  const raw: RawSample[] = [];
   const gp: { device?: string } = {};
-  for (const s of gpmd.samples)
-    parseGpmf(await file.slice(s.offset, s.offset + s.size).arrayBuffer(), raw, gp);
+  const raw = await readTelemetry(file, gpmd.samples, gp, onProgress);
 
   const valid = raw.filter(
     (s) =>

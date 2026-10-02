@@ -37,6 +37,10 @@ export type Clip = {
   coordinates: [number, number][];
   /** Full metadata of each point; samples[i] belongs to coordinates[i]. */
   samples: GpsPoint[];
+  /** Epoch ms when the clip was added (for "upload time" sorting). */
+  addedAt: number;
+  /** Raw numbers used for sorting; undefined when the source lacks the field. */
+  sort: { date?: number; duration?: number; distance?: number; speed?: number; altitude?: number };
   /** Extra metadata worth showing (only the fields that exist in the source). */
   details?: DetailGroup[];
 };
@@ -51,3 +55,14 @@ export const ROUTE_COLORS = [
   '#D6A000',
   '#E24343',
 ];
+
+/** Live status while files are being read (drives the progress bar in the upload zone). */
+export type UploadProgress = {
+  name: string;
+  /** 1-based position in the current batch */
+  n: number;
+  of: number;
+  phase: 'index' | 'telemetry' | 'thumbnail';
+  /** 0..1, or null when the step has no measurable progress */
+  frac: number | null;
+};
