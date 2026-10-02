@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SvgIcon, { type IconName } from './SvgIcon';
 
-export type BaseKey = 'streets' | 'topo' | 'satellite';
+export type BaseKey = 'streets' | 'light' | 'dark' | 'topo' | 'satellite';
 export const BASE_LABELS: Record<BaseKey, string> = {
   streets: 'Streets',
+  light: 'Light',
+  dark: 'Dark',
   topo: 'Topo',
   satellite: 'Satellite',
 };
@@ -30,13 +32,10 @@ export const DEFAULT_OPTS: MapOpts = {
   follow: false,
   profile: false,
 };
-const KEY = 'clip-to-track:map-opts';
+const KEY = 'clip-to-track:map-opts:v2'; // bumped so the new satellite default isn't hidden by an old saved choice
 export const loadOpts = (): MapOpts => {
   try {
-    return {
-      ...DEFAULT_OPTS,
-      ...JSON.parse(localStorage.getItem(KEY) ?? '{}'),
-    };
+    return { ...DEFAULT_OPTS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
   } catch {
     return DEFAULT_OPTS;
   }
@@ -70,12 +69,11 @@ type Hit = { place_id: number; display_name: string; boundingbox: string[] };
 function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
-  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>(
-    'idle',
-  );
+  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [active, setActive] = useState(-1);
   const [focused, setFocused] = useState(false);
   const abort = useRef<AbortController | null>(null);
+  const input = useRef<HTMLInputElement>(null);
   const skip = useRef(false); // don't re-search right after picking a result
   const text = q.trim();
 
@@ -85,10 +83,7 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
     abort.current = ac;
     setState('loading');
     try {
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(t)}`,
-        { signal: ac.signal },
-      );
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(t)}`, { signal: ac.signal });
       const j: Hit[] = await r.json();
       setHits(j);
       setActive(j.length ? 0 : -1);
@@ -116,19 +111,32 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
   const pick = (h: Hit) => {
     const [s, n, w, e] = h.boundingbox.map(Number);
     onGo([w, s, e, n]);
-    skip.current = true;
-    setQ(h.display_name.split(',')[0]);
+    abort.current?.abort();
+    const name = h.display_name.split(',')[0];
+    if (name !== text) skip.current = true; // the text change below must not trigger a new search
+    setQ(name);
     setHits([]);
     setState('idle');
+    input.current?.blur();
   };
 
-  const open = focused && text.length > 0;
+  // what the dropdown shows; null = nothing, so it never renders as an empty box
+  const view: 'hint' | 'loading' | 'error' | 'empty' | 'list' | null =
+    text.length === 0 ? null
+    : text.length < MIN_CHARS ? 'hint'
+    : hits.length ? 'list'
+    : state === 'loading' ? 'loading'
+    : state === 'error' ? 'error'
+    : state === 'done' ? 'empty'
+    : null;
+  const open = focused && view !== null;
   const listId = 'ctt-search-list';
 
   return (
     <div className="ctt-search">
       <SvgIcon name="search" size={15} className="ctt-search-ico" />
       <input
+        ref={input}
         value={q}
         placeholder="Search a place…"
         role="combobox"
@@ -142,45 +150,28 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowDown' && hits.length) {
-            e.preventDefault();
-            setActive((a) => (a + 1) % hits.length);
-          } else if (e.key === 'ArrowUp' && hits.length) {
-            e.preventDefault();
-            setActive((a) => (a - 1 + hits.length) % hits.length);
-          } else if (e.key === 'Enter') {
+          if (e.key === 'ArrowDown' && hits.length) { e.preventDefault(); setActive((a) => (a + 1) % hits.length); }
+          else if (e.key === 'ArrowUp' && hits.length) { e.preventDefault(); setActive((a) => (a - 1 + hits.length) % hits.length); }
+          else if (e.key === 'Enter') {
             if (hits[active]) pick(hits[active]);
             else if (text.length >= 2) run(text); // Enter forces a search even for short text
-          } else if (e.key === 'Escape') {
-            setQ('');
-            (e.target as HTMLInputElement).blur();
-          }
+          } else if (e.key === 'Escape') { setQ(''); (e.target as HTMLInputElement).blur(); }
         }}
       />
       {q && (
-        <button
-          className="ctt-search-clear"
-          aria-label="Clear search"
-          onPointerDown={(e) => e.preventDefault()}
-          onClick={() => setQ('')}
-        >
+        <button className="ctt-search-clear" aria-label="Clear search" onPointerDown={(e) => e.preventDefault()} onClick={() => setQ('')}>
           <SvgIcon name="close" size={13} />
         </button>
       )}
       {open && (
-        <div
-          className="ctt-dd ctt-search-dd"
-          onPointerDown={(e) => e.preventDefault() /* keep input focus */}
-        >
-          {text.length < MIN_CHARS ? (
-            <p className="ctt-dd-note">
-              Keep typing — suggestions appear from {MIN_CHARS} characters
-            </p>
-          ) : state === 'loading' && !hits.length ? (
+        <div className="ctt-dd ctt-search-dd" onPointerDown={(e) => e.preventDefault() /* keep input focus */}>
+          {view === 'hint' ? (
+            <p className="ctt-dd-note">Keep typing — suggestions appear from {MIN_CHARS} characters</p>
+          ) : view === 'loading' ? (
             <p className="ctt-dd-note">Searching…</p>
-          ) : state === 'error' ? (
+          ) : view === 'error' ? (
             <p className="ctt-dd-note">Search failed — check your connection</p>
-          ) : state === 'done' && !hits.length ? (
+          ) : view === 'empty' ? (
             <p className="ctt-dd-note">No places found</p>
           ) : (
             <ul id={listId} role="listbox">
@@ -210,28 +201,9 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
 }
 
 // ───────── toolbar bits ─────────
-function IconBtn({
-  icon,
-  label,
-  on,
-  disabled,
-  onClick,
-}: {
-  icon: IconName;
-  label: string;
-  on?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
+function IconBtn({ icon, label, on, disabled, onClick }: { icon: IconName; label: string; on?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
-    <button
-      className={`ctt-tb-btn${on ? ' is-on' : ''}`}
-      title={label}
-      aria-label={label}
-      aria-pressed={on}
-      disabled={disabled}
-      onClick={onClick}
-    >
+    <button className={`ctt-tb-btn${on ? ' is-on' : ''}`} title={label} aria-label={label} aria-pressed={on} disabled={disabled} onClick={onClick}>
       <SvgIcon name={icon} size={16} />
     </button>
   );
@@ -239,39 +211,15 @@ function IconBtn({
 
 type Item<T extends string> = { value: T; label: string };
 
-function Dropdown<T extends string>({
-  id,
-  openId,
-  setOpenId,
-  icon,
-  title,
-  current,
-  items,
-  onPick,
-  disabled,
-}: {
-  id: string;
-  openId: string | null;
-  setOpenId: (v: string | null) => void;
-  icon: IconName;
-  title: string;
-  current?: T;
-  items: Item<T>[];
-  onPick: (v: T) => void;
-  disabled?: boolean;
+function Dropdown<T extends string>({ id, openId, setOpenId, icon, title, current, items, onPick, disabled }: {
+  id: string; openId: string | null; setOpenId: (v: string | null) => void;
+  icon: IconName; title: string; current?: T; items: Item<T>[]; onPick: (v: T) => void; disabled?: boolean;
 }) {
   const open = openId === id;
   const label = items.find((i) => i.value === current)?.label;
   return (
     <div className="ctt-dd-wrap">
-      <button
-        className={`ctt-tb-btn ctt-tb-menu${open ? ' is-on' : ''}`}
-        title={title}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpenId(open ? null : id)}
-      >
+      <button className={`ctt-tb-btn ctt-tb-menu${open ? ' is-on' : ''}`} title={title} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpenId(open ? null : id)}>
         <SvgIcon name={icon} size={16} />
         <span>{label ?? title}</span>
         <SvgIcon name="chevron" size={12} />
@@ -284,10 +232,7 @@ function Dropdown<T extends string>({
               role="menuitemradio"
               aria-checked={i.value === current}
               className={i.value === current ? 'is-active' : ''}
-              onClick={() => {
-                onPick(i.value);
-                setOpenId(null);
-              }}
+              onClick={() => { onPick(i.value); setOpenId(null); }}
             >
               {i.label}
             </button>
@@ -298,10 +243,7 @@ function Dropdown<T extends string>({
   );
 }
 
-const BASES = (Object.keys(BASE_LABELS) as BaseKey[]).map((k) => ({
-  value: k,
-  label: BASE_LABELS[k],
-}));
+const BASES = (Object.keys(BASE_LABELS) as BaseKey[]).map((k) => ({ value: k, label: BASE_LABELS[k] }));
 const COLORS: Item<MapOpts['color']>[] = [
   { value: 'route', label: 'Route colour' },
   { value: 'speed', label: 'Speed' },
@@ -319,27 +261,14 @@ const EXPORTS: Item<'gpx' | 'geojson' | 'png'>[] = [
 ];
 
 /** Toolbar docked along the top of the map. */
-export default function MapPanel({
-  opts,
-  set,
-  hasClips,
-  hasSelected,
-  measuring,
-  onMeasure,
-  onFitAll,
-  onFitSelected,
-  onFullscreen,
-  onExport,
-  onGo,
-}: Props) {
+export default function MapPanel({ opts, set, hasClips, hasSelected, measuring, onMeasure, onFitAll, onFitSelected, onFullscreen, onExport, onGo }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const bar = useRef<HTMLDivElement>(null);
 
   // close menus on outside click / Escape
   useEffect(() => {
     if (!openId) return;
-    const down = (e: PointerEvent) =>
-      !bar.current?.contains(e.target as Node) && setOpenId(null);
+    const down = (e: PointerEvent) => !bar.current?.contains(e.target as Node) && setOpenId(null);
     const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpenId(null);
     document.addEventListener('pointerdown', down);
     document.addEventListener('keydown', key);
@@ -355,107 +284,26 @@ export default function MapPanel({
       <PlaceSearch onGo={onGo} />
 
       <div className="ctt-tb-group">
-        <Dropdown
-          {...dd}
-          id="base"
-          icon="layers"
-          title="Basemap"
-          current={opts.base}
-          items={BASES}
-          onPick={(base) => set({ base })}
-        />
-        <Dropdown
-          {...dd}
-          id="color"
-          icon="gauge"
-          title="Colour by"
-          current={opts.color}
-          items={COLORS}
-          onPick={(color) => set({ color })}
-        />
-        <Dropdown
-          {...dd}
-          id="points"
-          icon="gps"
-          title="Points"
-          current={opts.points}
-          items={POINTS}
-          onPick={(points) => set({ points })}
-        />
+        <Dropdown {...dd} id="base" icon="layers" title="Basemap" current={opts.base} items={BASES} onPick={(base) => set({ base })} />
+        <Dropdown {...dd} id="color" icon="gauge" title="Colour by" current={opts.color} items={COLORS} onPick={(color) => set({ color })} />
+        <Dropdown {...dd} id="points" icon="gps" title="Points" current={opts.points} items={POINTS} onPick={(points) => set({ points })} />
       </div>
 
       <div className="ctt-tb-group">
-        <IconBtn
-          icon="gps"
-          label="Start / end markers"
-          on={opts.ends}
-          onClick={() => set({ ends: !opts.ends })}
-        />
-        <IconBtn
-          icon="arrowUp"
-          label="Direction arrows"
-          on={opts.arrows}
-          onClick={() => set({ arrows: !opts.arrows })}
-        />
-        <IconBtn
-          icon="mountain"
-          label="Hillshade relief"
-          on={opts.relief}
-          onClick={() => set({ relief: !opts.relief })}
-        />
-        <IconBtn
-          icon="eye"
-          label="Focus selected clip"
-          on={opts.focus}
-          onClick={() => set({ focus: !opts.focus })}
-        />
-        <IconBtn
-          icon="play"
-          label="Follow playhead"
-          on={opts.follow}
-          onClick={() => set({ follow: !opts.follow })}
-        />
-        <IconBtn
-          icon="chart"
-          label="Elevation profile"
-          on={opts.profile}
-          disabled={!hasSelected}
-          onClick={() => set({ profile: !opts.profile })}
-        />
+        <IconBtn icon="gps" label="Start / end markers" on={opts.ends} onClick={() => set({ ends: !opts.ends })} />
+        <IconBtn icon="arrowUp" label="Direction arrows" on={opts.arrows} onClick={() => set({ arrows: !opts.arrows })} />
+        <IconBtn icon="mountain" label="Hillshade relief" on={opts.relief} onClick={() => set({ relief: !opts.relief })} />
+        <IconBtn icon="eye" label="Focus selected clip" on={opts.focus} onClick={() => set({ focus: !opts.focus })} />
+        <IconBtn icon="play" label="Follow playhead" on={opts.follow} onClick={() => set({ follow: !opts.follow })} />
+        <IconBtn icon="chart" label="Elevation profile" on={opts.profile} disabled={!hasSelected} onClick={() => set({ profile: !opts.profile })} />
       </div>
 
       <div className="ctt-tb-group">
-        <IconBtn
-          icon="ruler"
-          label="Measure distance"
-          on={measuring}
-          onClick={onMeasure}
-        />
-        <IconBtn
-          icon="fit"
-          label="Fit all clips"
-          disabled={!hasClips}
-          onClick={onFitAll}
-        />
-        <IconBtn
-          icon="route"
-          label="Fit selected clip"
-          disabled={!hasSelected}
-          onClick={onFitSelected}
-        />
-        <IconBtn
-          icon="maximize"
-          label="Fullscreen map"
-          onClick={onFullscreen}
-        />
-        <Dropdown
-          {...dd}
-          id="export"
-          icon="download"
-          title="Export"
-          items={EXPORTS}
-          onPick={onExport}
-        />
+        <IconBtn icon="ruler" label="Measure distance" on={measuring} onClick={onMeasure} />
+        <IconBtn icon="fit" label="Fit all clips" disabled={!hasClips} onClick={onFitAll} />
+        <IconBtn icon="route" label="Fit selected clip" disabled={!hasSelected} onClick={onFitSelected} />
+        <IconBtn icon="maximize" label="Fullscreen map" onClick={onFullscreen} />
+        <Dropdown {...dd} id="export" icon="download" title="Export" items={EXPORTS} onPick={onExport} />
       </div>
     </div>
   );

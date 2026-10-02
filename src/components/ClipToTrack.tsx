@@ -179,11 +179,11 @@ export default function ClipToTrack() {
               {clips.length}
             </span>
           </div>
-          {clips.length > 1 && (
-            <div className="ctt-sort">
+          <div className="ctt-sort">
               <label>
                 Sort by
                 <select
+                  disabled={clips.length < 2}
                   value={sort.key}
                   onChange={(e) => {
                     const key = e.target.value as SortKey;
@@ -197,14 +197,14 @@ export default function ClipToTrack() {
               </label>
               <button
                 className="ctt-btn"
+                disabled={clips.length < 2}
                 aria-label={sort.dir === 1 ? 'Ascending' : 'Descending'}
                 title={sort.dir === 1 ? 'Ascending' : 'Descending'}
                 onClick={() => setSort((s) => ({ ...s, dir: s.dir === 1 ? -1 : 1 }))}
               >
                 <SvgIcon name={sort.dir === 1 ? 'arrowUp' : 'arrowDown'} size={14} />
               </button>
-            </div>
-          )}
+          </div>
           <ul className="ctt-list" role="listbox" aria-label="Clips">
             {sorted.map((clip) => (
               <ClipCard

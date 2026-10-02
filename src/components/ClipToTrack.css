@@ -675,3 +675,12 @@
 .ctt-bar > i.is-indeterminate { width: 35%; animation: ctt-slide 1.1s ease-in-out infinite; }
 @keyframes ctt-slide { from { margin-left: -35%; } to { margin-left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .ctt-bar > i.is-indeterminate { animation: none; width: 100%; opacity: 0.5; } }
+
+/* ───────── v6 ───────── */
+.ctt-thumb-hint {
+  position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 64px);
+  padding: 1px 6px; overflow: hidden; border-radius: 6px; text-overflow: ellipsis; white-space: nowrap;
+  background: rgb(0 0 0 / 0.65); color: #fff; font-size: 11px;
+}
+.ctt-sort select:disabled { opacity: 0.5; cursor: not-allowed; }
+.ctt-sort .ctt-btn:disabled { opacity: 0.4; }

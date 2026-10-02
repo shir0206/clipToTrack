@@ -145,6 +145,11 @@ export default function ClipCard({
             }}
           />
         )}
+        {!clip.videoUrl && (
+          <span className="ctt-thumb-hint" title="The video file isn't kept after a reload — add it again to play">
+            Re-add video to play
+          </span>
+        )}
         <span className="ctt-duration">{clip.duration}</span>
       </div>
 
@@ -206,7 +211,6 @@ export default function ClipCard({
             <SvgIcon name="trash" size={14} />
           </button>
           {playing && <span className="ctt-playing">Playing</span>}
-          {!clip.videoUrl && <span className="ctt-hint">Re-add the MP4 to play</span>}
         </div>
         {confirming && (
           <div className="ctt-confirm" role="alertdialog" aria-label={`Delete ${clip.title}?`} onClick={(e) => e.stopPropagation()}>

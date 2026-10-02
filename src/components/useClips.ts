@@ -100,7 +100,8 @@ export function useClips() {
             setProgress({ ...base, phase: p.phase, frac: p.phase === 'telemetry' && p.total ? p.done / p.total : null }),
           ));
           const id = clipFromMetadata(metadata).id; // validates too
-          const videoUrl = URL.createObjectURL(file);
+          // .lrv has no MIME type; label it so <video> doesn't have to guess (wrapping a File in a Blob copies nothing)
+          const videoUrl = URL.createObjectURL(file.type ? file : new Blob([file], { type: 'video/mp4' }));
           setProgress({ ...base, phase: 'thumbnail', frac: null });
           const thumbnail = await captureThumbnail(videoUrl);
           added.push({ metadata, thumbnail, videoUrl, id, addedAt: Date.now() });
