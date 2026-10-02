@@ -3,7 +3,7 @@
   "homepage": "https://shir0206.github.io/clipToTrack",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "yarn@3.6.1",
+  "packageManager": "yarn@1.22.22",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
