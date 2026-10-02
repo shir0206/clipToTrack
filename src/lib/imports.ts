@@ -37,6 +37,7 @@ export function detectCapabilities(windowLike: object, inputLike: object) {
   return {
     directoryPicker: 'showDirectoryPicker' in windowLike,
     directoryInput: 'webkitdirectory' in inputLike,
+    saveFilePicker: 'showSaveFilePicker' in windowLike,
   };
 }
 

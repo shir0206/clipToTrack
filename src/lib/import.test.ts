@@ -11,13 +11,18 @@ it('detects fallbacks without requiring directory APIs', () => {
   expect(detectCapabilities({}, {})).toEqual({
     directoryPicker: false,
     directoryInput: false,
+    saveFilePicker: false,
   });
   expect(
     detectCapabilities(
-      { showDirectoryPicker: () => {} },
+      { showDirectoryPicker: () => {}, showSaveFilePicker: () => {} },
       { webkitdirectory: false },
     ),
-  ).toEqual({ directoryPicker: true, directoryInput: true });
+  ).toEqual({
+    directoryPicker: true,
+    directoryInput: true,
+    saveFilePicker: true,
+  });
 });
 it('recursively collects handles and preserves paths', async () => {
   const nested: DirectoryHandle = {

@@ -5,6 +5,8 @@ import {
   type ChangeEvent,
   type DragEvent,
 } from 'react';
+import ExportPanel from './ExportPanel';
+import ClipToTrack from '/components/ClipToTrack';
 import { discoverClips, type SourceFile } from './lib/discovery';
 import {
   collectDirectory,
@@ -99,7 +101,8 @@ export default function App() {
           <h1 id="page-title">ClipToTrack</h1>
           <p className="lede">
             Select a GoPro recording to find its MP4, LRV, and thumbnail
-            companions. Your files stay in this browser.
+            companions, then export GPX, CSV, GeoJSON, or complete JSON. Your
+            files stay in this browser.
           </p>
         </section>
         <section
@@ -251,15 +254,22 @@ export default function App() {
                       ))}
                     </ul>
                   )}
+                  <ExportPanel
+                    key={clip.id}
+                    clip={clip}
+                    savePickerAvailable={capabilities.saveFilePicker}
+                  />
                 </article>
               ))}
             </div>
           </section>
         )}
       </main>
+
+      <ClipToTrack></ClipToTrack>
       <footer>
         <span>Files never leave your device</span>
-        <span>Phase 1 · File discovery</span>
+        <span>Phase 6 · Export formats</span>
       </footer>
     </div>
   );

@@ -393,6 +393,68 @@ h1 {
   border-radius: 50%;
   background: #e8c990;
 }
+.export-panel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #ffffff12;
+}
+.export-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.export-heading h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.export-heading p,
+.export-note,
+.export-error {
+  margin: 0;
+  color: #84939e;
+  font-size: 12px;
+}
+.export-route,
+.export-columns {
+  border: 0;
+  margin: 0 0 12px;
+  padding: 0;
+  min-inline-size: 0;
+}
+.export-route legend,
+.export-columns legend {
+  padding: 0 0 8px;
+  color: #687984;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.export-route,
+.export-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.export-route label,
+.export-columns label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #c5d0d6;
+  font-size: 12px;
+}
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+.export-error {
+  margin-top: 10px;
+  color: #e8c990;
+}
 footer {
   display: flex;
   justify-content: space-between;

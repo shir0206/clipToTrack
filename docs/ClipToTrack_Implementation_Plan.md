@@ -254,25 +254,25 @@ Unknown GPMF keys must be retained in the full JSON export instead of causing an
 
 ### Work
 
-- [ ] Export GPX 1.1 track points with UTC time and elevation.
-- [ ] Include speed and GPS-quality extensions where supported.
-- [ ] Export configurable CSV columns.
-- [ ] Export GeoJSON with route geometry and summary properties.
-- [ ] Export versioned JSON containing raw streams, processed routes, units, source metadata, and exclusions.
-- [ ] Let the user choose raw or processed GPS for route exports.
-- [ ] Use deterministic number and timestamp formatting.
-- [ ] Generate exports as Blob objects and revoke object URLs after download.
-- [ ] Use `showSaveFilePicker()` when available and browser downloads otherwise.
+- [x] Export GPX 1.1 track points with UTC time and elevation.
+- [x] Include speed and GPS-quality extensions where supported.
+- [x] Export configurable CSV columns.
+- [x] Export GeoJSON with route geometry and summary properties.
+- [x] Export versioned JSON containing raw streams, processed routes, units, source metadata, and exclusions.
+- [x] Let the user choose raw or processed GPS for route exports.
+- [x] Use deterministic number and timestamp formatting.
+- [x] Generate exports as Blob objects and revoke object URLs after download.
+- [x] Use `showSaveFilePicker()` when available and browser downloads otherwise.
 
 ### Verification
 
-- [ ] GPX validates against the GPX 1.1 schema.
-- [ ] GPX contains 65 points when exporting the supplied raw route.
-- [ ] CSV rows and headers remain aligned for optional fields.
-- [ ] GeoJSON opens in a standard mapping tool.
-- [ ] Full JSON retains non-GPS telemetry and unknown GPMF fields.
-- [ ] Export tests are deterministic across time zones and operating systems.
-- [ ] Export works without the File System Access API.
+- [x] GPX validates against the GPX 1.1 schema.
+- [x] GPX contains 65 points when exporting the supplied raw route.
+- [x] CSV rows and headers remain aligned for optional fields.
+- [x] GeoJSON opens in a standard mapping tool.
+- [x] Full JSON retains non-GPS telemetry and unknown GPMF fields.
+- [x] Export tests are deterministic across time zones and operating systems.
+- [x] Export works without the File System Access API.
 
 ---
 
