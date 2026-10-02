@@ -106,6 +106,9 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
     }
     if (text.length < MIN_CHARS) {
       abort.current?.abort();
+      // This reset is tied to the debounced search side effect: stale remote hits must be cleared
+      // as soon as the query stops being searchable.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHits([]);
       setState('idle');
       return;

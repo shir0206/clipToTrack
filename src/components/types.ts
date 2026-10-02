@@ -14,7 +14,10 @@ export type GpsPoint = {
   cumulativeDistM?: number;
 };
 
-export type DetailGroup = { title: string; rows: [label: string, value: string][] };
+export type DetailGroup = {
+  title: string;
+  rows: [label: string, value: string][];
+};
 
 export type Clip = {
   id: string;
@@ -40,7 +43,13 @@ export type Clip = {
   /** Epoch ms when the clip was added (for "upload time" sorting). */
   addedAt: number;
   /** Raw numbers used for sorting; undefined when the source lacks the field. */
-  sort: { date?: number; duration?: number; distance?: number; speed?: number; altitude?: number };
+  sort: {
+    date?: number;
+    duration?: number;
+    distance?: number;
+    speed?: number;
+    altitude?: number;
+  };
   /** Extra metadata worth showing (only the fields that exist in the source). */
   details?: DetailGroup[];
 };

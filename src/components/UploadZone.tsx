@@ -2,9 +2,17 @@ import { useRef, useState } from 'react';
 import SvgIcon from './SvgIcon';
 import type { UploadProgress } from './types';
 
-type Props = { onFiles: (files: File[]) => void; busy?: boolean; progress?: UploadProgress | null };
+type Props = {
+  onFiles: (files: File[]) => void;
+  busy?: boolean;
+  progress?: UploadProgress | null;
+};
 
-const LABEL = { index: 'Reading file index…', telemetry: 'Reading telemetry', thumbnail: 'Creating thumbnail…' };
+const LABEL = {
+  index: 'Reading file index…',
+  telemetry: 'Reading telemetry',
+  thumbnail: 'Creating thumbnail…',
+};
 
 export default function UploadZone({ onFiles, busy, progress }: Props) {
   const pct = progress?.frac == null ? null : Math.round(progress.frac * 100);
@@ -12,7 +20,9 @@ export default function UploadZone({ onFiles, busy, progress }: Props) {
   const [over, setOver] = useState(false);
 
   const handle = (list: FileList | null) => {
-    const files = Array.from(list ?? []).filter((f) => /\.(mp4|lrv|json)$/i.test(f.name));
+    const files = Array.from(list ?? []).filter((f) =>
+      /\.(mp4|lrv|json)$/i.test(f.name),
+    );
     if (files.length) onFiles(files);
     if (input.current) input.current.value = ''; // allow re-selecting the same file
   };
@@ -65,11 +75,16 @@ export default function UploadZone({ onFiles, busy, progress }: Props) {
             aria-valuemax={100}
             aria-valuenow={pct ?? undefined}
           >
-            <i className={pct === null ? 'is-indeterminate' : ''} style={pct === null ? undefined : { width: `${pct}%` }} />
+            <i
+              className={pct === null ? 'is-indeterminate' : ''}
+              style={pct === null ? undefined : { width: `${pct}%` }}
+            />
           </div>
         </>
       ) : (
-        <span>or click to browse · MP4 / LRV or metadata JSON · Processed locally</span>
+        <span>
+          or click to browse · MP4 / LRV or metadata JSON · Processed locally
+        </span>
       )}
       <input
         ref={input}

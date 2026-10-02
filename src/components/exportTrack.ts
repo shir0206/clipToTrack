@@ -30,7 +30,9 @@ export function clipToGeoJson(clip: Clip): string {
       },
       geometry: {
         type: 'LineString',
-        coordinates: clip.samples.map((p) => (p.altM !== undefined ? [p.lon, p.lat, p.altM] : [p.lon, p.lat])),
+        coordinates: clip.samples.map((p) =>
+          p.altM !== undefined ? [p.lon, p.lat, p.altM] : [p.lon, p.lat],
+        ),
       },
     },
     null,

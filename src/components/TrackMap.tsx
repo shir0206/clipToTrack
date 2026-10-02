@@ -296,7 +296,11 @@ export default function TrackMap({
   useEffect(() => {
     measuringRef.current = measuring;
   }, [measuring]);
-  useEffect(() => setProbe(null), [selectedId, opts.profile]);
+  useEffect(() => {
+    // The probe belongs to the previous selection/profile overlay, so clear it when either changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProbe(null);
+  }, [selectedId, opts.profile]);
 
   // value range for metric colouring (+ legend)
   const range = useMemo(() => {

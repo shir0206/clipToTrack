@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 import type { Clip } from './types';
 import ClipCard from './ClipCard';
 import TrackMap, { type MapApi } from './TrackMap';
@@ -25,7 +32,8 @@ const value = (c: Clip, k: SortKey): number | string | undefined =>
 const loadSort = (): { key: SortKey; dir: 1 | -1 } => {
   try {
     const s = JSON.parse(localStorage.getItem(SORT_KEY) ?? '');
-    if (SORTS.some(([k]) => k === s.key)) return { key: s.key, dir: s.dir === -1 ? -1 : 1 };
+    if (SORTS.some(([k]) => k === s.key))
+      return { key: s.key, dir: s.dir === -1 ? -1 : 1 };
   } catch {
     /* default */
   }
@@ -35,7 +43,9 @@ const loadSort = (): { key: SortKey; dir: 1 | -1 } => {
 const MIN_W = 320; // card needs room
 const MIN_MAP = 280;
 const clampW = (w: number) =>
-  Math.round(Math.min(Math.max(w, MIN_W), Math.max(MIN_W, window.innerWidth - MIN_MAP)));
+  Math.round(
+    Math.min(Math.max(w, MIN_W), Math.max(MIN_W, window.innerWidth - MIN_MAP)),
+  );
 
 export default function ClipToTrack() {
   const { clips, error, busy, progress, addFiles, remove, clear } = useClips(); // clips persist in localStorage
@@ -65,13 +75,22 @@ export default function ClipToTrack() {
         const y = value(b, sort.key);
         if (x === undefined) return y === undefined ? 0 : 1; // missing values always last
         if (y === undefined) return -1;
-        const r = typeof x === 'string' ? x.localeCompare(y as string, undefined, { numeric: true, sensitivity: 'base' }) : x - (y as number);
+        const r =
+          typeof x === 'string'
+            ? x.localeCompare(y as string, undefined, {
+                numeric: true,
+                sensitivity: 'base',
+              })
+            : x - (y as number);
         // ties fall back to upload order, and flip with the direction so the toggle always visibly does something
         return (r || a.index - b.index) * sort.dir;
       }),
     [clips, sort],
   );
-  const mapClips = useMemo(() => clips.filter((c) => !hiddenIds.has(c.id)), [clips, hiddenIds]);
+  const mapClips = useMemo(
+    () => clips.filter((c) => !hiddenIds.has(c.id)),
+    [clips, hiddenIds],
+  );
   const toggleHidden = (id: string) =>
     setHiddenIds((s) => {
       const n = new Set(s);
@@ -102,7 +121,8 @@ export default function ClipToTrack() {
     setDragging(true);
   };
   const onDragMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) setPanelW(clampW(e.clientX));
+    if (e.currentTarget.hasPointerCapture(e.pointerId))
+      setPanelW(clampW(e.clientX));
   };
   const onDragEnd = () => setDragging(false);
   const onResizerKey = (e: KeyboardEvent) => {
@@ -191,14 +211,31 @@ export default function ClipToTrack() {
                     className={`ctt-sort-chip${on ? ' is-on' : ''}`}
                     disabled={clips.length < 2}
                     aria-pressed={on}
-                    title={on ? `${label}: ${asc ? 'ascending' : 'descending'} — click to reverse` : `Sort by ${label.toLowerCase()}`}
+                    title={
+                      on
+                        ? `${label}: ${asc ? 'ascending' : 'descending'} — click to reverse`
+                        : `Sort by ${label.toLowerCase()}`
+                    }
                     onClick={() =>
-                      setSort(on ? { key: k, dir: asc ? -1 : 1 } : { key: k, dir: k === 'name' || k === 'added' ? 1 : -1 })
+                      setSort(
+                        on
+                          ? { key: k, dir: asc ? -1 : 1 }
+                          : {
+                              key: k,
+                              dir: k === 'name' || k === 'added' ? 1 : -1,
+                            },
+                      )
                     }
                   >
                     <SvgIcon name={icon} size={13} />
                     {label}
-                    {on && <SvgIcon name={asc ? 'arrowUp' : 'arrowDown'} size={12} className="ctt-sort-dir" />}
+                    {on && (
+                      <SvgIcon
+                        name={asc ? 'arrowUp' : 'arrowDown'}
+                        size={12}
+                        className="ctt-sort-dir"
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -272,11 +309,13 @@ export default function ClipToTrack() {
         </section>
       </main>
 
-      {maxClip && <VideoModal
+      {maxClip && (
+        <VideoModal
           clip={maxClip}
           onClose={() => setMaxClipId(null)}
           onProgress={(f) => mapApi.current?.setPlayhead(maxClip.id, f)}
-        />}
+        />
+      )}
     </div>
   );
 }

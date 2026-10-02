@@ -9,7 +9,12 @@ const STORAGE_KEY = 'clip-to-track:clips:v1';
 const MAX_TRACK_POINTS = 2000;
 
 /** What we keep per clip. The MP4 itself can't live in localStorage, so videoUrl is session-only. */
-type Entry = { metadata: ClipMetadata; thumbnail?: string; videoUrl?: string; addedAt: number };
+type Entry = {
+  metadata: ClipMetadata;
+  thumbnail?: string;
+  videoUrl?: string;
+  addedAt: number;
+};
 type Stored = Pick<Entry, 'metadata' | 'thumbnail'> & { addedAt?: number };
 
 /** Cap the track length (all per-point fields are kept for the hover bubble). Summary stats are untouched. */
@@ -24,20 +29,23 @@ function load(): Entry[] {
   try {
     const arr: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
     if (!Array.isArray(arr)) return [];
-    return (arr as Stored[]).map((e) => ({ ...e, addedAt: e.addedAt ?? 0 })).filter((e) => {
-      try {
-        clipFromMetadata(e.metadata);
-        return true;
-      } catch {
-        return false; // drop corrupted entries instead of crashing the app
-      }
-    });
+    return (arr as Stored[])
+      .map((e) => ({ ...e, addedAt: e.addedAt ?? 0 }))
+      .filter((e) => {
+        try {
+          clipFromMetadata(e.metadata);
+          return true;
+        } catch {
+          return false; // drop corrupted entries instead of crashing the app
+        }
+      });
   } catch {
     return [];
   }
 }
 
-const message = (e: unknown) => (e instanceof Error ? e.message : 'unknown error');
+const message = (e: unknown) =>
+  e instanceof Error ? e.message : 'unknown error';
 
 export function useClips() {
   const [entries, setEntries] = useState<Entry[]>(load);
@@ -60,17 +68,29 @@ export function useClips() {
   // persist (JSON only — no video blobs)
   useEffect(() => {
     try {
-      const stored: Stored[] = entries.map(({ metadata, thumbnail, addedAt }) => ({ metadata, thumbnail, addedAt }));
+      const stored: Stored[] = entries.map(
+        ({ metadata, thumbnail, addedAt }) => ({
+          metadata,
+          thumbnail,
+          addedAt,
+        }),
+      );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     } catch {
-      setError('Browser storage is full — clips will be lost on reload. Remove some clips.');
+      // Persistence failure is discovered only while synchronizing entries to localStorage.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError(
+        'Browser storage is full — clips will be lost on reload. Remove some clips.',
+      );
     }
   }, [entries]);
 
   // revoke object URLs that are no longer referenced
   const urls = useRef(new Set<string>());
   useEffect(() => {
-    const live = new Set(entries.map((e) => e.videoUrl).filter((u): u is string => !!u));
+    const live = new Set(
+      entries.map((e) => e.videoUrl).filter((u): u is string => !!u),
+    );
     urls.current.forEach((u) => {
       if (!live.has(u)) {
         URL.revokeObjectURL(u);
@@ -79,62 +99,93 @@ export function useClips() {
     });
     live.forEach((u) => urls.current.add(u));
   }, [entries]);
-  useEffect(() => () => urls.current.forEach((u) => URL.revokeObjectURL(u)), []);
+  useEffect(
+    () => () => urls.current.forEach((u) => URL.revokeObjectURL(u)),
+    [],
+  );
 
   /** Accepts GoPro .mp4 files (telemetry is extracted) or metadata .json. Resolves to the first added clip id. */
-  const addFiles = useCallback(async (files: File[]): Promise<string | undefined> => {
-    setBusy(true);
-    const added: (Entry & { id: string })[] = [];
-    const errors: string[] = [];
+  const addFiles = useCallback(
+    async (files: File[]): Promise<string | undefined> => {
+      setBusy(true);
+      const added: (Entry & { id: string })[] = [];
+      const errors: string[] = [];
 
-    for (let n = 0; n < files.length; n++) {
-      const file = files[n];
-      const base = { name: file.name, n: n + 1, of: files.length };
-      setProgress({ ...base, phase: 'index', frac: null });
-      try {
-        if (/\.json$/i.test(file.name)) {
-          const metadata = compact(JSON.parse(await file.text()));
-          added.push({ metadata, id: clipFromMetadata(metadata).id, addedAt: Date.now() });
-        } else {
-          const metadata = compact(await extractGoProMetadata(file, (p) =>
-            setProgress({ ...base, phase: p.phase, frac: p.phase === 'telemetry' && p.total ? p.done / p.total : null }),
-          ));
-          const id = clipFromMetadata(metadata).id; // validates too
-          // .lrv has no MIME type; label it so <video> doesn't have to guess (wrapping a File in a Blob copies nothing)
-          const videoUrl = URL.createObjectURL(file.type ? file : new Blob([file], { type: 'video/mp4' }));
-          setProgress({ ...base, phase: 'thumbnail', frac: null });
-          const thumbnail = await captureThumbnail(videoUrl);
-          added.push({ metadata, thumbnail, videoUrl, id, addedAt: Date.now() });
+      for (let n = 0; n < files.length; n++) {
+        const file = files[n];
+        const base = { name: file.name, n: n + 1, of: files.length };
+        setProgress({ ...base, phase: 'index', frac: null });
+        try {
+          if (/\.json$/i.test(file.name)) {
+            const metadata = compact(JSON.parse(await file.text()));
+            added.push({
+              metadata,
+              id: clipFromMetadata(metadata).id,
+              addedAt: Date.now(),
+            });
+          } else {
+            const metadata = compact(
+              await extractGoProMetadata(file, (p) =>
+                setProgress({
+                  ...base,
+                  phase: p.phase,
+                  frac:
+                    p.phase === 'telemetry' && p.total
+                      ? p.done / p.total
+                      : null,
+                }),
+              ),
+            );
+            const id = clipFromMetadata(metadata).id; // validates too
+            // .lrv has no MIME type; label it so <video> doesn't have to guess (wrapping a File in a Blob copies nothing)
+            const videoUrl = URL.createObjectURL(
+              file.type ? file : new Blob([file], { type: 'video/mp4' }),
+            );
+            setProgress({ ...base, phase: 'thumbnail', frac: null });
+            const thumbnail = await captureThumbnail(videoUrl);
+            added.push({
+              metadata,
+              thumbnail,
+              videoUrl,
+              id,
+              addedAt: Date.now(),
+            });
+          }
+        } catch (e) {
+          errors.push(`${file.name}: ${message(e)}`);
         }
-      } catch (e) {
-        errors.push(`${file.name}: ${message(e)}`);
       }
-    }
 
-    setError(errors.length ? errors.join(' · ') : null);
-    if (added.length)
-      setEntries((prev) => {
-        // same id (file name + GPS start) replaces in place; keep an existing video/thumbnail if the new one has none
-        const byId = new Map(prev.map((e) => [clipFromMetadata(e.metadata).id, e]));
-        for (const { id, ...next } of added) {
-          const old = byId.get(id);
-          byId.set(id, {
-            metadata: next.metadata,
-            thumbnail: next.thumbnail ?? old?.thumbnail,
-            videoUrl: next.videoUrl ?? old?.videoUrl,
-            addedAt: next.addedAt,
-          });
-        }
-        return [...byId.values()];
-      });
-    setProgress(null);
-    setBusy(false);
-    return added[0]?.id;
-  }, []);
+      setError(errors.length ? errors.join(' · ') : null);
+      if (added.length)
+        setEntries((prev) => {
+          // same id (file name + GPS start) replaces in place; keep an existing video/thumbnail if the new one has none
+          const byId = new Map(
+            prev.map((e) => [clipFromMetadata(e.metadata).id, e]),
+          );
+          for (const { id, ...next } of added) {
+            const old = byId.get(id);
+            byId.set(id, {
+              metadata: next.metadata,
+              thumbnail: next.thumbnail ?? old?.thumbnail,
+              videoUrl: next.videoUrl ?? old?.videoUrl,
+              addedAt: next.addedAt,
+            });
+          }
+          return [...byId.values()];
+        });
+      setProgress(null);
+      setBusy(false);
+      return added[0]?.id;
+    },
+    [],
+  );
 
   /** Removes one clip from state and (via the persist effect) from localStorage; its object URL is revoked too. */
   const remove = useCallback((id: string) => {
-    setEntries((prev) => prev.filter((e) => clipFromMetadata(e.metadata).id !== id));
+    setEntries((prev) =>
+      prev.filter((e) => clipFromMetadata(e.metadata).id !== id),
+    );
     setError(null);
   }, []);
 

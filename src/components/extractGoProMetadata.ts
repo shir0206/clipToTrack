@@ -54,7 +54,8 @@ async function readTopLevelBox(file: Blob, type: string) {
       hdr = 16;
     } else if (size === 0) size = file.size - o;
     if (size < hdr) break;
-    if (fourcc(h, 4) === type) return file.slice(o + hdr, o + size).arrayBuffer();
+    if (fourcc(h, 4) === type)
+      return file.slice(o + hdr, o + size).arrayBuffer();
     o += size;
   }
   throw new Error('not a valid MP4 (no moov box)');
@@ -153,21 +154,42 @@ function parseTrack(dv: DataView, trak: Box): Track | undefined {
 // ───────────────────────── GPMF ─────────────────────────
 
 const SIZES: Record<string, number> = {
-  b: 1, B: 1, c: 1, s: 2, S: 2, l: 4, L: 4, f: 4, d: 8, j: 8, J: 8,
+  b: 1,
+  B: 1,
+  c: 1,
+  s: 2,
+  S: 2,
+  l: 4,
+  L: 4,
+  f: 4,
+  d: 8,
+  j: 8,
+  J: 8,
 };
 function readNum(dv: DataView, o: number, t: string): number {
   switch (t) {
-    case 'b': return dv.getInt8(o);
-    case 'B': return dv.getUint8(o);
-    case 's': return dv.getInt16(o);
-    case 'S': return dv.getUint16(o);
-    case 'l': return dv.getInt32(o);
-    case 'L': return dv.getUint32(o);
-    case 'f': return dv.getFloat32(o);
-    case 'd': return dv.getFloat64(o);
-    case 'j': return Number(dv.getBigInt64(o));
-    case 'J': return Number(dv.getBigUint64(o));
-    default: return NaN;
+    case 'b':
+      return dv.getInt8(o);
+    case 'B':
+      return dv.getUint8(o);
+    case 's':
+      return dv.getInt16(o);
+    case 'S':
+      return dv.getUint16(o);
+    case 'l':
+      return dv.getInt32(o);
+    case 'L':
+      return dv.getUint32(o);
+    case 'f':
+      return dv.getFloat32(o);
+    case 'd':
+      return dv.getFloat64(o);
+    case 'j':
+      return Number(dv.getBigInt64(o));
+    case 'J':
+      return Number(dv.getBigUint64(o));
+    default:
+      return NaN;
   }
 }
 const readStr = (dv: DataView, o: number, n: number) => {
@@ -179,7 +201,13 @@ const readStr = (dv: DataView, o: number, n: number) => {
   return s;
 };
 
-type Klv = { key: string; type: string; size: number; repeat: number; data: number };
+type Klv = {
+  key: string;
+  type: string;
+  size: number;
+  repeat: number;
+  data: number;
+};
 function* klvs(dv: DataView, start: number, end: number): Generator<Klv> {
   let o = start;
   while (o + 8 <= end) {
@@ -192,9 +220,14 @@ function* klvs(dv: DataView, start: number, end: number): Generator<Klv> {
 }
 
 type RawSample = {
-  lat: number; lon: number; alt: number;
-  speed2d: number; speed3d: number;
-  dop: number; fix: number; utcMs: number | undefined;
+  lat: number;
+  lon: number;
+  alt: number;
+  speed2d: number;
+  speed3d: number;
+  dop: number;
+  fix: number;
+  utcMs: number | undefined;
 };
 
 /** Reads numbers of a KLV as rows of `size/elemSize`-wide tuples (simple types only). */
@@ -212,14 +245,19 @@ function readSamples(dv: DataView, k: Klv, types: string): number[][] {
   return rows;
 }
 
-function parseGpmf(buf: ArrayBuffer, out: RawSample[], meta: { device?: string }) {
+function parseGpmf(
+  buf: ArrayBuffer,
+  out: RawSample[],
+  meta: { device?: string },
+) {
   const dv = new DataView(buf);
   const end = buf.byteLength;
   for (const devc of klvs(dv, 0, end)) {
     if (devc.key !== 'DEVC') continue;
     const devEnd = devc.data + devc.size * devc.repeat;
     for (const strm of klvs(dv, devc.data, devEnd)) {
-      if (strm.key === 'DVNM') meta.device ??= readStr(dv, strm.data, strm.size * strm.repeat);
+      if (strm.key === 'DVNM')
+        meta.device ??= readStr(dv, strm.data, strm.size * strm.repeat);
       if (strm.key !== 'STRM') continue;
 
       let scal: number[] = [1];
@@ -229,27 +267,61 @@ function parseGpmf(buf: ArrayBuffer, out: RawSample[], meta: { device?: string }
       let gpsp = NaN;
       let gps5: Klv | undefined;
       let gps9: Klv | undefined;
-      for (const k of klvs(dv, strm.data, strm.data + strm.size * strm.repeat)) {
+      for (const k of klvs(
+        dv,
+        strm.data,
+        strm.data + strm.size * strm.repeat,
+      )) {
         if (k.key === 'SCAL')
-          scal = readSamples(dv, { ...k, size: SIZES[k.type], repeat: k.size * k.repeat / SIZES[k.type] }, k.type).map((r) => r[0]);
-        else if (k.key === 'TYPE') types = readStr(dv, k.data, k.size * k.repeat);
+          scal = readSamples(
+            dv,
+            {
+              ...k,
+              size: SIZES[k.type],
+              repeat: (k.size * k.repeat) / SIZES[k.type],
+            },
+            k.type,
+          ).map((r) => r[0]);
+        else if (k.key === 'TYPE')
+          types = readStr(dv, k.data, k.size * k.repeat);
         else if (k.key === 'GPSU') {
-          const m = readStr(dv, k.data, 16).match(/^(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\.(\d+)/);
-          if (m) gpsu = Date.UTC(2000 + +m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6], Math.round(+`0.${m[7]}` * 1000));
+          const m = readStr(dv, k.data, 16).match(
+            /^(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)\.(\d+)/,
+          );
+          if (m)
+            gpsu = Date.UTC(
+              2000 + +m[1],
+              +m[2] - 1,
+              +m[3],
+              +m[4],
+              +m[5],
+              +m[6],
+              Math.round(+`0.${m[7]}` * 1000),
+            );
         } else if (k.key === 'GPSF') gpsf = readNum(dv, k.data, 'L');
         else if (k.key === 'GPSP') gpsp = readNum(dv, k.data, 'S') / 100;
         else if (k.key === 'GPS5') gps5 = k;
         else if (k.key === 'GPS9') gps9 = k;
       }
-      const sc = (row: number[]) => row.map((v, i) => v / (scal[i % scal.length] || 1));
+      const sc = (row: number[]) =>
+        row.map((v, i) => v / (scal[i % scal.length] || 1));
 
       if (gps9) {
         const rows = readSamples(dv, gps9, types || 'lllllllSS');
         for (const r of rows) {
           const [lat, lon, alt, s2, s3, days, secs, dop, fix] = sc(r);
           out.push({
-            lat, lon, alt, speed2d: s2, speed3d: s3, dop, fix: Math.round(fix * (scal[8] || 1)) / (scal[8] || 1),
-            utcMs: Date.UTC(2000, 0, 1) + Math.round(days) * 86_400_000 + Math.round(secs * 1000),
+            lat,
+            lon,
+            alt,
+            speed2d: s2,
+            speed3d: s3,
+            dop,
+            fix: Math.round(fix * (scal[8] || 1)) / (scal[8] || 1),
+            utcMs:
+              Date.UTC(2000, 0, 1) +
+              Math.round(days) * 86_400_000 +
+              Math.round(secs * 1000),
           });
         }
       } else if (gps5) {
@@ -257,8 +329,17 @@ function parseGpmf(buf: ArrayBuffer, out: RawSample[], meta: { device?: string }
         rows.forEach((r, i) => {
           const [lat, lon, alt, s2, s3] = sc(r);
           out.push({
-            lat, lon, alt, speed2d: s2, speed3d: s3, dop: gpsp, fix: gpsf,
-            utcMs: gpsu === undefined ? undefined : gpsu + Math.round((i * 1000) / rows.length),
+            lat,
+            lon,
+            alt,
+            speed2d: s2,
+            speed3d: s3,
+            dop: gpsp,
+            fix: gpsf,
+            utcMs:
+              gpsu === undefined
+                ? undefined
+                : gpsu + Math.round((i * 1000) / rows.length),
           });
         });
       }
@@ -273,7 +354,9 @@ const rad = (d: number) => (d * Math.PI) / 180;
 const haversine = (a: RawSample, b: RawSample) => {
   const dLat = rad(b.lat - a.lat);
   const dLon = rad(b.lon - a.lon);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 };
 const round = (n: number, dp: number) => Math.round(n * 10 ** dp) / 10 ** dp;
@@ -282,11 +365,27 @@ const iso = (ms: number, withMs = true) => {
   return withMs ? s : s.replace(/\.\d{3}Z$/, 'Z');
 };
 const label = (w: number) =>
-  w >= 7600 ? '8K' : w >= 5000 ? '5.3K' : w >= 3700 ? '4K' : w >= 2600 ? '2.7K' : w >= 1900 ? '1080p' : w >= 1200 ? '720p' : '';
+  w >= 7600
+    ? '8K'
+    : w >= 5000
+      ? '5.3K'
+      : w >= 3700
+        ? '4K'
+        : w >= 2600
+          ? '2.7K'
+          : w >= 1900
+            ? '1080p'
+            : w >= 1200
+              ? '720p'
+              : '';
 
 // ───────────────────────── telemetry reading ─────────────────────────
 
-export type ExtractProgress = { phase: 'index' | 'telemetry'; done: number; total: number };
+export type ExtractProgress = {
+  phase: 'index' | 'telemetry';
+  done: number;
+  total: number;
+};
 
 // GoPro interleaves one small gpmd chunk with ~1 s of video, so the chunks are far apart.
 // Merging them into "a few huge slices" would read the whole video, so instead we
@@ -300,12 +399,18 @@ type Item = { offset: number; size: number; idx: number };
 type Slice = { start: number; end: number; items: Item[] };
 
 function planSlices(samples: { offset: number; size: number }[]): Slice[] {
-  const sorted: Item[] = samples.map((s, idx) => ({ ...s, idx })).sort((a, b) => a.offset - b.offset);
+  const sorted: Item[] = samples
+    .map((s, idx) => ({ ...s, idx }))
+    .sort((a, b) => a.offset - b.offset);
   const out: Slice[] = [];
   for (const it of sorted) {
     const last = out[out.length - 1];
     const end = it.offset + it.size;
-    if (last && it.offset - last.end <= MAX_GAP && end - last.start <= MAX_RANGE) {
+    if (
+      last &&
+      it.offset - last.end <= MAX_GAP &&
+      end - last.start <= MAX_RANGE
+    ) {
       last.items.push(it);
       last.end = Math.max(last.end, end);
     } else out.push({ start: it.offset, end, items: [it] });
@@ -338,7 +443,11 @@ async function readTelemetry(
   await pool(slices, POOL, async (sl) => {
     const buf = await file.slice(sl.start, sl.end).arrayBuffer();
     for (const it of sl.items)
-      parseGpmf(buf.slice(it.offset - sl.start, it.offset - sl.start + it.size), perSample[it.idx], meta);
+      parseGpmf(
+        buf.slice(it.offset - sl.start, it.offset - sl.start + it.size),
+        perSample[it.idx],
+        meta,
+      );
     done += sl.items.length;
     const now = performance.now();
     if (done === total || now - lastTick > 100) {
@@ -351,7 +460,10 @@ async function readTelemetry(
 
 // ───────────────────────── public API ─────────────────────────
 
-export async function extractGoProMetadata(file: File, onProgress?: (p: ExtractProgress) => void): Promise<ClipMetadata> {
+export async function extractGoProMetadata(
+  file: File,
+  onProgress?: (p: ExtractProgress) => void,
+): Promise<ClipMetadata> {
   onProgress?.({ phase: 'index', done: 0, total: 1 });
   const moov = await readTopLevelBox(file, 'moov');
   const dv = new DataView(moov);
@@ -365,7 +477,10 @@ export async function extractGoProMetadata(file: File, onProgress?: (p: ExtractP
 
   const video = tracks.find((t) => t.handler === 'vide');
   const gpmd = tracks.find((t) => t.format === 'gpmd');
-  if (!gpmd) throw new Error('no GoPro telemetry track (gpmd) — is this an original GoPro file?');
+  if (!gpmd)
+    throw new Error(
+      'no GoPro telemetry track (gpmd) — is this an original GoPro file?',
+    );
 
   // mvhd → creation time + fallback duration
   const mvhd = child(dv, root, 'mvhd');
@@ -388,12 +503,19 @@ export async function extractGoProMetadata(file: File, onProgress?: (p: ExtractP
 
   const valid = raw.filter(
     (s) =>
-      Number.isFinite(s.lat) && Number.isFinite(s.lon) &&
-      Math.abs(s.lat) <= 90 && Math.abs(s.lon) <= 180 &&
-      !(s.lat === 0 && s.lon === 0) && s.fix >= 2,
+      Number.isFinite(s.lat) &&
+      Number.isFinite(s.lon) &&
+      Math.abs(s.lat) <= 90 &&
+      Math.abs(s.lon) <= 180 &&
+      !(s.lat === 0 && s.lon === 0) &&
+      s.fix >= 2,
   );
   if (valid.length < 2)
-    throw new Error(raw.length ? 'no GPS lock in this clip (recorded without a 2D/3D fix)' : 'telemetry track has no GPS data (was GPS enabled?)');
+    throw new Error(
+      raw.length
+        ? 'no GPS lock in this clip (recorded without a 2D/3D fix)'
+        : 'telemetry track has no GPS data (was GPS enabled?)',
+    );
 
   let cum = 0;
   const track: GpsPoint[] = valid.map((s, i) => {
@@ -423,33 +545,61 @@ export async function extractGoProMetadata(file: File, onProgress?: (p: ExtractP
   const last = valid[valid.length - 1];
 
   const device = gp.device?.trim();
-  const camera = device ? (/^gopro/i.test(device) ? device : `GoPro ${device}`) : 'GoPro';
+  const camera = device
+    ? /^gopro/i.test(device)
+      ? device
+      : `GoPro ${device}`
+    : 'GoPro';
   const w = video?.width ?? 0;
   const h = video?.height ?? 0;
-  const codec = video?.format === 'hvc1' || video?.format === 'hev1' ? 'HEVC (H.265)' : video?.format === 'avc1' ? 'H.264' : video?.format;
-  const fps = video?.frameDelta ? round(video.timescale / video.frameDelta, 2) : undefined;
+  const codec =
+    video?.format === 'hvc1' || video?.format === 'hev1'
+      ? 'HEVC (H.265)'
+      : video?.format === 'avc1'
+        ? 'H.264'
+        : video?.format;
+  const fps = video?.frameDelta
+    ? round(video.timescale / video.frameDelta, 2)
+    : undefined;
 
   return {
     schemaVersion: 1,
-    source: { fileName: file.name, fileSizeMB: round(file.size / 1_048_576, 1) },
+    source: {
+      fileName: file.name,
+      fileSizeMB: round(file.size / 1_048_576, 1),
+    },
     file: {
       camera,
       ...(createdMs !== undefined && { createdUtc: iso(createdMs, false) }),
       ...(durationSec !== undefined && { durationSec: round(durationSec, 2) }),
       ...(fps !== undefined && { frameRate: fps }),
       ...(video && { frames: video.sampleCount, videoCodec: codec }),
-      ...(w && h && { resolution: `${w} x ${h}${label(w) ? ` (${label(w)})` : ''}` }),
+      ...(w &&
+        h && { resolution: `${w} x ${h}${label(w) ? ` (${label(w)})` : ''}` }),
     },
     gps: {
       samples: valid.length,
       fixType: Math.min(...valid.map((s) => s.fix)),
       ...(dops.length && { dopMean: round(mean(dops), 2) }),
-      ...(first.utcMs !== undefined && { startUtc: iso(first.utcMs), endUtc: iso(last.utcMs ?? first.utcMs) }),
+      ...(first.utcMs !== undefined && {
+        startUtc: iso(first.utcMs),
+        endUtc: iso(last.utcMs ?? first.utcMs),
+      }),
       start: { lat: track[0].lat, lon: track[0].lon },
-      end: { lat: track[track.length - 1].lat, lon: track[track.length - 1].lon },
+      end: {
+        lat: track[track.length - 1].lat,
+        lon: track[track.length - 1].lon,
+      },
       totalDistanceM: round(cum, 4),
-      altitudeM: { min: round(Math.min(...alts), 3), max: round(Math.max(...alts), 3), mean: round(mean(alts), 3) },
-      speed3dKmh: { max: round(Math.max(...spd), 3), mean: round(mean(spd), 3) },
+      altitudeM: {
+        min: round(Math.min(...alts), 3),
+        max: round(Math.max(...alts), 3),
+        mean: round(mean(alts), 3),
+      },
+      speed3dKmh: {
+        max: round(Math.max(...spd), 3),
+        mean: round(mean(spd), 3),
+      },
       track,
     },
   };

@@ -124,7 +124,11 @@ export default function ClipCard({
     >
       <div
         className="ctt-thumb"
-        style={clip.thumbnail ? { backgroundImage: `url(${clip.thumbnail})` } : undefined}
+        style={
+          clip.thumbnail
+            ? { backgroundImage: `url(${clip.thumbnail})` }
+            : undefined
+        }
       >
         {clip.videoUrl && !videoError && (
           <video
@@ -146,7 +150,10 @@ export default function ClipCard({
           />
         )}
         {!clip.videoUrl && (
-          <span className="ctt-thumb-hint" title="The video file isn't kept after a reload — add it again to play">
+          <span
+            className="ctt-thumb-hint"
+            title="The video file isn't kept after a reload — add it again to play"
+          >
             Re-add video to play
           </span>
         )}
@@ -179,7 +186,10 @@ export default function ClipCard({
             className="ctt-btn"
             aria-label={`Stop ${clip.title}`}
             disabled={!canPlay}
-            onClick={stop(handleStop)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleStop();
+            }}
           >
             <SvgIcon name="stop" size={13} />
           </button>
@@ -213,10 +223,26 @@ export default function ClipCard({
           {playing && <span className="ctt-playing">Playing</span>}
         </div>
         {confirming && (
-          <div className="ctt-confirm" role="alertdialog" aria-label={`Delete ${clip.title}?`} onClick={(e) => e.stopPropagation()}>
+          <div
+            className="ctt-confirm"
+            role="alertdialog"
+            aria-label={`Delete ${clip.title}?`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <span>Remove from map and saved data?</span>
-            <button className="ctt-confirm-yes" autoFocus onClick={stop(onDelete)}>Delete</button>
-            <button className="ctt-confirm-no" onClick={stop(() => setConfirming(false))}>Cancel</button>
+            <button
+              className="ctt-confirm-yes"
+              autoFocus
+              onClick={stop(onDelete)}
+            >
+              Delete
+            </button>
+            <button
+              className="ctt-confirm-no"
+              onClick={stop(() => setConfirming(false))}
+            >
+              Cancel
+            </button>
           </div>
         )}
         {videoError && (

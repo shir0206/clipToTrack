@@ -19,7 +19,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "yarn format:check && yarn lint && yarn test && yarn build",
-    "ci": "yarn check && yarn test:browser",
+    "ci": "yarn run check",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

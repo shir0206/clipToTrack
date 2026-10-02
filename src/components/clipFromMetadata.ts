@@ -41,7 +41,12 @@ export type ClipMetadata = {
     totalDistanceM?: number;
     straightLineDistanceM?: number;
     initialBearingDeg?: number;
-    altitudeM?: { min: number; max: number; mean?: number; changeStartToEnd?: number };
+    altitudeM?: {
+      min: number;
+      max: number;
+      mean?: number;
+      changeStartToEnd?: number;
+    };
     speed3dKmh?: { max: number; mean?: number };
     track: GpsPoint[];
   };
@@ -94,36 +99,97 @@ function buildDetails(m: ClipMetadata): DetailGroup[] {
   const { file: f, gps: g, source: s, exposure: e, motion: mo, audio: a } = m;
   const delta = g.altitudeM?.changeStartToEnd;
   const raw: [string, [string, string | undefined][]][] = [
-    ['GPS', [
-      ['Avg speed', isNum(g.speed3dKmh?.mean) ? fmtSpeed(g.speed3dKmh!.mean) : undefined],
-      ['Straight line', isNum(g.straightLineDistanceM) ? fmtDistance(g.straightLineDistanceM) : undefined],
-      ['Heading', isNum(g.initialBearingDeg) ? `${Math.round(g.initialBearingDeg)}° ${COMPASS[Math.round(g.initialBearingDeg / 45) % 8]}` : undefined],
-      ['Altitude change', isNum(delta) ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)} m` : undefined],
-    ]],
-    ['Video', [
-      ['Codec', f?.videoCodec],
-      ['Bitrate', isNum(f?.videoBitrateMbps) ? `${f!.videoBitrateMbps} Mbps` : undefined],
-      ['Frames', isNum(f?.frames) ? String(f!.frames) : undefined],
-      ['File size', isNum(s?.fileSizeMB) ? `${s!.fileSizeMB} MB` : undefined],
-      ['Audio', f?.audio],
-      ['Firmware', f?.firmware],
-    ]],
-    ['Exposure', [
-      ['ISO', rng(e?.iso?.min, e?.iso?.max)],
-      ['Shutter', rng(e?.shutterOneOverX?.slowest, e?.shutterOneOverX?.fastest, (n) => `1/${Math.round(n)}`)],
-      ['White balance', e?.whiteBalanceK ? `${e.whiteBalanceK} K` : undefined],
-      ['Dropped frames', isNum(e?.droppedFrames) ? String(e!.droppedFrames) : undefined],
-    ]],
-    ['Motion & audio', [
-      ['Peak accel', isNum(mo?.accelMagnitudeMs2?.max) ? `${mo!.accelMagnitudeMs2!.max.toFixed(1)} m/s²` : undefined],
-      ['Peak gyro', isNum(mo?.gyroMagnitudeMaxRadS) ? `${mo!.gyroMagnitudeMaxRadS} rad/s` : undefined],
-      ['Camera tilt', mo?.gravityNote],
-      ['Wind', a?.windProcessing],
-      ['Wet mic', a?.wetMicrophone],
-    ]],
+    [
+      'GPS',
+      [
+        [
+          'Avg speed',
+          isNum(g.speed3dKmh?.mean) ? fmtSpeed(g.speed3dKmh!.mean) : undefined,
+        ],
+        [
+          'Straight line',
+          isNum(g.straightLineDistanceM)
+            ? fmtDistance(g.straightLineDistanceM)
+            : undefined,
+        ],
+        [
+          'Heading',
+          isNum(g.initialBearingDeg)
+            ? `${Math.round(g.initialBearingDeg)}° ${COMPASS[Math.round(g.initialBearingDeg / 45) % 8]}`
+            : undefined,
+        ],
+        [
+          'Altitude change',
+          isNum(delta)
+            ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)} m`
+            : undefined,
+        ],
+      ],
+    ],
+    [
+      'Video',
+      [
+        ['Codec', f?.videoCodec],
+        [
+          'Bitrate',
+          isNum(f?.videoBitrateMbps)
+            ? `${f!.videoBitrateMbps} Mbps`
+            : undefined,
+        ],
+        ['Frames', isNum(f?.frames) ? String(f!.frames) : undefined],
+        ['File size', isNum(s?.fileSizeMB) ? `${s!.fileSizeMB} MB` : undefined],
+        ['Audio', f?.audio],
+        ['Firmware', f?.firmware],
+      ],
+    ],
+    [
+      'Exposure',
+      [
+        ['ISO', rng(e?.iso?.min, e?.iso?.max)],
+        [
+          'Shutter',
+          rng(
+            e?.shutterOneOverX?.slowest,
+            e?.shutterOneOverX?.fastest,
+            (n) => `1/${Math.round(n)}`,
+          ),
+        ],
+        [
+          'White balance',
+          e?.whiteBalanceK ? `${e.whiteBalanceK} K` : undefined,
+        ],
+        [
+          'Dropped frames',
+          isNum(e?.droppedFrames) ? String(e!.droppedFrames) : undefined,
+        ],
+      ],
+    ],
+    [
+      'Motion & audio',
+      [
+        [
+          'Peak accel',
+          isNum(mo?.accelMagnitudeMs2?.max)
+            ? `${mo!.accelMagnitudeMs2!.max.toFixed(1)} m/s²`
+            : undefined,
+        ],
+        [
+          'Peak gyro',
+          isNum(mo?.gyroMagnitudeMaxRadS)
+            ? `${mo!.gyroMagnitudeMaxRadS} rad/s`
+            : undefined,
+        ],
+        ['Camera tilt', mo?.gravityNote],
+        ['Wind', a?.windProcessing],
+        ['Wet mic', a?.wetMicrophone],
+      ],
+    ],
   ];
   return raw
-    .map(([title, rows]) => ({ title, rows: rows.filter((r): r is [string, string] => !!r[1]) }))
+    .map(([title, rows]) => ({
+      title,
+      rows: rows.filter((r): r is [string, string] => !!r[1]),
+    }))
     .filter((grp) => grp.rows.length);
 }
 

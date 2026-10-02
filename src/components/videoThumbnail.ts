@@ -10,7 +10,6 @@ export function captureThumbnail(
     v.preload = 'auto';
     v.playsInline = true;
 
-    let timer: ReturnType<typeof setTimeout>;
     const done = (result?: string) => {
       clearTimeout(timer);
       v.onerror = v.onloadeddata = v.onseeked = null;
@@ -18,7 +17,7 @@ export function captureThumbnail(
       v.load(); // release the decoder
       resolve(result);
     };
-    timer = setTimeout(() => done(), timeoutMs);
+    const timer = setTimeout(() => done(), timeoutMs);
 
     v.onerror = () => done();
     v.onloadeddata = () => {

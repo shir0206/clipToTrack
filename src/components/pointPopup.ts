@@ -17,7 +17,15 @@ const num = (n: unknown, dp: number, grouping = true) =>
     : DASH;
 
 const fixLabel = (f?: number) =>
-  f === 3 ? '3D fix' : f === 2 ? '2D fix' : f === 0 ? 'No fix' : typeof f === 'number' ? `Fix ${f}` : DASH;
+  f === 3
+    ? '3D fix'
+    : f === 2
+      ? '2D fix'
+      : f === 0
+        ? 'No fix'
+        : typeof f === 'number'
+          ? `Fix ${f}`
+          : DASH;
 
 /** HTML for the hover bubble of clip.samples[i]. Only numbers and escaped strings go in. */
 export function pointPopupHtml(clip: Clip, i: number): string {
@@ -28,9 +36,15 @@ export function pointPopupHtml(clip: Clip, i: number): string {
   // GPS days since 2000 / secs of day are derived from the UTC time (they're the raw form of it)
   const ms = p.utc ? Date.parse(p.utc) : NaN;
   const since = ms - GPS_EPOCH;
-  const days = Number.isFinite(since) ? String(Math.floor(since / DAY_MS)) : DASH;
-  const secs = Number.isFinite(since) ? num((since % DAY_MS) / 1000, 3, false) : DASH;
-  const utc = p.utc ? esc(p.utc.replace('T', ' ').replace('Z', '')) + ' UTC' : DASH;
+  const days = Number.isFinite(since)
+    ? String(Math.floor(since / DAY_MS))
+    : DASH;
+  const secs = Number.isFinite(since)
+    ? num((since % DAY_MS) / 1000, 3, false)
+    : DASH;
+  const utc = p.utc
+    ? esc(p.utc.replace('T', ' ').replace('Z', '')) + ' UTC'
+    : DASH;
 
   const cells: [string, string][] = [
     ['Latitude (deg)', num(p.lat, 7)],
