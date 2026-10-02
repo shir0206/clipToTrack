@@ -3,7 +3,7 @@ import type { ReactNode, SVGProps } from 'react';
 export type IconName =
   | 'play' | 'pause' | 'stop' | 'maximize' | 'close' | 'upload' | 'trash'
   | 'clock' | 'route' | 'gauge' | 'mountain' | 'camera' | 'gps' | 'info' | 'chevron'
-  | 'arrowUp' | 'arrowDown' | 'eye' | 'eyeOff' | 'layers' | 'ruler' | 'download' | 'search' | 'fit' | 'chart' | 'sliders';
+  | 'arrowUp' | 'arrowDown' | 'eye' | 'eyeOff' | 'layers' | 'ruler' | 'download' | 'search' | 'fit' | 'chart' | 'sliders' | 'calendar' | 'type';
 
 const solid = { fill: 'currentColor', stroke: 'none' } as const;
 
@@ -75,6 +75,8 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   fit: <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />,
   chart: <path d="M3 3v18h18M7 14l4-4 4 4 5-6" />,
+  calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
+  type: <path d="M4 7V4h16v3M9 20h6M12 4v16" />,
   sliders: <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />,
 };
 

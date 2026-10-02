@@ -22,7 +22,7 @@ export type MapOpts = {
   profile: boolean;
 };
 export const DEFAULT_OPTS: MapOpts = {
-  base: 'satellite',
+  base: 'streets',
   color: 'route',
   points: 'auto',
   ends: true,
@@ -32,7 +32,7 @@ export const DEFAULT_OPTS: MapOpts = {
   follow: false,
   profile: false,
 };
-const KEY = 'clip-to-track:map-opts:v2'; // bumped so the new satellite default isn't hidden by an old saved choice
+const KEY = 'clip-to-track:map-opts:v3'; // bumped so a previously saved 'satellite' doesn't override the default
 export const loadOpts = (): MapOpts => {
   try {
     return { ...DEFAULT_OPTS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };

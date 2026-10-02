@@ -542,13 +542,6 @@
 .ctt-modal-video { display: block; width: 100%; max-height: calc(94vh - 56px); background: #000; outline: none; }
 
 /* ───────── v3: sorting, hidden clips, pinned popup, map tools ───────── */
-.ctt-sort { display: flex; align-items: center; gap: 8px; }
-.ctt-sort label { display: flex; flex: 1; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-.ctt-sort select {
-  flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px;
-  border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text);
-}
-.ctt-sort .ctt-btn { width: 30px; height: 30px; }
 .ctt-card.is-hidden .ctt-badge { opacity: 0.45; }
 .ctt-card.is-hidden::before { opacity: 0.35; }
 
@@ -682,5 +675,20 @@
   padding: 1px 6px; overflow: hidden; border-radius: 6px; text-overflow: ellipsis; white-space: nowrap;
   background: rgb(0 0 0 / 0.65); color: #fff; font-size: 11px;
 }
-.ctt-sort select:disabled { opacity: 0.5; cursor: not-allowed; }
-.ctt-sort .ctt-btn:disabled { opacity: 0.4; }
+
+/* ───────── v7: sort chips ───────── */
+.ctt-sort { display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); }
+.ctt-sort-label { flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.ctt-sort-chips { display: flex; gap: 4px; min-width: 0; overflow-x: auto; padding: 2px; scrollbar-width: none; }
+.ctt-sort-chips::-webkit-scrollbar { display: none; }
+.ctt-sort-chip {
+  display: inline-flex; flex: none; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
+  border: 0; border-radius: 9px; background: transparent; color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.ctt-sort-chip:hover:not(:disabled):not(.is-on) { background: var(--bg); color: var(--text); }
+.ctt-sort-chip.is-on { background: #2878ff; color: #fff; font-weight: 600; box-shadow: 0 2px 8px rgb(40 120 255 / 0.35); }
+.ctt-sort-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+.ctt-sort-chip:focus-visible { outline: 2px solid #2878ff; outline-offset: 1px; }
+.ctt-sort-dir { margin-left: 1px; }

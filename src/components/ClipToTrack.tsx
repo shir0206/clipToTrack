@@ -4,25 +4,24 @@ import ClipCard from './ClipCard';
 import TrackMap, { type MapApi } from './TrackMap';
 import UploadZone from './UploadZone';
 import VideoModal from './VideoModal';
-import SvgIcon from './SvgIcon';
+import SvgIcon, { type IconName } from './SvgIcon';
 import { useClips } from './useClips';
 import './ClipToTrack.css';
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
 const SORT_KEY = 'clip-to-track:sort';
 
-type SortKey = 'added' | 'name' | 'date' | 'duration' | 'distance' | 'speed' | 'altitude';
-const SORTS: [SortKey, string][] = [
-  ['added', 'Upload time'],
-  ['name', 'Name'],
-  ['date', 'Date'],
-  ['duration', 'Duration'],
-  ['distance', 'Distance'],
-  ['speed', 'Max speed'],
-  ['altitude', 'Altitude range'],
+type SortKey = 'added' | 'name' | 'date' | 'duration' | 'distance' | 'speed';
+const SORTS: [SortKey, string, IconName][] = [
+  ['added', 'Uploaded', 'upload'],
+  ['name', 'Name', 'type'],
+  ['date', 'Date', 'calendar'],
+  ['duration', 'Duration', 'clock'],
+  ['distance', 'Distance', 'route'],
+  ['speed', 'Max speed', 'gauge'],
 ];
 const value = (c: Clip, k: SortKey): number | string | undefined =>
-  k === 'added' ? c.addedAt : k === 'name' ? c.title : k === 'altitude' ? c.sort.altitude : c.sort[k];
+  k === 'added' ? c.addedAt : k === 'name' ? c.title : c.sort[k];
 const loadSort = (): { key: SortKey; dir: 1 | -1 } => {
   try {
     const s = JSON.parse(localStorage.getItem(SORT_KEY) ?? '');
@@ -179,31 +178,30 @@ export default function ClipToTrack() {
               {clips.length}
             </span>
           </div>
-          <div className="ctt-sort">
-              <label>
-                Sort by
-                <select
-                  disabled={clips.length < 2}
-                  value={sort.key}
-                  onChange={(e) => {
-                    const key = e.target.value as SortKey;
-                    setSort({ key, dir: key === 'name' || key === 'added' ? 1 : -1 }); // sensible default direction
-                  }}
-                >
-                  {SORTS.map(([k, label]) => (
-                    <option key={k} value={k}>{label}</option>
-                  ))}
-                </select>
-              </label>
-              <button
-                className="ctt-btn"
-                disabled={clips.length < 2}
-                aria-label={sort.dir === 1 ? 'Ascending' : 'Descending'}
-                title={sort.dir === 1 ? 'Ascending' : 'Descending'}
-                onClick={() => setSort((s) => ({ ...s, dir: s.dir === 1 ? -1 : 1 }))}
-              >
-                <SvgIcon name={sort.dir === 1 ? 'arrowUp' : 'arrowDown'} size={14} />
-              </button>
+          <div className="ctt-sort" role="group" aria-label="Sort clips">
+            <span className="ctt-sort-label">Sort</span>
+            <div className="ctt-sort-chips">
+              {SORTS.map(([k, label, icon]) => {
+                const on = sort.key === k;
+                const asc = sort.dir === 1;
+                return (
+                  <button
+                    key={k}
+                    className={`ctt-sort-chip${on ? ' is-on' : ''}`}
+                    disabled={clips.length < 2}
+                    aria-pressed={on}
+                    title={on ? `${label}: ${asc ? 'ascending' : 'descending'} — click to reverse` : `Sort by ${label.toLowerCase()}`}
+                    onClick={() =>
+                      setSort(on ? { key: k, dir: asc ? -1 : 1 } : { key: k, dir: k === 'name' || k === 'added' ? 1 : -1 })
+                    }
+                  >
+                    <SvgIcon name={icon} size={13} />
+                    {label}
+                    {on && <SvgIcon name={asc ? 'arrowUp' : 'arrowDown'} size={12} className="ctt-sort-dir" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <ul className="ctt-list" role="listbox" aria-label="Clips">
             {sorted.map((clip) => (

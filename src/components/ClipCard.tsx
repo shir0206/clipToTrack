@@ -150,7 +150,7 @@ export default function ClipCard({
             Re-add video to play
           </span>
         )}
-        <span className="ctt-duration">{clip.duration}</span>
+        {clip.videoUrl && <span className="ctt-duration">{clip.duration}</span>}
       </div>
 
       <div className="ctt-card-body">
