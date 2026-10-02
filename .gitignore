@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.pnp.*
+.yarn/cache/
+.yarn/install-state.gz
+playwright-report/
+test-results/
+.DS_Store
+asset/
