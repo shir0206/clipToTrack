@@ -4,6 +4,10 @@ import type { Clip } from './types';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+
+// Let Vite fingerprint and serve MapLibre's worker as a real JS asset.
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 type Props = {
   clips: Clip[];
@@ -37,16 +41,18 @@ const STYLE: maplibregl.StyleSpecification = {
 
 const toTracks = (clips: Clip[]): FeatureCollection => ({
   type: 'FeatureCollection',
-  features: clips.filter((c) => c.coordinates.length > 1).map((c) => ({
-    type: 'Feature',
-    properties: {
-      clipId: c.id,
-      index: c.index,
-      title: c.title,
-      color: c.color,
-    },
-    geometry: { type: 'LineString', coordinates: c.coordinates },
-  })),
+  features: clips
+    .filter((c) => c.coordinates.length > 1)
+    .map((c) => ({
+      type: 'Feature',
+      properties: {
+        clipId: c.id,
+        index: c.index,
+        title: c.title,
+        color: c.color,
+      },
+      geometry: { type: 'LineString', coordinates: c.coordinates },
+    })),
 });
 
 // one Point feature per GPS sample (the vertices of the path)
@@ -55,7 +61,12 @@ const toPoints = (clips: Clip[]): FeatureCollection => ({
   features: clips.flatMap((c) =>
     c.coordinates.map((coord, i) => ({
       type: 'Feature' as const,
-      properties: { clipId: c.id, color: c.color, i, last: i === c.coordinates.length - 1 },
+      properties: {
+        clipId: c.id,
+        color: c.color,
+        i,
+        last: i === c.coordinates.length - 1,
+      },
       geometry: { type: 'Point' as const, coordinates: coord },
     })),
   ),
@@ -63,16 +74,18 @@ const toPoints = (clips: Clip[]): FeatureCollection => ({
 
 const toEnds = (clips: Clip[]): FeatureCollection => ({
   type: 'FeatureCollection',
-  features: clips.filter((c) => c.coordinates.length > 1).flatMap((c) =>
-    [
-      { kind: 'start', coord: c.coordinates[0] },
-      { kind: 'end', coord: c.coordinates[c.coordinates.length - 1] },
-    ].map((p) => ({
-      type: 'Feature' as const,
-      properties: { color: c.color, kind: p.kind },
-      geometry: { type: 'Point' as const, coordinates: p.coord },
-    })),
-  ),
+  features: clips
+    .filter((c) => c.coordinates.length > 1)
+    .flatMap((c) =>
+      [
+        { kind: 'start', coord: c.coordinates[0] },
+        { kind: 'end', coord: c.coordinates[c.coordinates.length - 1] },
+      ].map((p) => ({
+        type: 'Feature' as const,
+        properties: { color: c.color, kind: p.kind },
+        geometry: { type: 'Point' as const, coordinates: p.coord },
+      })),
+    ),
 });
 
 const boundsOf = (coords: [number, number][]) =>
@@ -145,7 +158,12 @@ export default function TrackMap({
         paint: {
           'line-color': '#fff',
           'line-opacity': 0.9,
-          'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 10, 8],
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            10,
+            8,
+          ],
         },
       });
       m.addLayer({
@@ -155,7 +173,12 @@ export default function TrackMap({
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 6, 4],
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'selected'], false],
+            6,
+            4,
+          ],
         },
       });
 
@@ -163,10 +186,23 @@ export default function TrackMap({
       // merge and bury the line. Show every 5th sample (+ the last) from zoom 14, and
       // every sample only when zoomed in close (zoom 20+).
       const thinned: maplibregl.FilterSpecification = [
-        'any', ['==', ['%', ['get', 'i'], 5], 0], ['==', ['get', 'last'], true],
+        'any',
+        ['==', ['%', ['get', 'i'], 5], 0],
+        ['==', ['get', 'last'], true],
       ];
-      const dot = (r: number, stroke: number): maplibregl.CircleLayerSpecification['paint'] => ({
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, r * 0.6, 19, r] as maplibregl.ExpressionSpecification,
+      const dot = (
+        r: number,
+        stroke: number,
+      ): maplibregl.CircleLayerSpecification['paint'] => ({
+        'circle-radius': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          14,
+          r * 0.6,
+          19,
+          r,
+        ] as maplibregl.ExpressionSpecification,
         'circle-color': '#fff',
         'circle-stroke-color': ['get', 'color'],
         'circle-stroke-width': stroke,
@@ -202,7 +238,12 @@ export default function TrackMap({
         paint: {
           'circle-radius': 6,
           // start = hollow (white), end = filled with the route colour
-          'circle-color': ['case', ['==', ['get', 'kind'], 'end'], ['get', 'color'], '#fff'],
+          'circle-color': [
+            'case',
+            ['==', ['get', 'kind'], 'end'],
+            ['get', 'color'],
+            '#fff',
+          ],
           'circle-stroke-color': ['get', 'color'],
           'circle-stroke-width': 3,
         },
