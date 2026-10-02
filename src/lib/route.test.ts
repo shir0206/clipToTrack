@@ -1,9 +1,13 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { GpsPoint } from './gpmf/types';
 import { parseMp4 } from './mp4/parser';
 import { buildRouteAnalysis } from './route';
+
+const fixtureDir = process.env.CLIP_TO_TRACK_FIXTURE_DIR ?? resolve('asset');
+const lrvFixture = resolve(fixtureDir, 'GL010753.LRV');
 
 const point = (
   overrides: Partial<GpsPoint> & Pick<GpsPoint, 'utcTime'>,
@@ -212,17 +216,20 @@ describe('route analysis', () => {
     });
   });
 
-  it('matches the reference HERO13 route quality and statistics', async () => {
-    const content = await readFile(resolve('asset', 'GL010753.LRV'));
-    const result = await parseMp4(new File([content], 'GL010753.LRV'));
+  (existsSync(lrvFixture) ? it : it.skip)(
+    'matches the reference HERO13 route quality and statistics',
+    async () => {
+      const content = await readFile(lrvFixture);
+      const result = await parseMp4(new File([content], 'GL010753.LRV'));
 
-    const analysis = buildRouteAnalysis(result.telemetry.gps);
+      const analysis = buildRouteAnalysis(result.telemetry.gps);
 
-    expect(analysis.rawRoute).toHaveLength(65);
-    expect(analysis.acceptedRoute).toHaveLength(65);
-    expect(analysis.rejectedPoints).toHaveLength(0);
-    expect(analysis.statistics.durationSeconds).toBeCloseTo(6.4, 5);
-    expect(analysis.statistics.distanceMeters).toBeCloseTo(46.71, 0);
-    expect(analysis.statistics.maxSpeedKph).toBeCloseTo(38.25, 1);
-  });
+      expect(analysis.rawRoute).toHaveLength(65);
+      expect(analysis.acceptedRoute).toHaveLength(65);
+      expect(analysis.rejectedPoints).toHaveLength(0);
+      expect(analysis.statistics.durationSeconds).toBeCloseTo(6.4, 5);
+      expect(analysis.statistics.distanceMeters).toBeCloseTo(46.71, 0);
+      expect(analysis.statistics.maxSpeedKph).toBeCloseTo(38.25, 1);
+    },
+  );
 });

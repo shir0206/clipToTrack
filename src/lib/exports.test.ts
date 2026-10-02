@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -14,6 +15,9 @@ import {
   exportTelemetryJson,
   type CsvColumn,
 } from './exports';
+
+const fixtureDir = process.env.CLIP_TO_TRACK_FIXTURE_DIR ?? resolve('asset');
+const lrvFixture = resolve(fixtureDir, 'GL010753.LRV');
 
 const point = (
   overrides: Partial<GpsPoint> & Pick<GpsPoint, 'utcTime'>,
@@ -324,32 +328,35 @@ describe('export formats', () => {
     expect(createObjectURL).not.toHaveBeenCalled();
   });
 
-  it('exports 65 GPX points and complete JSON from the supplied raw route', async () => {
-    const content = await readFile(resolve('asset', 'GL010753.LRV'));
-    const result = await parseMp4(new File([content], 'GL010753.LRV'));
-    const xml = exportGpx(result.route, { route: 'raw' });
-    const json = JSON.parse(
-      exportTelemetryJson({
-        telemetry: result.telemetry,
-        analysis: result.route,
-        sourceMetadata: result.metadata,
-      }),
-    );
-    const geoJson = JSON.parse(exportGeoJson(result.route, { route: 'raw' }));
+  (existsSync(lrvFixture) ? it : it.skip)(
+    'exports 65 GPX points and complete JSON from the supplied raw route',
+    async () => {
+      const content = await readFile(lrvFixture);
+      const result = await parseMp4(new File([content], 'GL010753.LRV'));
+      const xml = exportGpx(result.route, { route: 'raw' });
+      const json = JSON.parse(
+        exportTelemetryJson({
+          telemetry: result.telemetry,
+          analysis: result.route,
+          sourceMetadata: result.metadata,
+        }),
+      );
+      const geoJson = JSON.parse(exportGeoJson(result.route, { route: 'raw' }));
 
-    expect(gpx11Issues(xml)).toEqual([]);
-    expect([...xml.matchAll(/<trkpt /g)]).toHaveLength(65);
-    expect(json.rawStreams.gps).toHaveLength(65);
-    expect(
-      json.rawStreams.streams.some(
-        (stream: { key: string }) => stream.key === 'ACCL',
-      ),
-    ).toBe(true);
-    expect(json.rawStreams.unknownRecords.length).toBeGreaterThan(0);
-    expect(json.rawStreams.unknownRecords[0].rawPayload).toMatch(
-      /^[A-Za-z0-9+/]+=*$/,
-    );
-    expect(geoJson.features[0].geometry.coordinates).toHaveLength(65);
-    expect(geoJson.features[0].geometry.type).toBe('LineString');
-  });
+      expect(gpx11Issues(xml)).toEqual([]);
+      expect([...xml.matchAll(/<trkpt /g)]).toHaveLength(65);
+      expect(json.rawStreams.gps).toHaveLength(65);
+      expect(
+        json.rawStreams.streams.some(
+          (stream: { key: string }) => stream.key === 'ACCL',
+        ),
+      ).toBe(true);
+      expect(json.rawStreams.unknownRecords.length).toBeGreaterThan(0);
+      expect(json.rawStreams.unknownRecords[0].rawPayload).toMatch(
+        /^[A-Za-z0-9+/]+=*$/,
+      );
+      expect(geoJson.features[0].geometry.coordinates).toHaveLength(65);
+      expect(geoJson.features[0].geometry.type).toBe('LineString');
+    },
+  );
 });

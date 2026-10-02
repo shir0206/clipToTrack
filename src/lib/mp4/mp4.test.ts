@@ -1,7 +1,12 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseMp4 } from './parser';
+
+const fixtureDir = process.env.CLIP_TO_TRACK_FIXTURE_DIR ?? resolve('asset');
+const fixturePath = (name: string) => resolve(fixtureDir, name);
+const hasFixture = (name: string) => existsSync(fixturePath(name));
 
 function box(type: string, payload = new Uint8Array(), large = false) {
   const header = large ? 16 : 8;
@@ -108,93 +113,103 @@ describe('incremental MP4 parsing', () => {
     ).rejects.toMatchObject({ code: 'CANCELLED' });
   });
 
-  it.each([
+  for (const [name, width, height] of [
     ['GX010753.MP4', 5312, 2988],
     ['GL010753.LRV', 768, 432],
-  ])(
-    'reads reference metadata and gpmd ranges from %s',
-    async (name, width, height) => {
-      const content = await readFile(resolve('asset', name));
-      const result = await parseMp4(new File([content], name));
+  ] as const) {
+    (hasFixture(name) ? it : it.skip)(
+      `reads reference metadata and gpmd ranges from ${name}`,
+      async () => {
+        const content = await readFile(fixturePath(name));
+        const result = await parseMp4(new File([content], name));
 
-      expect(result.durationSeconds).toBeCloseTo(6.48, 2);
-      expect(result.tracks.map((track) => track.handlerType)).toEqual(
-        expect.arrayContaining(['vide', 'soun', 'tmcd', 'meta']),
+        expect(result.durationSeconds).toBeCloseTo(6.48, 2);
+        expect(result.tracks.map((track) => track.handlerType)).toEqual(
+          expect.arrayContaining(['vide', 'soun', 'tmcd', 'meta']),
+        );
+        expect(
+          result.tracks.find((track) => track.handlerType === 'vide'),
+        ).toMatchObject({
+          width,
+          height,
+        });
+        const telemetry = result.tracks.find(
+          (track) => track.sampleEntry === 'gpmd',
+        );
+        expect(telemetry?.samples).toHaveLength(7);
+        expect(result.telemetrySamples).toHaveLength(7);
+        expect(
+          result.telemetrySamples.every((sample) => sample.data.byteLength > 0),
+        ).toBe(true);
+        expect(result.sourceName).toBe(basename(name));
+        expect(result.metadata.firmware).toBe('H24.01.02.10.00');
+        expect(result.metadata.coordinates).toBe('+47.2900+012.6970/');
+        expect(result.metadata.cameraModel).toBe('HERO13 Black');
+      },
+    );
+  }
+
+  (hasFixture('GX010753.MP4') && hasFixture('GL010753.LRV') ? it : it.skip)(
+    'normalizes identical HERO13 telemetry from the MP4 and LRV sources',
+    async () => {
+      const [mp4Content, lrvContent] = await Promise.all([
+        readFile(fixturePath('GX010753.MP4')),
+        readFile(fixturePath('GL010753.LRV')),
+      ]);
+      const [mp4, lrv] = await Promise.all([
+        parseMp4(new File([mp4Content], 'GX010753.MP4')),
+        parseMp4(new File([lrvContent], 'GL010753.LRV')),
+      ]);
+
+      expect(mp4.telemetryHash).toBe(lrv.telemetryHash);
+      expect(mp4.telemetry.gps).toEqual(
+        lrv.telemetry.gps.map((point) => ({
+          ...point,
+          sourceFile: 'GX010753.MP4',
+        })),
       );
-      expect(
-        result.tracks.find((track) => track.handlerType === 'vide'),
-      ).toMatchObject({
-        width,
-        height,
-      });
-      const telemetry = result.tracks.find(
-        (track) => track.sampleEntry === 'gpmd',
+      expect(mp4.telemetry.gps).toHaveLength(65);
+      expect(mp4.route.rawRoute).toHaveLength(65);
+      expect(mp4.route.acceptedRoute).toHaveLength(65);
+      expect(mp4.route.rejectedPoints).toHaveLength(0);
+      expect(mp4.route.statistics.durationSeconds).toBeCloseTo(6.4, 5);
+      expect(mp4.route.statistics.distanceMeters).toBeCloseTo(46.71, 0);
+      expect(mp4.telemetry.gps.every((point) => point.fix === 3)).toBe(true);
+      expect(mp4.telemetry.gps.every((point) => point.dop === 1.37)).toBe(true);
+      expect(mp4.telemetry.gps[0].utcTime).toBe('2026-09-21T08:36:35.300Z');
+      expect(mp4.telemetry.gps.at(-1)?.utcTime).toBe(
+        '2026-09-21T08:36:41.700Z',
       );
-      expect(telemetry?.samples).toHaveLength(7);
-      expect(result.telemetrySamples).toHaveLength(7);
-      expect(
-        result.telemetrySamples.every((sample) => sample.data.byteLength > 0),
-      ).toBe(true);
-      expect(result.sourceName).toBe(basename(name));
-      expect(result.metadata.firmware).toBe('H24.01.02.10.00');
-      expect(result.metadata.coordinates).toBe('+47.2900+012.6970/');
-      expect(result.metadata.cameraModel).toBe('HERO13 Black');
+
+      const counts = (key: string) =>
+        mp4.telemetry.streams
+          .filter((stream) => stream.key === key)
+          .reduce((sum, stream) => sum + stream.values.length, 0);
+      expect(counts('ACCL')).toBeGreaterThanOrEqual(1_200);
+      expect(counts('GYRO')).toBeGreaterThanOrEqual(1_200);
     },
   );
 
-  it('normalizes identical HERO13 telemetry from the MP4 and LRV sources', async () => {
-    const [mp4Content, lrvContent] = await Promise.all([
-      readFile(resolve('asset', 'GX010753.MP4')),
-      readFile(resolve('asset', 'GL010753.LRV')),
-    ]);
-    const [mp4, lrv] = await Promise.all([
-      parseMp4(new File([mp4Content], 'GX010753.MP4')),
-      parseMp4(new File([lrvContent], 'GL010753.LRV')),
-    ]);
-
-    expect(mp4.telemetryHash).toBe(lrv.telemetryHash);
-    expect(mp4.telemetry.gps).toEqual(
-      lrv.telemetry.gps.map((point) => ({
-        ...point,
-        sourceFile: 'GX010753.MP4',
-      })),
-    );
-    expect(mp4.telemetry.gps).toHaveLength(65);
-    expect(mp4.route.rawRoute).toHaveLength(65);
-    expect(mp4.route.acceptedRoute).toHaveLength(65);
-    expect(mp4.route.rejectedPoints).toHaveLength(0);
-    expect(mp4.route.statistics.durationSeconds).toBeCloseTo(6.4, 5);
-    expect(mp4.route.statistics.distanceMeters).toBeCloseTo(46.71, 0);
-    expect(mp4.telemetry.gps.every((point) => point.fix === 3)).toBe(true);
-    expect(mp4.telemetry.gps.every((point) => point.dop === 1.37)).toBe(true);
-    expect(mp4.telemetry.gps[0].utcTime).toBe('2026-09-21T08:36:35.300Z');
-    expect(mp4.telemetry.gps.at(-1)?.utcTime).toBe('2026-09-21T08:36:41.700Z');
-
-    const counts = (key: string) =>
-      mp4.telemetry.streams
-        .filter((stream) => stream.key === key)
-        .reduce((sum, stream) => sum + stream.values.length, 0);
-    expect(counts('ACCL')).toBeGreaterThanOrEqual(1_200);
-    expect(counts('GYRO')).toBeGreaterThanOrEqual(1_200);
-  });
-
-  it('rejects sample offsets outside the file before attempting a read', async () => {
-    const content = new Uint8Array(
-      await readFile(resolve('asset', 'GL010753.LRV')),
-    );
-    const marker = new TextEncoder().encode('stco');
-    let tables = 0;
-    for (let index = 0; index <= content.length - marker.length; index += 1) {
-      if (marker.every((byte, part) => content[index + part] === byte)) {
-        new DataView(content.buffer).setUint32(index + 12, 0xfffffff0);
-        tables += 1;
+  (hasFixture('GL010753.LRV') ? it : it.skip)(
+    'rejects sample offsets outside the file before attempting a read',
+    async () => {
+      const content = new Uint8Array(
+        await readFile(fixturePath('GL010753.LRV')),
+      );
+      const marker = new TextEncoder().encode('stco');
+      let tables = 0;
+      for (let index = 0; index <= content.length - marker.length; index += 1) {
+        if (marker.every((byte, part) => content[index + part] === byte)) {
+          new DataView(content.buffer).setUint32(index + 12, 0xfffffff0);
+          tables += 1;
+        }
       }
-    }
-    expect(tables).toBeGreaterThan(0);
-    await expect(parseMp4(new Blob([content]))).rejects.toMatchObject({
-      code: 'INVALID_OFFSET',
-    });
-  });
+      expect(tables).toBeGreaterThan(0);
+      await expect(parseMp4(new Blob([content]))).rejects.toMatchObject({
+        code: 'INVALID_OFFSET',
+      });
+    },
+  );
 
   it('uses a stable structured error for files without telemetry', async () => {
     await expect(parseMp4(new Blob([box('moov')]))).rejects.toEqual(
