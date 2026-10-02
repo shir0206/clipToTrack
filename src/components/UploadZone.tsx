@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 
-type Props = { onFiles: (files: File[]) => void };
+type Props = { onFiles: (files: File[]) => void; busy?: boolean };
 
-export default function UploadZone({ onFiles }: Props) {
+export default function UploadZone({ onFiles, busy }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
 
   const handle = (list: FileList | null) => {
-    const files = Array.from(list ?? []).filter((f) => /\.json$/i.test(f.name));
+    const files = Array.from(list ?? []).filter((f) => /\.(mp4|json)$/i.test(f.name));
     if (files.length) onFiles(files);
     if (input.current) input.current.value = ''; // allow re-selecting the same file
   };
@@ -17,7 +17,7 @@ export default function UploadZone({ onFiles }: Props) {
       className={`ctt-upload${over ? ' is-over' : ''}`}
       role="button"
       tabIndex={0}
-      aria-label="Add clip metadata JSON"
+      aria-label="Add GoPro video"
       onClick={() => input.current?.click()}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -36,12 +36,12 @@ export default function UploadZone({ onFiles }: Props) {
         handle(e.dataTransfer.files);
       }}
     >
-      <strong>Drag &amp; drop clip metadata</strong>
-      <span>or click to browse · JSON · Processed locally</span>
+      <strong>{busy ? 'Reading telemetry…' : 'Drag & drop GoPro videos'}</strong>
+      <span>or click to browse · MP4 · Processed locally</span>
       <input
         ref={input}
         type="file"
-        accept=".json,application/json"
+        accept=".mp4,video/mp4,.json,application/json"
         multiple
         hidden
         onChange={(e) => handle(e.target.files)}

@@ -4,10 +4,11 @@
   --text: #152033;
   --muted: #64748b;
   --border: #dfe5ed;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -28,6 +29,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex: none;
   height: 60px;
   padding: 0 20px;
   background: var(--card);
@@ -67,15 +69,15 @@
 
 /* layout */
 .ctt-layout {
-  display: grid;
+  display: flex;
   flex: 1;
-  min-height: 0;
-  grid-template-columns: clamp(360px, 33vw, 520px) minmax(0, 1fr);
+  overflow: hidden;
 }
 .ctt-panel {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  flex: none;
+  width: 33vw;
   gap: 12px;
   padding: 16px;
   border-right: 1px solid var(--border);
@@ -92,7 +94,6 @@
 }
 .ctt-list {
   flex: 1;
-  min-height: 0;
   overflow-y: auto;
   margin: 0;
   padding: 2px 2px 4px;
@@ -103,8 +104,7 @@
 }
 .ctt-map-wrap {
   position: relative;
-  min-width: 0;
-  min-height: 0;
+  flex: 1;
 }
 .ctt-map {
   position: absolute;
@@ -177,7 +177,6 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-width: 0;
 }
 .ctt-card-head {
   display: flex;
@@ -322,26 +321,46 @@
   color: var(--muted);
 }
 
-/* narrow screens: map on top, clips below */
-@media (max-width: 1023px) {
-  .ctt-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 45%);
-  }
-  .ctt-map-wrap {
-    order: -1;
-  }
-  .ctt-panel {
-    border-right: 0;
-    border-top: 1px solid var(--border);
-  }
-  .ctt-tagline {
-    display: none;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .ctt-card,
   .ctt-upload {
     transition: none;
   }
+}
+
+/* playback */
+.ctt-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  background: #000;
+}
+.ctt-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ctt-hint,
+.ctt-video-error {
+  font-size: 11px;
+  color: var(--muted);
+}
+.ctt-video-error {
+  margin: 6px 0 0;
+  color: #a12626;
+}
+.ctt-link {
+  font: inherit;
+  font-size: 12px;
+  margin-right: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2878ff;
+  cursor: pointer;
+}
+.ctt-link:hover {
+  text-decoration: underline;
 }

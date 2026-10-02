@@ -81,7 +81,7 @@ button {
   box-shadow: 0 0 12px #87f4c2;
 }
 main {
-  width: min(1040px, calc(100% - 40px));
+  width: 100vw;
   margin: 0 auto;
   flex: 1;
 }

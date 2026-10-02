@@ -4,7 +4,9 @@ export type Clip = {
   title: string;
   date: string;
   color: string;
-  thumbnail?: string; // optional image url
+  thumbnail?: string; // optional image url (JPEG data URL captured from the video)
+  /** Object URL of the local MP4. Session-only: not persisted, so it's missing after a reload. */
+  videoUrl?: string;
   duration: string;
   distance: string;
   maxSpeed: string;

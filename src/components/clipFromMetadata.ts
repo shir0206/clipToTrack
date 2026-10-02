@@ -7,15 +7,26 @@ export type GpsPoint = {
   lon: number;
   altM?: number;
   speed3dKmh?: number;
+  utc?: string;
+  // present in full extractions; dropped when compacted for storage
+  index?: number;
+  speed2dMs?: number;
+  speed3dMs?: number;
+  dop?: number;
+  fix?: number;
+  segmentDistM?: number;
+  cumulativeDistM?: number;
 };
 export type ClipMetadata = {
   schemaVersion?: number;
-  source?: { fileName?: string };
+  source?: { fileName?: string; fileSizeMB?: number };
   file?: {
     camera?: string;
     createdUtc?: string;
     durationSec?: number;
     frameRate?: number;
+    frames?: number;
+    videoCodec?: string;
     resolution?: string;
   };
   gps: {
@@ -23,9 +34,12 @@ export type ClipMetadata = {
     fixType?: number;
     dopMean?: number;
     startUtc?: string;
+    endUtc?: string;
+    start?: { lat: number; lon: number };
+    end?: { lat: number; lon: number };
     totalDistanceM?: number;
-    altitudeM?: { min: number; max: number };
-    speed3dKmh?: { max: number };
+    altitudeM?: { min: number; max: number; mean?: number };
+    speed3dKmh?: { max: number; mean?: number };
     track: GpsPoint[];
   };
 };

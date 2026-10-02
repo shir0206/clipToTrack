@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Clip } from './types';
 
 type Props = {
@@ -25,6 +25,42 @@ export default function ClipCard({
     fn();
   };
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const onStopRef = useRef(onStop);
+  useEffect(() => {
+    onStopRef.current = onStop;
+  });
+
+  // `playing` (owned by the parent) is the single source of truth; the <video> just follows it
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (playing) {
+      v.play().catch((e: DOMException) => {
+        if (e.name === 'AbortError') return; // pause() raced play()
+        setVideoError("This browser can't play this video (HEVC/10-bit often needs Safari or hardware support).");
+        onStopRef.current();
+      });
+    } else {
+      v.pause();
+    }
+  }, [playing]);
+
+  const canPlay = !!clip.videoUrl && !videoError;
+  const handleStop = () => {
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.currentTime = 0;
+    }
+    onStop();
+  };
+  const handleToggle = () => {
+    setVideoError(null);
+    onTogglePlay();
+  };
+
   return (
     <li
       id={`ctt-${clip.id}`}
@@ -36,6 +72,7 @@ export default function ClipCard({
       style={{ '--c': clip.color } as CSSProperties}
       onClick={onSelect}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return; // let the inner buttons handle their own keys
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onSelect();
@@ -52,6 +89,24 @@ export default function ClipCard({
             : undefined
         }
       >
+        {clip.videoUrl && !videoError && (
+          <video
+            ref={videoRef}
+            className="ctt-video"
+            src={clip.videoUrl}
+            poster={clip.thumbnail}
+            preload="metadata"
+            playsInline
+            onEnded={() => {
+              if (videoRef.current) videoRef.current.currentTime = 0;
+              onStop();
+            }}
+            onError={() => {
+              setVideoError("This browser can't play this video (HEVC/10-bit often needs Safari or hardware support).");
+              onStop();
+            }}
+          />
+        )}
         <span className="ctt-duration">{clip.duration}</span>
       </div>
 
@@ -69,19 +124,23 @@ export default function ClipCard({
           <button
             className="ctt-btn ctt-btn-primary"
             aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`}
-            onClick={stop(onTogglePlay)}
+            disabled={!canPlay}
+            onClick={stop(handleToggle)}
           >
             {playing ? '❚❚' : '▶'}
           </button>
           <button
             className="ctt-btn"
             aria-label={`Stop ${clip.title}`}
-            onClick={stop(onStop)}
+            disabled={!canPlay}
+            onClick={stop(handleStop)}
           >
             ■
           </button>
           {playing && <span className="ctt-playing">Playing</span>}
+          {!clip.videoUrl && <span className="ctt-hint">Re-add the MP4 to play</span>}
         </div>
+        {videoError && <p className="ctt-video-error" role="status">{videoError}</p>}
       </div>
 
       <dl className="ctt-stats">
