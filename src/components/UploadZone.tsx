@@ -19,14 +19,33 @@ export default function UploadZone({ onFiles }: Props) {
       tabIndex={0}
       aria-label="Add clip metadata JSON"
       onClick={() => input.current?.click()}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.current?.click(); } }}
-      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          input.current?.click();
+        }
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
       onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); handle(e.dataTransfer.files); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        handle(e.dataTransfer.files);
+      }}
     >
       <strong>Drag &amp; drop clip metadata</strong>
       <span>or click to browse · JSON · Processed locally</span>
-      <input ref={input} type="file" accept=".json,application/json" multiple hidden onChange={(e) => handle(e.target.files)} />
+      <input
+        ref={input}
+        type="file"
+        accept=".json,application/json"
+        multiple
+        hidden
+        onChange={(e) => handle(e.target.files)}
+      />
     </div>
   );
 }

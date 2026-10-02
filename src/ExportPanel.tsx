@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Clip } from './lib/discovery';
 import {
   buildExportBlob,
@@ -35,15 +35,13 @@ export default function ExportPanel({
   const [route, setRoute] = useState<RouteExportSource>('raw');
   const [columns, setColumns] = useState<CsvColumn[]>(DEFAULT_CSV_COLUMNS);
   const [busy, setBusy] = useState(false);
-  const client = useMemo(() => createMp4WorkerClient(), []);
-
-  useEffect(() => () => client.dispose(), [client]);
 
   useEffect(() => {
     const source = clip.telemetrySource;
     if (!source) return;
 
     let cancelled = false;
+    const client = createMp4WorkerClient();
     const operation = client.parse(source.file, (value) => {
       if (!cancelled) setProgress(value);
     });
@@ -61,8 +59,9 @@ export default function ExportPanel({
     return () => {
       cancelled = true;
       operation.cancel();
+      client.dispose();
     };
-  }, [client, clip.telemetrySource]);
+  }, [clip.telemetrySource]);
 
   function toggleColumn(column: CsvColumn) {
     setColumns((current) =>

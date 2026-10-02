@@ -105,7 +105,10 @@ export default function TrackMap({
   const map = useRef<maplibregl.Map | null>(null);
   const [ready, setReady] = useState(false);
   const cb = useRef({ onSelect, onHover });
-  cb.current = { onSelect, onHover };
+
+  useEffect(() => {
+    cb.current = { onSelect, onHover };
+  }, [onSelect, onHover]);
 
   // init once
   useEffect(() => {

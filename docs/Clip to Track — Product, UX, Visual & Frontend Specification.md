@@ -54,13 +54,13 @@ Selecting:
 must update the same global:
 
 ```ts
-selectedClipId
+selectedClipId;
 ```
 
 For example:
 
 ```ts
-selectedClipId = "clip-03"
+selectedClipId = 'clip-03';
 ```
 
 Everything derives its visual state from this value.
@@ -102,7 +102,7 @@ These represent the same object.
 Use:
 
 ```ts
-selectedClipId
+selectedClipId;
 ```
 
 as the source of truth.
@@ -544,10 +544,7 @@ type TrackProperties = {
   durationMs: number;
 };
 
-type TrackFeature = GeoJSON.Feature<
-  GeoJSON.LineString,
-  TrackProperties
->;
+type TrackFeature = GeoJSON.Feature<GeoJSON.LineString, TrackProperties>;
 ```
 
 Example feature:
@@ -601,9 +598,9 @@ containing all routes.
 Example:
 
 ```ts
-map.addSource("tracks", {
-  type: "geojson",
-  data: trackFeatureCollection
+map.addSource('tracks', {
+  type: 'geojson',
+  data: trackFeatureCollection,
 });
 ```
 
@@ -727,12 +724,12 @@ Example:
 ```ts
 map.setFeatureState(
   {
-    source: "tracks",
-    id: clipId
+    source: 'tracks',
+    id: clipId,
   },
   {
-    selected: true
-  }
+    selected: true,
+  },
 );
 ```
 
@@ -1237,20 +1234,12 @@ interface Clip {
 
   track: GeoJSON.Feature<GeoJSON.LineString>;
 
-  bounds: [
-    [number, number],
-    [number, number]
-  ];
+  bounds: [[number, number], [number, number]];
 
   stats: ClipStats;
 
   status:
-    | "queued"
-    | "reading"
-    | "extracting"
-    | "processing"
-    | "ready"
-    | "error";
+    'queued' | 'reading' | 'extracting' | 'processing' | 'ready' | 'error';
 
   error?: ClipError;
 }
@@ -1289,7 +1278,7 @@ interface ProjectState {
 
   playbackTimeMs: number;
 
-  mapStyle: "map" | "satellite" | "terrain";
+  mapStyle: 'map' | 'satellite' | 'terrain';
 
   followPlayback: boolean;
 }
@@ -1323,7 +1312,7 @@ useEffect(() => {
     container: containerRef.current!,
     style: MAP_STYLE,
     center: DEFAULT_CENTER,
-    zoom: DEFAULT_ZOOM
+    zoom: DEFAULT_ZOOM,
   });
 
   return () => {
@@ -1366,8 +1355,8 @@ Example architecture:
 
 ```ts
 const geojson = {
-  type: "FeatureCollection",
-  features: clips.map(clip => clip.track)
+  type: 'FeatureCollection',
+  features: clips.map((clip) => clip.track),
 };
 ```
 

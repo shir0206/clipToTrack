@@ -11,8 +11,19 @@ type Props = {
   onStop: () => void;
 };
 
-export default function ClipCard({ clip, selected, playing, onSelect, onHover, onTogglePlay, onStop }: Props) {
-  const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
+export default function ClipCard({
+  clip,
+  selected,
+  playing,
+  onSelect,
+  onHover,
+  onTogglePlay,
+  onStop,
+}: Props) {
+  const stop = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
 
   return (
     <li
@@ -24,11 +35,23 @@ export default function ClipCard({ clip, selected, playing, onSelect, onHover, o
       className={`ctt-card${selected ? ' is-selected' : ''}${playing ? ' is-playing' : ''}`}
       style={{ '--c': clip.color } as CSSProperties}
       onClick={onSelect}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
     >
-      <div className="ctt-thumb" style={clip.thumbnail ? { backgroundImage: `url(${clip.thumbnail})` } : undefined}>
+      <div
+        className="ctt-thumb"
+        style={
+          clip.thumbnail
+            ? { backgroundImage: `url(${clip.thumbnail})` }
+            : undefined
+        }
+      >
         <span className="ctt-duration">{clip.duration}</span>
       </div>
 
@@ -43,19 +66,41 @@ export default function ClipCard({ clip, selected, playing, onSelect, onHover, o
         </div>
 
         <div className="ctt-controls">
-          <button className="ctt-btn ctt-btn-primary" aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`} onClick={stop(onTogglePlay)}>
+          <button
+            className="ctt-btn ctt-btn-primary"
+            aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`}
+            onClick={stop(onTogglePlay)}
+          >
             {playing ? '❚❚' : '▶'}
           </button>
-          <button className="ctt-btn" aria-label={`Stop ${clip.title}`} onClick={stop(onStop)}>■</button>
+          <button
+            className="ctt-btn"
+            aria-label={`Stop ${clip.title}`}
+            onClick={stop(onStop)}
+          >
+            ■
+          </button>
           {playing && <span className="ctt-playing">Playing</span>}
         </div>
       </div>
 
       <dl className="ctt-stats">
-        <div><dt>Duration</dt><dd>{clip.duration}</dd></div>
-        <div><dt>Distance</dt><dd>{clip.distance}</dd></div>
-        <div><dt>Max speed</dt><dd>{clip.maxSpeed}</dd></div>
-        <div><dt>Altitude</dt><dd>{clip.altitude}</dd></div>
+        <div>
+          <dt>Duration</dt>
+          <dd>{clip.duration}</dd>
+        </div>
+        <div>
+          <dt>Distance</dt>
+          <dd>{clip.distance}</dd>
+        </div>
+        <div>
+          <dt>Max speed</dt>
+          <dd>{clip.maxSpeed}</dd>
+        </div>
+        <div>
+          <dt>Altitude</dt>
+          <dd>{clip.altitude}</dd>
+        </div>
       </dl>
       <p className="ctt-quality">{clip.gpsQuality}</p>
     </li>

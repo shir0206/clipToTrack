@@ -18,6 +18,12 @@ export type Clip = {
 };
 
 export const ROUTE_COLORS = [
-  '#2878FF', '#FF7A1A', '#14A44D', '#8B5CF6',
-  '#EC4899', '#0891B2', '#D6A000', '#E24343',
+  '#2878FF',
+  '#FF7A1A',
+  '#14A44D',
+  '#8B5CF6',
+  '#EC4899',
+  '#0891B2',
+  '#D6A000',
+  '#E24343',
 ];
