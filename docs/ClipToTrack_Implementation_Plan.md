@@ -196,25 +196,25 @@ Unknown GPMF keys must be retained in the full JSON export instead of causing an
 
 ### Work
 
-- [ ] Preserve the raw route exactly as decoded.
-- [ ] Validate coordinate ranges and timestamps.
-- [ ] Exclude points without a configurable minimum GPS fix.
-- [ ] Add a configurable maximum DOP threshold.
-- [ ] Detect duplicate timestamps and impossible location jumps.
-- [ ] Calculate segment distance with a geodesic method.
-- [ ] Calculate duration, moving time, average speed, maximum speed, ascent, and descent.
-- [ ] Implement optional smoothing using a conservative Kalman filter or equivalent time-aware filter.
-- [ ] Keep smoothing disabled by default in exports unless the user selects the processed route.
-- [ ] Record why every rejected point was excluded.
+- [x] Preserve the raw route exactly as decoded.
+- [x] Validate coordinate ranges and timestamps.
+- [x] Exclude points without a configurable minimum GPS fix.
+- [x] Add a configurable maximum DOP threshold.
+- [x] Detect duplicate timestamps and impossible location jumps.
+- [x] Calculate segment distance with a geodesic method.
+- [x] Calculate duration, moving time, average speed, maximum speed, ascent, and descent.
+- [x] Implement optional smoothing using a conservative Kalman filter or equivalent time-aware filter.
+- [x] Keep smoothing disabled by default in exports unless the user selects the processed route.
+- [x] Record why every rejected point was excluded.
 
 ### Verification
 
-- [ ] The supplied raw route contains 65 accepted points.
-- [ ] Its GPS time span is 6.4 seconds.
-- [ ] Its raw distance is approximately 46.71 metres within an agreed geodesic tolerance.
-- [ ] Its maximum 2D speed is approximately 38.25 km/h.
-- [ ] Raw values never change when smoothing settings change.
-- [ ] Tests cover no fix, poor DOP, stationary jitter, time gaps, duplicate timestamps, and impossible jumps.
+- [x] The supplied raw route contains 65 accepted points.
+- [x] Its GPS time span is 6.4 seconds.
+- [x] Its raw distance is approximately 46.71 metres within an agreed geodesic tolerance.
+- [x] Its maximum 2D speed is approximately 38.25 km/h.
+- [x] Raw values never change when smoothing settings change.
+- [x] Tests cover no fix, poor DOP, stationary jitter, time gaps, duplicate timestamps, and impossible jumps.
 
 ---
 

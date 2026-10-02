@@ -160,6 +160,11 @@ describe('incremental MP4 parsing', () => {
       })),
     );
     expect(mp4.telemetry.gps).toHaveLength(65);
+    expect(mp4.route.rawRoute).toHaveLength(65);
+    expect(mp4.route.acceptedRoute).toHaveLength(65);
+    expect(mp4.route.rejectedPoints).toHaveLength(0);
+    expect(mp4.route.statistics.durationSeconds).toBeCloseTo(6.4, 5);
+    expect(mp4.route.statistics.distanceMeters).toBeCloseTo(46.71, 0);
     expect(mp4.telemetry.gps.every((point) => point.fix === 3)).toBe(true);
     expect(mp4.telemetry.gps.every((point) => point.dop === 1.37)).toBe(true);
     expect(mp4.telemetry.gps[0].utcTime).toBe('2026-09-21T08:36:35.300Z');

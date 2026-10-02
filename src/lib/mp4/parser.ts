@@ -1,5 +1,6 @@
 import { decodeGpmfSamples } from '../gpmf/decoder';
 import type { DecodedTelemetry } from '../gpmf/types';
+import { buildRouteAnalysis, type RouteAnalysis } from '../route';
 
 const HEADER_BYTES = 16;
 const MAC_EPOCH_SECONDS = 2_082_844_800;
@@ -57,6 +58,7 @@ export interface MovieInfo {
   tracks: TrackInfo[];
   telemetrySamples: Array<SampleRange & { data: ArrayBuffer }>;
   telemetry: DecodedTelemetry;
+  route: RouteAnalysis;
   telemetryHash: string;
   metadata: MovieMetadata;
 }
@@ -569,15 +571,17 @@ export async function parseMp4(
     'name' in source && typeof source.name === 'string'
       ? source.name
       : undefined;
+  const telemetry = decodeGpmfSamples(
+    telemetrySamples.map((sample) => sample.data),
+    sourceName,
+  );
   return {
     sourceName,
     durationSeconds: movieHeader.durationSeconds,
     tracks,
     telemetrySamples,
-    telemetry: decodeGpmfSamples(
-      telemetrySamples.map((sample) => sample.data),
-      sourceName,
-    ),
+    telemetry,
+    route: buildRouteAnalysis(telemetry.gps),
     telemetryHash: telemetryHash(telemetrySamples),
     metadata: {
       creationTime: movieHeader.creationTime,
