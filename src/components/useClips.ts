@@ -12,13 +12,11 @@ const MAX_TRACK_POINTS = 2000;
 type Entry = { metadata: ClipMetadata; thumbnail?: string; videoUrl?: string };
 type Stored = Pick<Entry, 'metadata' | 'thumbnail'>;
 
-/** Slim the track to what the app reads (lat/lon/alt/speed/utc) and cap its length. Summary stats are untouched. */
+/** Cap the track length (all per-point fields are kept for the hover bubble). Summary stats are untouched. */
 function compact(m: ClipMetadata): ClipMetadata {
   const t = m.gps.track;
   const step = Math.max(1, Math.ceil(t.length / MAX_TRACK_POINTS));
-  const track = t
-    .filter((_, i) => i % step === 0 || i === t.length - 1)
-    .map(({ lat, lon, altM, speed3dKmh, utc }) => ({ lat, lon, altM, speed3dKmh, utc }));
+  const track = t.filter((_, i) => i % step === 0 || i === t.length - 1);
   return { ...m, gps: { ...m.gps, samples: m.gps.samples ?? t.length, track } };
 }
 

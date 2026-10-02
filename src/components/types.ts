@@ -1,3 +1,19 @@
+/** One GPS sample. Extra fields are optional because older stored clips / hand-made JSON may lack them. */
+export type GpsPoint = {
+  lat: number;
+  lon: number;
+  altM?: number;
+  speed3dKmh?: number;
+  utc?: string;
+  index?: number;
+  speed2dMs?: number;
+  speed3dMs?: number;
+  dop?: number;
+  fix?: number;
+  segmentDistM?: number;
+  cumulativeDistM?: number;
+};
+
 export type Clip = {
   id: string;
   index: number;
@@ -17,6 +33,8 @@ export type Clip = {
   gpsQuality: string;
   /** [lng, lat] */
   coordinates: [number, number][];
+  /** Full metadata of each point; samples[i] belongs to coordinates[i]. */
+  samples: GpsPoint[];
 };
 
 export const ROUTE_COLORS = [

@@ -3,7 +3,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Clip } from './types';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
-import type { FeatureCollection } from 'geojson';
+import type { FeatureCollection, Point } from 'geojson';
+import { pointPopupHtml } from './pointPopup';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 
 // Let Vite fingerprint and serve MapLibre's worker as a real JS asset.
@@ -78,15 +79,23 @@ const toEnds = (clips: Clip[]): FeatureCollection => ({
     .filter((c) => c.coordinates.length > 1)
     .flatMap((c) =>
       [
-        { kind: 'start', coord: c.coordinates[0] },
-        { kind: 'end', coord: c.coordinates[c.coordinates.length - 1] },
+        { kind: 'start', i: 0, coord: c.coordinates[0] },
+        {
+          kind: 'end',
+          i: c.coordinates.length - 1,
+          coord: c.coordinates[c.coordinates.length - 1],
+        },
       ].map((p) => ({
         type: 'Feature' as const,
-        properties: { color: c.color, kind: p.kind },
+        properties: { clipId: c.id, i: p.i, color: c.color, kind: p.kind },
         geometry: { type: 'Point' as const, coordinates: p.coord },
       })),
     ),
 });
+
+const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
+const POINT_LAYERS = ['points-selected', 'points', 'points-all', 'ends'];
+const HIT_PX = 8; // forgiving hover radius around a dot
 
 const boundsOf = (coords: [number, number][]) =>
   coords.reduce(
@@ -105,10 +114,15 @@ export default function TrackMap({
   const map = useRef<maplibregl.Map | null>(null);
   const [ready, setReady] = useState(false);
   const cb = useRef({ onSelect, onHover });
+  const data = useRef(clips); // latest clips for the hover handler (it's registered once)
 
   useEffect(() => {
     cb.current = { onSelect, onHover };
   }, [onSelect, onHover]);
+
+  useEffect(() => {
+    data.current = clips;
+  }, [clips]);
 
   // init once
   useEffect(() => {
@@ -132,6 +146,7 @@ export default function TrackMap({
       });
       m.addSource('points', { type: 'geojson', data: toPoints([]) });
       m.addSource('ends', { type: 'geojson', data: toEnds([]) });
+      m.addSource('hover', { type: 'geojson', data: EMPTY });
 
       m.addLayer({
         id: 'tracks-glow',
@@ -251,6 +266,74 @@ export default function TrackMap({
           'circle-stroke-width': 3,
         },
       });
+
+      // ring around the hovered point, above everything else
+      m.addLayer({
+        id: 'hover-ring',
+        type: 'circle',
+        source: 'hover',
+        paint: {
+          'circle-radius': 8,
+          'circle-color': '#fff',
+          'circle-stroke-color': ['get', 'color'],
+          'circle-stroke-width': 3.5,
+        },
+      });
+
+      // hover a point -> bubble with all of its metadata
+      const popup = new maplibregl.Popup({
+        className: 'ctt-popup',
+        closeButton: false,
+        closeOnClick: false,
+        closeOnMove: false,
+        focusAfterOpen: false,
+        maxWidth: 'none',
+        offset: 14,
+      });
+      let shown = '';
+      const hide = () => {
+        if (!shown) return;
+        shown = '';
+        popup.remove();
+        (m.getSource('hover') as GeoJSONSource).setData(EMPTY);
+      };
+      m.on('mousemove', (e) => {
+        const { x, y } = e.point;
+        const hits = m.queryRenderedFeatures(
+          [
+            [x - HIT_PX, y - HIT_PX],
+            [x + HIT_PX, y + HIT_PX],
+          ],
+          { layers: POINT_LAYERS },
+        );
+        // nearest dot to the cursor wins
+        let best: (typeof hits)[number] | undefined;
+        let bestD = Infinity;
+        for (const f of hits) {
+          const p = m.project((f.geometry as Point).coordinates as [number, number]);
+          const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+          if (d < bestD) [best, bestD] = [f, d];
+        }
+        const clipId = best?.properties?.clipId;
+        const i = best?.properties?.i;
+        if (clipId === undefined || i === undefined) return hide();
+
+        const key = `${clipId}:${i}`;
+        if (key === shown) return;
+        const clip = data.current.find((c) => c.id === clipId);
+        const coord = clip?.coordinates[i];
+        if (!clip || !coord || !clip.samples[i]) return hide();
+
+        shown = key;
+        popup.setLngLat(coord).setHTML(pointPopupHtml(clip, i)).addTo(m);
+        (m.getSource('hover') as GeoJSONSource).setData({
+          type: 'Feature',
+          properties: { color: clip.color },
+          geometry: { type: 'Point', coordinates: coord },
+        });
+      });
+      m.on('mouseout', hide);
+      m.on('zoomstart', hide);
 
       m.on('click', ['points', 'points-all'], (e) => {
         const id = e.features?.[0]?.properties?.clipId;

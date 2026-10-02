@@ -1,22 +1,8 @@
-import type { Clip } from './types';
+import type { Clip, GpsPoint } from './types';
 import { ROUTE_COLORS } from './types';
 
 /** Shape of the JSON produced from the "Summary" (+ "GPS Track") tabs. Only fields we read. */
-export type GpsPoint = {
-  lat: number;
-  lon: number;
-  altM?: number;
-  speed3dKmh?: number;
-  utc?: string;
-  // present in full extractions; dropped when compacted for storage
-  index?: number;
-  speed2dMs?: number;
-  speed3dMs?: number;
-  dop?: number;
-  fix?: number;
-  segmentDistM?: number;
-  cumulativeDistM?: number;
-};
+export type { GpsPoint };
 export type ClipMetadata = {
   schemaVersion?: number;
   source?: { fileName?: string; fileSizeMB?: number };
@@ -88,15 +74,14 @@ export function clipFromMetadata(raw: unknown, index = 1): Clip {
   const track = m?.gps?.track;
   if (!Array.isArray(track)) throw new Error('missing gps.track');
 
-  const coordinates = track
-    .filter(
-      (p) =>
-        isNum(p?.lat) &&
-        isNum(p?.lon) &&
-        Math.abs(p.lat) <= 90 &&
-        Math.abs(p.lon) <= 180,
-    )
-    .map((p) => [p.lon, p.lat] as [number, number]);
+  const samples = track.filter(
+    (p) =>
+      isNum(p?.lat) &&
+      isNum(p?.lon) &&
+      Math.abs(p.lat) <= 90 &&
+      Math.abs(p.lon) <= 180,
+  );
+  const coordinates = samples.map((p) => [p.lon, p.lat] as [number, number]);
   if (coordinates.length < 2)
     throw new Error('needs at least 2 valid GPS points');
 
@@ -136,5 +121,6 @@ export function clipFromMetadata(raw: unknown, index = 1): Clip {
     camera,
     gpsQuality,
     coordinates,
+    samples,
   };
 }
