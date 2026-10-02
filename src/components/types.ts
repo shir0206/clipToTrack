@@ -14,6 +14,8 @@ export type GpsPoint = {
   cumulativeDistM?: number;
 };
 
+export type DetailGroup = { title: string; rows: [label: string, value: string][] };
+
 export type Clip = {
   id: string;
   index: number;
@@ -35,6 +37,8 @@ export type Clip = {
   coordinates: [number, number][];
   /** Full metadata of each point; samples[i] belongs to coordinates[i]. */
   samples: GpsPoint[];
+  /** Extra metadata worth showing (only the fields that exist in the source). */
+  details?: DetailGroup[];
 };
 
 export const ROUTE_COLORS = [

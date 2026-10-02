@@ -1,4 +1,4 @@
-import type { Clip, GpsPoint } from './types';
+import type { Clip, DetailGroup, GpsPoint } from './types';
 import { ROUTE_COLORS } from './types';
 
 /** Shape of the JSON produced from the "Summary" (+ "GPS Track") tabs. Only fields we read. */
@@ -14,7 +14,22 @@ export type ClipMetadata = {
     frames?: number;
     videoCodec?: string;
     resolution?: string;
+    firmware?: string;
+    videoBitrateMbps?: number;
+    audio?: string;
   };
+  exposure?: {
+    iso?: { min: number; max: number };
+    shutterOneOverX?: { fastest: number; slowest: number };
+    whiteBalanceK?: string;
+    droppedFrames?: number;
+  };
+  motion?: {
+    accelMagnitudeMs2?: { max: number };
+    gyroMagnitudeMaxRadS?: number;
+    gravityNote?: string;
+  };
+  audio?: { windProcessing?: string; wetMicrophone?: string };
   gps: {
     samples?: number;
     fixType?: number;
@@ -24,7 +39,9 @@ export type ClipMetadata = {
     start?: { lat: number; lon: number };
     end?: { lat: number; lon: number };
     totalDistanceM?: number;
-    altitudeM?: { min: number; max: number; mean?: number };
+    straightLineDistanceM?: number;
+    initialBearingDeg?: number;
+    altitudeM?: { min: number; max: number; mean?: number; changeStartToEnd?: number };
     speed3dKmh?: { max: number; mean?: number };
     track: GpsPoint[];
   };
@@ -67,6 +84,48 @@ const fmtDate = (iso?: string) => {
   });
   return `${day} · ${time}`;
 };
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const rng = (a?: number, b?: number, f: (n: number) => string = String) =>
+  isNum(a) && isNum(b) ? (a === b ? f(a) : `${f(a)}–${f(b)}`) : undefined;
+
+/** Optional extras from the JSON; rows whose source field is missing are dropped. */
+function buildDetails(m: ClipMetadata): DetailGroup[] {
+  const { file: f, gps: g, source: s, exposure: e, motion: mo, audio: a } = m;
+  const delta = g.altitudeM?.changeStartToEnd;
+  const raw: [string, [string, string | undefined][]][] = [
+    ['GPS', [
+      ['Avg speed', isNum(g.speed3dKmh?.mean) ? fmtSpeed(g.speed3dKmh!.mean) : undefined],
+      ['Straight line', isNum(g.straightLineDistanceM) ? fmtDistance(g.straightLineDistanceM) : undefined],
+      ['Heading', isNum(g.initialBearingDeg) ? `${Math.round(g.initialBearingDeg)}° ${COMPASS[Math.round(g.initialBearingDeg / 45) % 8]}` : undefined],
+      ['Altitude change', isNum(delta) ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)} m` : undefined],
+    ]],
+    ['Video', [
+      ['Codec', f?.videoCodec],
+      ['Bitrate', isNum(f?.videoBitrateMbps) ? `${f!.videoBitrateMbps} Mbps` : undefined],
+      ['Frames', isNum(f?.frames) ? String(f!.frames) : undefined],
+      ['File size', isNum(s?.fileSizeMB) ? `${s!.fileSizeMB} MB` : undefined],
+      ['Audio', f?.audio],
+      ['Firmware', f?.firmware],
+    ]],
+    ['Exposure', [
+      ['ISO', rng(e?.iso?.min, e?.iso?.max)],
+      ['Shutter', rng(e?.shutterOneOverX?.slowest, e?.shutterOneOverX?.fastest, (n) => `1/${Math.round(n)}`)],
+      ['White balance', e?.whiteBalanceK ? `${e.whiteBalanceK} K` : undefined],
+      ['Dropped frames', isNum(e?.droppedFrames) ? String(e!.droppedFrames) : undefined],
+    ]],
+    ['Motion & audio', [
+      ['Peak accel', isNum(mo?.accelMagnitudeMs2?.max) ? `${mo!.accelMagnitudeMs2!.max.toFixed(1)} m/s²` : undefined],
+      ['Peak gyro', isNum(mo?.gyroMagnitudeMaxRadS) ? `${mo!.gyroMagnitudeMaxRadS} rad/s` : undefined],
+      ['Camera tilt', mo?.gravityNote],
+      ['Wind', a?.windProcessing],
+      ['Wet mic', a?.wetMicrophone],
+    ]],
+  ];
+  return raw
+    .map(([title, rows]) => ({ title, rows: rows.filter((r): r is [string, string] => !!r[1]) }))
+    .filter((grp) => grp.rows.length);
+}
 
 /** Validates parsed JSON and converts it into a Clip. Throws an Error with a readable message. */
 export function clipFromMetadata(raw: unknown, index = 1): Clip {
@@ -122,5 +181,6 @@ export function clipFromMetadata(raw: unknown, index = 1): Clip {
     gpsQuality,
     coordinates,
     samples,
+    details: buildDetails(m as ClipMetadata),
   };
 }

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import SvgIcon from './SvgIcon';
 
 type Props = { onFiles: (files: File[]) => void; busy?: boolean };
 
@@ -14,7 +15,7 @@ export default function UploadZone({ onFiles, busy }: Props) {
 
   return (
     <div
-      className={`ctt-upload${over ? ' is-over' : ''}`}
+      className={`ctt-upload${over ? ' is-over' : ''}${busy ? ' is-busy' : ''}`}
       role="button"
       tabIndex={0}
       aria-label="Add GoPro video"
@@ -36,8 +37,11 @@ export default function UploadZone({ onFiles, busy }: Props) {
         handle(e.dataTransfer.files);
       }}
     >
+      <span className="ctt-upload-ico">
+        <SvgIcon name="upload" size={20} />
+      </span>
       <strong>{busy ? 'Reading telemetry…' : 'Drag & drop GoPro videos'}</strong>
-      <span>or click to browse · MP4 · Processed locally</span>
+      <span>or click to browse · MP4 or metadata JSON · Processed locally</span>
       <input
         ref={input}
         type="file"

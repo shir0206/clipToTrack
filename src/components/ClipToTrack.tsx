@@ -1,9 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import ClipCard from './ClipCard';
 import TrackMap from './TrackMap';
 import UploadZone from './UploadZone';
+import VideoModal from './VideoModal';
+import SvgIcon from './SvgIcon';
 import { useClips } from './useClips';
 import './ClipToTrack.css';
+
+const WIDTH_KEY = 'clip-to-track:panel-width';
+const MIN_W = 320; // card needs room
+const MIN_MAP = 280;
+const clampW = (w: number) =>
+  Math.round(Math.min(Math.max(w, MIN_W), Math.max(MIN_W, window.innerWidth - MIN_MAP)));
 
 export default function ClipToTrack() {
   const { clips, error, busy, addFiles, clear } = useClips(); // clips persist in localStorage
@@ -12,6 +20,40 @@ export default function ClipToTrack() {
   ); // single source of truth
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   const [playingClipId, setPlayingClipId] = useState<string | null>(null);
+  const [maxClipId, setMaxClipId] = useState<string | null>(null);
+
+  const [panelW, setPanelW] = useState(() =>
+    clampW(Number(localStorage.getItem(WIDTH_KEY)) || window.innerWidth * 0.33),
+  );
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WIDTH_KEY, String(panelW));
+    } catch {
+      /* ignore */
+    }
+  }, [panelW]);
+  useEffect(() => {
+    const onResize = () => setPanelW((w) => clampW(w));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const onDragStart = (e: PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onDragMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) setPanelW(clampW(e.clientX));
+  };
+  const onDragEnd = () => setDragging(false);
+  const onResizerKey = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') setPanelW((w) => clampW(w - 24));
+    else if (e.key === 'ArrowRight') setPanelW((w) => clampW(w + 24));
+    else return;
+    e.preventDefault();
+  };
 
   const select = (id: string) => {
     setSelectedClipId(id);
@@ -29,12 +71,15 @@ export default function ClipToTrack() {
 
   const handleClear = () => {
     setPlayingClipId(null);
+    setMaxClipId(null);
     setSelectedClipId(null);
     clear();
   };
 
+  const maxClip = clips.find((c) => c.id === maxClipId && c.videoUrl);
+
   return (
-    <div className="ctt-app">
+    <div className={`ctt-app${dragging ? ' is-resizing' : ''}`}>
       <header className="ctt-header">
         <div className="ctt-brand">
           <span className="ctt-logo">clip to track</span>
@@ -49,12 +94,13 @@ export default function ClipToTrack() {
       </header>
 
       <main className="ctt-layout">
-        <aside className="ctt-panel">
+        <aside className="ctt-panel" style={{ width: panelW }}>
           <div className="ctt-panel-title">
             Clips{' '}
             <span>
               {clips.length > 0 && (
                 <button className="ctt-link" onClick={handleClear}>
+                  <SvgIcon name="trash" size={13} />
                   Clear all
                 </button>
               )}
@@ -75,6 +121,11 @@ export default function ClipToTrack() {
                   setPlayingClipId((p) => (p === clip.id ? null : clip.id));
                 }}
                 onStop={() => setPlayingClipId(null)}
+                onMaximize={() => {
+                  setPlayingClipId(null); // the large player takes over
+                  setSelectedClipId(clip.id);
+                  setMaxClipId(clip.id);
+                }}
               />
             ))}
           </ul>
@@ -85,6 +136,22 @@ export default function ClipToTrack() {
           )}
           <UploadZone onFiles={handleFiles} busy={busy} />
         </aside>
+
+        <div
+          className={`ctt-resizer${dragging ? ' is-dragging' : ''}`}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          aria-valuenow={panelW}
+          aria-valuemin={MIN_W}
+          tabIndex={0}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onKeyDown={onResizerKey}
+          onDoubleClick={() => setPanelW(clampW(window.innerWidth * 0.33))}
+        />
 
         <section className="ctt-map-wrap">
           <TrackMap
@@ -102,6 +169,8 @@ export default function ClipToTrack() {
           )}
         </section>
       </main>
+
+      {maxClip && <VideoModal clip={maxClip} onClose={() => setMaxClipId(null)} />}
     </div>
   );
 }

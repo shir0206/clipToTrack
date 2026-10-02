@@ -133,6 +133,8 @@ export default function TrackMap({
       zoom: 1,
     });
     map.current = m;
+    const ro = new ResizeObserver(() => m.resize()); // sidebar drag / maximize
+    ro.observe(el.current!);
     m.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
       'top-right',
@@ -354,7 +356,10 @@ export default function TrackMap({
       setReady(true);
     });
 
-    return () => m.remove();
+    return () => {
+      ro.disconnect();
+      m.remove();
+    };
   }, []);
 
   // geometry changes -> setData

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Clip } from './types';
+import SvgIcon, { type IconName } from './SvgIcon';
 
 type Props = {
   clip: Clip;
@@ -9,7 +10,11 @@ type Props = {
   onHover: (hovering: boolean) => void;
   onTogglePlay: () => void;
   onStop: () => void;
+  onMaximize: () => void;
 };
+
+const UNPLAYABLE =
+  "This browser can't play this video (HEVC/10-bit often needs Safari or hardware support).";
 
 export default function ClipCard({
   clip,
@@ -19,6 +24,7 @@ export default function ClipCard({
   onHover,
   onTogglePlay,
   onStop,
+  onMaximize,
 }: Props) {
   const stop = (fn: () => void) => (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -39,7 +45,7 @@ export default function ClipCard({
     if (playing) {
       v.play().catch((e: DOMException) => {
         if (e.name === 'AbortError') return; // pause() raced play()
-        setVideoError("This browser can't play this video (HEVC/10-bit often needs Safari or hardware support).");
+        setVideoError(UNPLAYABLE);
         onStopRef.current();
       });
     } else {
@@ -60,6 +66,13 @@ export default function ClipCard({
     setVideoError(null);
     onTogglePlay();
   };
+
+  const stats: [IconName, string, string][] = [
+    ['clock', 'Duration', clip.duration],
+    ['route', 'Distance', clip.distance],
+    ['gauge', 'Max speed', clip.maxSpeed],
+    ['mountain', 'Altitude', clip.altitude],
+  ];
 
   return (
     <li
@@ -83,11 +96,7 @@ export default function ClipCard({
     >
       <div
         className="ctt-thumb"
-        style={
-          clip.thumbnail
-            ? { backgroundImage: `url(${clip.thumbnail})` }
-            : undefined
-        }
+        style={clip.thumbnail ? { backgroundImage: `url(${clip.thumbnail})` } : undefined}
       >
         {clip.videoUrl && !videoError && (
           <video
@@ -102,7 +111,7 @@ export default function ClipCard({
               onStop();
             }}
             onError={() => {
-              setVideoError("This browser can't play this video (HEVC/10-bit often needs Safari or hardware support).");
+              setVideoError(UNPLAYABLE);
               onStop();
             }}
           />
@@ -116,7 +125,10 @@ export default function ClipCard({
           <div>
             <h3>{clip.title}</h3>
             <p>{clip.date}</p>
-            <p>{clip.camera}</p>
+            <p className="ctt-meta">
+              <SvgIcon name="camera" size={12} />
+              {clip.camera}
+            </p>
           </div>
         </div>
 
@@ -127,7 +139,7 @@ export default function ClipCard({
             disabled={!canPlay}
             onClick={stop(handleToggle)}
           >
-            {playing ? '❚❚' : '▶'}
+            <SvgIcon name={playing ? 'pause' : 'play'} size={14} />
           </button>
           <button
             className="ctt-btn"
@@ -135,33 +147,66 @@ export default function ClipCard({
             disabled={!canPlay}
             onClick={stop(handleStop)}
           >
-            ■
+            <SvgIcon name="stop" size={13} />
+          </button>
+          <button
+            className="ctt-btn"
+            aria-label={`Maximize ${clip.title}`}
+            title="Open larger"
+            disabled={!canPlay}
+            onClick={stop(onMaximize)}
+          >
+            <SvgIcon name="maximize" size={14} />
           </button>
           {playing && <span className="ctt-playing">Playing</span>}
           {!clip.videoUrl && <span className="ctt-hint">Re-add the MP4 to play</span>}
         </div>
-        {videoError && <p className="ctt-video-error" role="status">{videoError}</p>}
+        {videoError && (
+          <p className="ctt-video-error" role="status">
+            {videoError}
+          </p>
+        )}
       </div>
 
       <dl className="ctt-stats">
-        <div>
-          <dt>Duration</dt>
-          <dd>{clip.duration}</dd>
-        </div>
-        <div>
-          <dt>Distance</dt>
-          <dd>{clip.distance}</dd>
-        </div>
-        <div>
-          <dt>Max speed</dt>
-          <dd>{clip.maxSpeed}</dd>
-        </div>
-        <div>
-          <dt>Altitude</dt>
-          <dd>{clip.altitude}</dd>
-        </div>
+        {stats.map(([icon, label, value]) => (
+          <div key={label} className="ctt-stat">
+            <SvgIcon name={icon} size={16} />
+            <div>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          </div>
+        ))}
       </dl>
-      <p className="ctt-quality">{clip.gpsQuality}</p>
+
+      <p className="ctt-quality">
+        <SvgIcon name="gps" size={12} />
+        {clip.gpsQuality}
+      </p>
+
+      {!!clip.details?.length && (
+        <details className="ctt-more" onClick={(e) => e.stopPropagation()}>
+          <summary>
+            <SvgIcon name="info" size={14} />
+            More details
+            <SvgIcon name="chevron" size={14} className="ctt-chev" />
+          </summary>
+          {clip.details.map((g) => (
+            <section key={g.title} className="ctt-more-group">
+              <h4>{g.title}</h4>
+              <dl>
+                {g.rows.map(([k, v]) => (
+                  <div key={k} style={{ display: 'contents' }}>
+                    <dt>{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </details>
+      )}
     </li>
   );
 }
