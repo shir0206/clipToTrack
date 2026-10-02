@@ -6,7 +6,7 @@ import {
   type DragEvent,
 } from 'react';
 import ExportPanel from './ExportPanel';
-import ClipToTrack from '/components/ClipToTrack';
+import ClipToTrack from './components/ClipToTrack';
 import { discoverClips, type SourceFile } from './lib/discovery';
 import {
   collectDirectory,

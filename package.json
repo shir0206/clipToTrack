@@ -24,12 +24,15 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "geojson": "^0.5.0",
+    "maplibre-gl": "^6.11.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
