@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { Clip } from './data';
+import type { Clip } from './types';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
@@ -21,6 +21,7 @@ const STYLE: maplibregl.StyleSpecification = {
       type: 'raster',
       tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
+      maxzoom: 19, // tiles stop at 19; MapLibre overzooms them beyond that
       attribution: '© OpenStreetMap contributors',
     },
   },
@@ -36,7 +37,7 @@ const STYLE: maplibregl.StyleSpecification = {
 
 const toTracks = (clips: Clip[]): FeatureCollection => ({
   type: 'FeatureCollection',
-  features: clips.map((c) => ({
+  features: clips.filter((c) => c.coordinates.length > 1).map((c) => ({
     type: 'Feature',
     properties: {
       clipId: c.id,
@@ -48,9 +49,21 @@ const toTracks = (clips: Clip[]): FeatureCollection => ({
   })),
 });
 
-const toEnds = (clips: Clip[]): FeatureCollection => ({
+// one Point feature per GPS sample (the vertices of the path)
+const toPoints = (clips: Clip[]): FeatureCollection => ({
   type: 'FeatureCollection',
   features: clips.flatMap((c) =>
+    c.coordinates.map((coord, i) => ({
+      type: 'Feature' as const,
+      properties: { clipId: c.id, color: c.color, i, last: i === c.coordinates.length - 1 },
+      geometry: { type: 'Point' as const, coordinates: coord },
+    })),
+  ),
+});
+
+const toEnds = (clips: Clip[]): FeatureCollection => ({
+  type: 'FeatureCollection',
+  features: clips.filter((c) => c.coordinates.length > 1).flatMap((c) =>
     [
       { kind: 'start', coord: c.coordinates[0] },
       { kind: 'end', coord: c.coordinates[c.coordinates.length - 1] },
@@ -86,8 +99,8 @@ export default function TrackMap({
     const m = new maplibregl.Map({
       container: el.current!,
       style: STYLE,
-      center: [7.84, 46.1],
-      zoom: 11,
+      center: [0, 20], // placeholder; fitted to the data once clips load
+      zoom: 1,
     });
     map.current = m;
     m.addControl(
@@ -101,6 +114,7 @@ export default function TrackMap({
         data: toTracks([]),
         promoteId: 'clipId',
       });
+      m.addSource('points', { type: 'geojson', data: toPoints([]) });
       m.addSource('ends', { type: 'geojson', data: toEnds([]) });
 
       m.addLayer({
@@ -122,6 +136,18 @@ export default function TrackMap({
           ],
         },
       });
+      // white casing under the coloured line so the path always stands out on the basemap
+      m.addLayer({
+        id: 'tracks-casing',
+        type: 'line',
+        source: 'tracks',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#fff',
+          'line-opacity': 0.9,
+          'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 10, 8],
+        },
+      });
       m.addLayer({
         id: 'tracks-line',
         type: 'line',
@@ -129,13 +155,45 @@ export default function TrackMap({
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false],
-            6,
-            4,
-          ],
+          'line-width': ['case', ['boolean', ['feature-state', 'selected'], false], 6, 4],
         },
+      });
+
+      // GPS samples. 10 Hz data is far denser than the screen can show, so dots would
+      // merge and bury the line. Show every 5th sample (+ the last) from zoom 14, and
+      // every sample only when zoomed in close (zoom 20+).
+      const thinned: maplibregl.FilterSpecification = [
+        'any', ['==', ['%', ['get', 'i'], 5], 0], ['==', ['get', 'last'], true],
+      ];
+      const dot = (r: number, stroke: number): maplibregl.CircleLayerSpecification['paint'] => ({
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, r * 0.6, 19, r] as maplibregl.ExpressionSpecification,
+        'circle-color': '#fff',
+        'circle-stroke-color': ['get', 'color'],
+        'circle-stroke-width': stroke,
+      });
+      m.addLayer({
+        id: 'points-all',
+        type: 'circle',
+        source: 'points',
+        minzoom: 20,
+        paint: dot(2.5, 1.5),
+      });
+      m.addLayer({
+        id: 'points',
+        type: 'circle',
+        source: 'points',
+        minzoom: 14,
+        filter: thinned,
+        paint: dot(3.5, 2),
+      });
+      // selected clip's points: larger, on top
+      m.addLayer({
+        id: 'points-selected',
+        type: 'circle',
+        source: 'points',
+        minzoom: 14,
+        filter: ['all', thinned, ['==', ['get', 'clipId'], '']],
+        paint: dot(4.5, 2.5),
       });
       m.addLayer({
         id: 'ends',
@@ -143,12 +201,17 @@ export default function TrackMap({
         source: 'ends',
         paint: {
           'circle-radius': 6,
-          'circle-color': '#fff',
+          // start = hollow (white), end = filled with the route colour
+          'circle-color': ['case', ['==', ['get', 'kind'], 'end'], ['get', 'color'], '#fff'],
           'circle-stroke-color': ['get', 'color'],
           'circle-stroke-width': 3,
         },
       });
 
+      m.on('click', ['points', 'points-all'], (e) => {
+        const id = e.features?.[0]?.properties?.clipId;
+        if (id) cb.current.onSelect(id);
+      });
       m.on('click', 'tracks-line', (e) => {
         const id = e.features?.[0]?.properties?.clipId;
         if (id) cb.current.onSelect(id);
@@ -172,10 +235,12 @@ export default function TrackMap({
     const m = map.current;
     if (!ready || !m) return;
     (m.getSource('tracks') as GeoJSONSource).setData(toTracks(clips));
+    (m.getSource('points') as GeoJSONSource).setData(toPoints(clips));
     (m.getSource('ends') as GeoJSONSource).setData(toEnds(clips));
     if (clips.length)
       m.fitBounds(boundsOf(clips.flatMap((c) => c.coordinates)), {
         padding: 60,
+        maxZoom: 20,
         duration: 0,
       });
   }, [clips, ready]);
@@ -190,6 +255,11 @@ export default function TrackMap({
         { selected: c.id === selectedId, hovered: c.id === hoveredId },
       ),
     );
+    m.setFilter('points-selected', [
+      'all',
+      ['any', ['==', ['%', ['get', 'i'], 5], 0], ['==', ['get', 'last'], true]],
+      ['==', ['get', 'clipId'], selectedId ?? ''],
+    ]);
   }, [clips, selectedId, hoveredId, ready]);
 
   // camera only moves on intentional selection
@@ -200,6 +270,7 @@ export default function TrackMap({
     m.fitBounds(boundsOf(clip.coordinates), {
       padding: { top: 80, bottom: 80, left: 80, right: 80 },
       duration: 600,
+      maxZoom: 20,
     });
   }, [selectedId, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -2,11 +2,15 @@ import { useState } from 'react';
 import ClipCard from './ClipCard';
 import TrackMap from './TrackMap';
 import UploadZone from './UploadZone';
-import { MOCK_CLIPS, type Clip } from './data';
+import { clipFromMetadata } from './clipFromMetadata';
+import { ROUTE_COLORS, type Clip } from './types';
+import sampleMetadata from './GX010753_metadata.json';
 import './ClipToTrack.css';
 
 export default function ClipToTrack() {
-  const [clips] = useState<Clip[]>(MOCK_CLIPS); // TODO: setClips after telemetry parsing
+  // Seeded with the bundled sample; use useState<Clip[]>([]) to start empty.
+  const [clips, setClips] = useState<Clip[]>(() => [clipFromMetadata(sampleMetadata, 1)]);
+  const [error, setError] = useState<string | null>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(clips[0]?.id ?? null); // single source of truth
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   const [playingClipId, setPlayingClipId] = useState<string | null>(null);
@@ -16,9 +20,27 @@ export default function ClipToTrack() {
     document.getElementById(`ctt-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
 
-  const handleFiles = (files: File[]) => {
-    // TODO: extract GPS telemetry (e.g. gopro-telemetry), build Clip objects, setClips
-    console.log('Files to process', files);
+  const handleFiles = async (files: File[]) => {
+    const added: Clip[] = [];
+    const errors: string[] = [];
+    for (const file of files) {
+      try {
+        added.push(clipFromMetadata(JSON.parse(await file.text())));
+      } catch (e) {
+        errors.push(`${file.name}: ${e instanceof Error ? e.message : 'invalid JSON'}`);
+      }
+    }
+    setError(errors.length ? errors.join(' · ') : null);
+    if (!added.length) return;
+
+    setClips((prev) => {
+      // same id (file + GPS start time) replaces the existing clip in place
+      const byId = new Map(prev.map((c) => [c.id, c]));
+      added.forEach((c) => byId.set(c.id, c));
+      return [...byId.values()].map((c, i) => ({ ...c, index: i + 1, color: ROUTE_COLORS[i % ROUTE_COLORS.length] }));
+    });
+    setSelectedClipId(added[0].id);
+    setTimeout(() => select(added[0].id), 0); // scroll the new card into view after render
   };
 
   return (
@@ -54,6 +76,7 @@ export default function ClipToTrack() {
               />
             ))}
           </ul>
+          {error && <p className="ctt-error" role="alert">Couldn’t load {error}</p>}
           <UploadZone onFiles={handleFiles} />
         </aside>
 
@@ -66,7 +89,7 @@ export default function ClipToTrack() {
             onHover={setHoveredClipId}
           />
           {clips.length === 0 && (
-            <div className="ctt-empty"><h2>No tracks yet</h2><p>Drop GoPro clips to map your adventure.</p></div>
+            <div className="ctt-empty"><h2>No tracks yet</h2><p>Drop a clip metadata JSON to map your adventure.</p></div>
           )}
         </section>
       </main>

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { Clip } from './data';
+import type { Clip } from './types';
 
 type Props = {
   clip: Clip;
@@ -38,6 +38,7 @@ export default function ClipCard({ clip, selected, playing, onSelect, onHover, o
           <div>
             <h3>{clip.title}</h3>
             <p>{clip.date}</p>
+            <p>{clip.camera}</p>
           </div>
         </div>
 
@@ -56,6 +57,7 @@ export default function ClipCard({ clip, selected, playing, onSelect, onHover, o
         <div><dt>Max speed</dt><dd>{clip.maxSpeed}</dd></div>
         <div><dt>Altitude</dt><dd>{clip.altitude}</dd></div>
       </dl>
+      <p className="ctt-quality">{clip.gpsQuality}</p>
     </li>
   );
 }
