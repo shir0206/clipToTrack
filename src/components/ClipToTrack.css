@@ -692,3 +692,33 @@
 .ctt-sort-chip:disabled { opacity: 0.45; cursor: not-allowed; }
 .ctt-sort-chip:focus-visible { outline: 2px solid #2878ff; outline-offset: 1px; }
 .ctt-sort-dir { margin-left: 1px; }
+
+/* ───────── v8: toolbar tooltips, wider thumbnail hint ───────── */
+.ctt-tb-btn[data-tip] { position: relative; }
+.ctt-tb-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 9px); left: 50%; z-index: 20;
+  transform: translate(-50%, -3px);
+  padding: 5px 9px; border-radius: 8px; background: #152033; color: #fff;
+  font-size: 12px; font-weight: 500; line-height: 1.2; white-space: nowrap;
+  box-shadow: 0 4px 12px rgb(21 32 51 / 0.25);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.12s, transform 0.12s;
+}
+.ctt-tb-btn[data-tip]::before { /* little arrow */
+  content: ''; position: absolute; top: calc(100% + 4px); left: 50%; z-index: 20;
+  width: 8px; height: 8px; background: #152033; transform: translate(-50%, -3px) rotate(45deg);
+  opacity: 0; pointer-events: none; transition: opacity 0.12s, transform 0.12s;
+}
+.ctt-tb-btn[data-tip]:hover::after,
+.ctt-tb-btn[data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); transition-delay: 0.3s; }
+.ctt-tb-btn[data-tip]:hover::before,
+.ctt-tb-btn[data-tip]:focus-visible::before { opacity: 1; transform: translate(-50%, 0) rotate(45deg); transition-delay: 0.3s; }
+@media (prefers-reduced-motion: reduce) { .ctt-tb-btn[data-tip]::after, .ctt-tb-btn[data-tip]::before { transition: none; } }
+
+/* the duration badge is hidden while this is shown, so it can use the full thumbnail width */
+.ctt-thumb-hint {
+  left: 6px; right: 6px; max-width: none; padding: 4px 9px;
+  border-radius: 8px; font-size: 12px; font-weight: 500; white-space: normal; line-height: 1.25;
+  background: rgb(0 0 0 / 0.72);
+}

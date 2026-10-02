@@ -203,7 +203,7 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
 // ───────── toolbar bits ─────────
 function IconBtn({ icon, label, on, disabled, onClick }: { icon: IconName; label: string; on?: boolean; disabled?: boolean; onClick: () => void }) {
   return (
-    <button className={`ctt-tb-btn${on ? ' is-on' : ''}`} title={label} aria-label={label} aria-pressed={on} disabled={disabled} onClick={onClick}>
+    <button className={`ctt-tb-btn${on ? ' is-on' : ''}`} data-tip={label} aria-label={label} aria-pressed={on} disabled={disabled} onClick={onClick}>
       <SvgIcon name={icon} size={16} />
     </button>
   );

@@ -66,7 +66,8 @@ export default function ClipToTrack() {
         if (x === undefined) return y === undefined ? 0 : 1; // missing values always last
         if (y === undefined) return -1;
         const r = typeof x === 'string' ? x.localeCompare(y as string, undefined, { numeric: true, sensitivity: 'base' }) : x - (y as number);
-        return r * sort.dir;
+        // ties fall back to upload order, and flip with the direction so the toggle always visibly does something
+        return (r || a.index - b.index) * sort.dir;
       }),
     [clips, sort],
   );
