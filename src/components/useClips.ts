@@ -14,8 +14,13 @@ type Entry = {
   thumbnail?: string;
   videoUrl?: string;
   addedAt: number;
+  /** Permanent colour slot (1-based). Assigned once on add, never recomputed from list position. */
+  slot: number;
 };
-type Stored = Pick<Entry, 'metadata' | 'thumbnail'> & { addedAt?: number };
+type Stored = Pick<Entry, 'metadata' | 'thumbnail'> & {
+  addedAt?: number;
+  slot?: number;
+};
 
 /** Cap the track length (all per-point fields are kept for the hover bubble). Summary stats are untouched. */
 function compact(m: ClipMetadata): ClipMetadata {
@@ -30,7 +35,8 @@ function load(): Entry[] {
     const arr: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
     if (!Array.isArray(arr)) return [];
     return (arr as Stored[])
-      .map((e) => ({ ...e, addedAt: e.addedAt ?? 0 }))
+      // clips saved before slots existed keep the colour they had (their position + 1)
+      .map((e, i) => ({ ...e, addedAt: e.addedAt ?? 0, slot: e.slot ?? i + 1 }))
       .filter((e) => {
         try {
           clipFromMetadata(e.metadata);
@@ -57,7 +63,7 @@ export function useClips() {
   const clips: Clip[] = useMemo(
     () =>
       entries.map((e, i) => ({
-        ...clipFromMetadata(e.metadata, i + 1),
+        ...clipFromMetadata(e.metadata, i + 1, e.slot),
         thumbnail: e.thumbnail,
         videoUrl: e.videoUrl,
         addedAt: e.addedAt,
@@ -69,10 +75,11 @@ export function useClips() {
   useEffect(() => {
     try {
       const stored: Stored[] = entries.map(
-        ({ metadata, thumbnail, addedAt }) => ({
+        ({ metadata, thumbnail, addedAt, slot }) => ({
           metadata,
           thumbnail,
           addedAt,
+          slot,
         }),
       );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
@@ -108,7 +115,7 @@ export function useClips() {
   const addFiles = useCallback(
     async (files: File[]): Promise<string | undefined> => {
       setBusy(true);
-      const added: (Entry & { id: string })[] = [];
+      const added: (Omit<Entry, 'slot'> & { id: string })[] = [];
       const errors: string[] = [];
 
       for (let n = 0; n < files.length; n++) {
@@ -163,6 +170,14 @@ export function useClips() {
           const byId = new Map(
             prev.map((e) => [clipFromMetadata(e.metadata).id, e]),
           );
+          // a new clip takes the lowest colour slot nobody is using; a re-added clip keeps its own
+          const used = new Set(prev.map((e) => e.slot));
+          const freeSlot = () => {
+            let n = 1;
+            while (used.has(n)) n++;
+            used.add(n);
+            return n;
+          };
           for (const { id, ...next } of added) {
             const old = byId.get(id);
             byId.set(id, {
@@ -170,6 +185,7 @@ export function useClips() {
               thumbnail: next.thumbnail ?? old?.thumbnail,
               videoUrl: next.videoUrl ?? old?.videoUrl,
               addedAt: next.addedAt,
+              slot: old?.slot ?? freeSlot(),
             });
           }
           return [...byId.values()];

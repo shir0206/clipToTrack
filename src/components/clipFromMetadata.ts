@@ -194,7 +194,11 @@ function buildDetails(m: ClipMetadata): DetailGroup[] {
 }
 
 /** Validates parsed JSON and converts it into a Clip. Throws an Error with a readable message. */
-export function clipFromMetadata(raw: unknown, index = 1): Clip {
+/**
+ * `index` is the display number; `slot` picks the route colour and stays fixed for the clip's lifetime,
+ * so deleting other clips never recolours it. Defaults to `index` for callers that don't track slots.
+ */
+export function clipFromMetadata(raw: unknown, index = 1, slot = index): Clip {
   const m = raw as Partial<ClipMetadata> | null;
   const track = m?.gps?.track;
   if (!Array.isArray(track)) throw new Error('missing gps.track');
@@ -238,7 +242,7 @@ export function clipFromMetadata(raw: unknown, index = 1): Clip {
     index,
     title: fileName.replace(/\.[^.]+$/, ''),
     date: fmtDate(gps.startUtc ?? file?.createdUtc),
-    color: ROUTE_COLORS[(index - 1) % ROUTE_COLORS.length],
+    color: ROUTE_COLORS[(slot - 1) % ROUTE_COLORS.length],
     duration: fmtDuration(file?.durationSec),
     distance: fmtDistance(gps.totalDistanceM),
     maxSpeed: fmtSpeed(gps.speed3dKmh?.max),
