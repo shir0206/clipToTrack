@@ -11,7 +11,7 @@ import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Point } from 'geojson';
 import { pointPopupHtml } from './pointPopup';
-import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import MapPanel, {
   loadOpts,
   saveOpts,
