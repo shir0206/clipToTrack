@@ -10,6 +10,7 @@ import type { Clip } from './types';
 import ClipCard from './ClipCard';
 import TrackMap, { type MapApi } from './TrackMap';
 import UploadZone from './UploadZone';
+import Logo from './Logo';
 import VideoModal from './VideoModal';
 import SvgIcon, { type IconName } from './SvgIcon';
 import { useClips } from './useClips';
@@ -173,12 +174,7 @@ export default function ClipToTrack() {
   return (
     <div className={`ctt-app${dragging ? ' is-resizing' : ''}`}>
       <header className="ctt-header">
-        <div className="ctt-brand">
-          <span className="ctt-logo">clip to track</span>
-          <span className="ctt-tagline">
-            GoPro clips. Mapped to your adventures.
-          </span>
-        </div>
+        <Logo tagline="GoPro clips. Mapped to your adventures." />
         <div className="ctt-header-actions">
           <button>Projects</button>
           <button>Settings</button>

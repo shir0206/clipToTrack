@@ -164,7 +164,10 @@ export default function ClipCard({
         <div className="ctt-card-head">
           <span className="ctt-badge">{clip.index}</span>
           <div>
-            <h3>{clip.title}</h3>
+            <div className="ctt-title-row">
+              <h3>{clip.title}</h3>
+              {playing && <span className="ctt-playing">Playing</span>}
+            </div>
             <p>{clip.date}</p>
             <p className="ctt-meta">
               <SvgIcon name="camera" size={12} />
@@ -220,7 +223,6 @@ export default function ClipCard({
           >
             <SvgIcon name="trash" size={14} />
           </button>
-          {playing && <span className="ctt-playing">Playing</span>}
         </div>
         {confirming && (
           <div
