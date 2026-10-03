@@ -34,17 +34,23 @@ function load(): Entry[] {
   try {
     const arr: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
     if (!Array.isArray(arr)) return [];
-    return (arr as Stored[])
-      // clips saved before slots existed keep the colour they had (their position + 1)
-      .map((e, i) => ({ ...e, addedAt: e.addedAt ?? 0, slot: e.slot ?? i + 1 }))
-      .filter((e) => {
-        try {
-          clipFromMetadata(e.metadata);
-          return true;
-        } catch {
-          return false; // drop corrupted entries instead of crashing the app
-        }
-      });
+    return (
+      (arr as Stored[])
+        // clips saved before slots existed keep the colour they had (their position + 1)
+        .map((e, i) => ({
+          ...e,
+          addedAt: e.addedAt ?? 0,
+          slot: e.slot ?? i + 1,
+        }))
+        .filter((e) => {
+          try {
+            clipFromMetadata(e.metadata);
+            return true;
+          } catch {
+            return false; // drop corrupted entries instead of crashing the app
+          }
+        })
+    );
   } catch {
     return [];
   }
