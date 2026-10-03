@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import type { Clip, GpsPoint } from './types';
-import SvgIcon from './SvgIcon';
 import './SpeedCluster.css';
 
 type Props = {
   clip: Clip;
-  /** index into clip.samples (shared with the map marker); null = nothing probed */
+  /** index into clip.samples, driven by the map path (hover / click / video playhead); null = nothing yet */
   probe: number | null;
-  onProbe: (i: number | null) => void;
 };
 
 const fin = (n: unknown): n is number =>
@@ -18,78 +16,98 @@ const kmh = (p: GpsPoint) =>
     : fin(p.speed3dMs)
       ? p.speed3dMs * 3.6
       : undefined;
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 /** Speed dial has 8 intervals; pick the smallest "nice" step that covers the clip's top speed. */
 const NICE = [1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100];
 const niceStep = (max: number) =>
   NICE.find((n) => n * 8 >= max) ?? Math.ceil(max / 8 / 100) * 100;
 
-const LED_COLORS = [
-  '#5b8dff', '#5b8dff', '#5b8dff',
-  '#f07a6e', '#f07a6e', '#f07a6e',
-  '#d93232', '#d93232', '#d93232',
-];
-
-function indexAt(times: number[], t: number) {
-  let lo = 0;
-  let hi = times.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (times[mid] <= t) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo;
-}
+// dial geometry (SVG user units, viewBox 0 0 200 200; angles in degrees, 0 = 3 o'clock, clockwise)
+const START = 135;
+const SWEEP = 270;
+const polar = (a: number, r: number) => {
+  const t = (a * Math.PI) / 180;
+  return [100 + r * Math.cos(t), 100 + r * Math.sin(t)] as const;
+};
+const arc = (f: number, r: number) => {
+  const a = SWEEP * f;
+  const [x0, y0] = polar(START, r);
+  const [x1, y1] = polar(START + a, r);
+  return `M${x0.toFixed(2)},${y0.toFixed(2)}A${r},${r} 0 ${a > 180 ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
+};
 
 function Dial({
   labels,
   frac,
-  top,
-  bottom,
+  title,
+  unit,
   className = '',
 }: {
   labels: string[];
   frac: number;
-  top: string;
-  bottom: string;
+  title: string;
+  unit: string;
   className?: string;
 }) {
-  const step = 270 / (labels.length - 1);
-  const style = {
-    '--step': `${step}deg`,
-    '--M': `${step / 2}deg`,
-    '--m': `${step / 4}deg`,
-    '--f': Math.min(1, Math.max(0, frac)),
-  } as CSSProperties;
+  const f = clamp01(frac);
+  const n = labels.length - 1;
+  const ticks = [];
+  for (let i = 0; i <= n * 2; i++) {
+    const major = i % 2 === 0;
+    const a = START + (SWEEP * i) / (n * 2);
+    const [x0, y0] = polar(a, major ? 79 : 83);
+    const [x1, y1] = polar(a, 88);
+    ticks.push(
+      <line
+        key={i}
+        className={major ? 'maj' : 'min'}
+        x1={x0}
+        y1={y0}
+        x2={x1}
+        y2={y1}
+      />,
+    );
+  }
   return (
-    <section className={`ctt-gt-dial ${className}`} style={style}>
-      <div className="ctt-gt-face">
-        <i className="ctt-gt-ticks minor" />
-        <i className="ctt-gt-ticks major" />
-        {labels.map((l, i) => (
-          <span
-            key={i}
-            className="ctt-gt-n"
-            style={{ '--i': i } as CSSProperties}
-          >
+    <svg
+      className={`ctt-gt-dial ${className}`}
+      viewBox="0 0 200 200"
+      style={{ '--f': f } as CSSProperties}
+      aria-hidden="true"
+    >
+      <circle className="ctt-gt-face" cx="100" cy="100" r="97" />
+      <path className="ctt-gt-track" d={arc(1, 92)} />
+      {f > 0.002 && <path className="ctt-gt-fill" d={arc(f, 92)} />}
+      {ticks}
+      {labels.map((l, i) => {
+        const [x, y] = polar(START + (SWEEP * i) / n, 64);
+        return (
+          <text key={i} className="ctt-gt-lbl" x={x} y={y}>
             {l}
-          </span>
-        ))}
-        <div className="ctt-gt-cap top">{top}</div>
-        <div className="ctt-gt-cap bot">{bottom}</div>
-        <div className="ctt-gt-needle" />
-        <div className="ctt-gt-hub" />
-      </div>
-    </section>
+          </text>
+        );
+      })}
+      <text className="ctt-gt-cap" x="100" y="134">
+        {title}
+      </text>
+      <text className="ctt-gt-unit" x="100" y="147">
+        {unit}
+      </text>
+      <g className="ctt-gt-needle">
+        <line x1="90" y1="100" x2="160" y2="100" />
+      </g>
+      <circle className="ctt-gt-hub" cx="100" cy="100" r="5" />
+    </svg>
   );
 }
 
 /**
- * GT instrument cluster fed by the clip's own GPS samples:
- * speedometer + digital readout (3D speed), altitude dial, distance and max speed.
- * It follows `probe`, so it stays in sync with the map marker; a play button replays the clip in real time.
+ * Dark instrument cluster fed by the clip's own GPS samples (speed, altitude, distance).
+ * It has no controls of its own: it shows the sample picked by `probe`, so the route on the map
+ * (hover, click, or the video playhead) is the controller.
  */
-export default function SpeedCluster({ clip, probe, onProbe }: Props) {
+export default function SpeedCluster({ clip, probe }: Props) {
   const samples = clip.samples;
   const last = samples.length - 1;
 
@@ -103,50 +121,10 @@ export default function SpeedCluster({ clip, probe, onProbe }: Props) {
     };
   }, [samples]);
 
-  // ms since the first sample (from the GPS UTC stamps; 10 Hz fallback)
-  const times = useMemo(() => {
-    const t = samples.map((s) => (s.utc ? Date.parse(s.utc) : NaN));
-    const ok = t.length > 1 && t.every(Number.isFinite) && t[last] > t[0];
-    return ok ? t.map((x) => x - t[0]) : samples.map((_, i) => i * 100);
-  }, [samples, last]);
-
-  // keep showing the last probed sample when the pointer leaves another chart
+  // keep showing the last probed sample when the pointer leaves the route
   const [held, setHeld] = useState<number | null>(null);
   if (probe !== null && probe !== held) setHeld(probe);
   const idx = probe ?? held;
-
-  const [playing, setPlaying] = useState(false);
-  const idxRef = useRef(idx);
-  const onProbeRef = useRef(onProbe);
-  useEffect(() => {
-    idxRef.current = idx;
-    onProbeRef.current = onProbe;
-  });
-
-  useEffect(() => {
-    if (!playing) return;
-    const from = idxRef.current;
-    const t0 = from !== null && from < last ? times[from] : 0;
-    const started = performance.now();
-    let prev = -1;
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = t0 + (now - started);
-      if (t >= times[last]) {
-        onProbeRef.current(last);
-        setPlaying(false);
-        return;
-      }
-      const i = indexAt(times, t);
-      if (i !== prev) {
-        prev = i;
-        onProbeRef.current(i);
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [playing, times, last]);
 
   if (stats.maxSpeed === undefined)
     return (
@@ -159,7 +137,7 @@ export default function SpeedCluster({ clip, probe, onProbe }: Props) {
   const scale = step * 8;
   const speedLabels = Array.from({ length: 9 }, (_, i) => String(i * step));
 
-  const p = idx !== null ? samples[idx] : undefined;
+  const p = idx !== null ? samples[Math.min(idx, last)] : undefined;
   const v = p ? kmh(p) : undefined;
   const speedFrac = v !== undefined ? v / scale : 0;
 
@@ -174,117 +152,65 @@ export default function SpeedCluster({ clip, probe, onProbe }: Props) {
   const altFrac =
     hasAlt && fin(p?.altM) ? (p!.altM! - stats.altMin!) / altSpan : 0;
 
-  const dist = fin(p?.cumulativeDistM) ? Math.round(p!.cumulativeDistM!) : '--';
-  const totalDist = samples[last]?.cumulativeDistM;
-  const distFrac =
-    fin(p?.cumulativeDistM) && fin(totalDist) && totalDist > 0
-      ? p!.cumulativeDistM! / totalDist
-      : 0;
-  const maxFrac = v !== undefined ? v / stats.maxSpeed : 0;
-  // cosmetic, like the HTML cluster: gear and drive mode follow the speed
-  const gear = Math.min(6, 1 + Math.floor(speedFrac * 6));
-  const mode = speedFrac < 0.34 ? 0 : speedFrac < 0.67 ? 1 : 2;
-  const pct = (f: number) => `${Math.round(Math.min(1, Math.max(0, f)) * 100)}%`;
+  const total = samples[last]?.cumulativeDistM;
+  const done = p?.cumulativeDistM;
+  const distFrac = fin(done) && fin(total) && total > 0 ? done / total : 0;
 
   return (
-    <div>
-      <div
-        className="ctt-gt"
-        role="img"
-        aria-label={`Speedometer: ${v !== undefined ? Math.round(v) : 'no'} km/h`}
-      >
-        <div className="ctt-gt-dash">
-          {hasAlt && (
-            <Dial
-              className="ctt-gt-alt ctt-gt-tacho"
-              labels={altLabels}
-              frac={altFrac}
-              top="ALT"
-              bottom="metres"
-            />
-          )}
-
-          <section className="ctt-gt-mid">
-            <div className="ctt-gt-leds" aria-hidden="true">
-              {LED_COLORS.map((c, k) => (
-                <i
-                  key={k}
-                  style={
-                    {
-                      '--c': c,
-                      '--on': Math.min(1, Math.max(0, speedFrac * 9 - k)),
-                    } as CSSProperties
-                  }
-                />
-              ))}
-            </div>
-            <div className="ctt-gt-lcd">
-              <div className="ctt-gt-spd">
-                {v !== undefined ? Math.round(v) : '--'}
-              </div>
-              <div className="ctt-gt-unit">KM/H</div>
-            </div>
-            <div className="ctt-gt-row">
-              <div className="ctt-gt-box">
-                <b>{gear}</b>
-                <span>GEAR</span>
-              </div>
-              <div className="ctt-gt-mode">
-                {['ECO', 'COMFORT', 'SPORT+'].map((m, k) => (
-                  <em key={m} className={k === mode ? 'on' : undefined}>
-                    {m}
-                  </em>
-                ))}
-              </div>
-            </div>
-            <div className="ctt-gt-bars">
-              <span>DIST</span>
-              <div className="ctt-gt-bar">
-                <i style={{ width: pct(distFrac) }} />
-              </div>
-              <span className="ctt-gt-val">{dist} m</span>
-              <span>MAX</span>
-              <div className="ctt-gt-bar hot">
-                <i style={{ width: pct(maxFrac) }} />
-              </div>
-              <span className="ctt-gt-val">{Math.round(stats.maxSpeed)}</span>
-            </div>
-          </section>
-
-          <Dial
-            className="ctt-gt-speedo"
-            labels={speedLabels}
-            frac={speedFrac}
-            top="GT"
-            bottom="km/h"
-          />
-        </div>
-      </div>
-
-      <div className="ctt-prof-ctl">
-        <button
-          className="ctt-btn"
-          aria-label={playing ? 'Pause replay' : 'Replay clip'}
-          onClick={() => setPlaying((x) => !x)}
-        >
-          <SvgIcon name={playing ? 'pause' : 'play'} size={14} />
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={last}
-          value={idx ?? 0}
-          aria-label="Scrub through the clip"
-          onChange={(e) => {
-            setPlaying(false);
-            onProbe(Number(e.target.value));
-          }}
+    <div
+      className="ctt-gt"
+      role="img"
+      aria-label={`Speedometer: ${v !== undefined ? Math.round(v) : 'no'} km/h`}
+    >
+      {hasAlt && (
+        <Dial
+          className="ctt-gt-alt"
+          labels={altLabels}
+          frac={altFrac}
+          title="ALTITUDE"
+          unit="m"
         />
-        <span className="ctt-prof-read">
-          {((times[idx ?? 0] ?? 0) / 1000).toFixed(1)} /{' '}
-          {(times[last] / 1000).toFixed(1)} s
-        </span>
-      </div>
+      )}
+
+      <section className="ctt-gt-mid">
+        <div className="ctt-gt-seg" aria-hidden="true">
+          {Array.from({ length: 12 }, (_, k) => (
+            <i
+              key={k}
+              style={{ '--on': clamp01(speedFrac * 12 - k) } as CSSProperties}
+            />
+          ))}
+        </div>
+        <div className="ctt-gt-read">
+          <b>{v !== undefined ? Math.round(v) : '--'}</b>
+          <span>km/h</span>
+        </div>
+        <div className="ctt-gt-tiles">
+          <div>
+            <span>Distance</span>
+            <b>{fin(done) ? `${Math.round(done)} m` : '--'}</b>
+          </div>
+          <div>
+            <span>Max speed</span>
+            <b>{Math.round(stats.maxSpeed)} km/h</b>
+          </div>
+        </div>
+        {idx === null ? (
+          <p className="ctt-gt-hint">Hover or play the route on the map</p>
+        ) : (
+          <div className="ctt-gt-bar" aria-hidden="true">
+            <i style={{ width: `${Math.round(distFrac * 100)}%` }} />
+          </div>
+        )}
+      </section>
+
+      <Dial
+        className="ctt-gt-speedo"
+        labels={speedLabels}
+        frac={speedFrac}
+        title="SPEED"
+        unit="km/h"
+      />
     </div>
   );
 }

@@ -1,8 +1,11 @@
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type DragEvent,
+  type KeyboardEvent,
   type PointerEvent,
 } from 'react';
 import type { Clip } from './types';
@@ -24,6 +27,11 @@ type SpeedMode = 'graph' | 'dial';
 const W = 1000;
 const H = 100;
 const PAD = 6;
+
+const HEIGHT_KEY = 'clip-to-track:profile-height';
+const DEFAULT_H = 260;
+const MIN_H = 170;
+const MIN_STAGE = 200; // the map always keeps at least this much
 
 const LABEL: Record<Metric, string> = { alt: 'Altitude', speed: 'Speed' };
 const UNIT: Record<Metric, string> = { alt: 'm', speed: 'km/h' };
@@ -125,12 +133,7 @@ function Pane({
       </div>
 
       {dial ? (
-        <SpeedCluster
-          key={clip.id}
-          clip={clip}
-          probe={probe}
-          onProbe={onProbe}
-        />
+        <SpeedCluster key={clip.id} clip={clip} probe={probe} />
       ) : chart ? (
         <div
           className="ctt-prof-plot"
@@ -189,6 +192,34 @@ export default function ElevationProfile({
   const [split, setSplit] = useState<[Metric, Metric] | null>(null); // [left, right]
   const [speedMode, setSpeedMode] = useState<SpeedMode>('graph');
 
+  // dock height: drag the grip on its top edge (or use ↑ / ↓); remembered between visits
+  const root = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(
+    () => Number(localStorage.getItem(HEIGHT_KEY)) || DEFAULT_H,
+  );
+  useEffect(() => {
+    try {
+      localStorage.setItem(HEIGHT_KEY, String(height));
+    } catch {
+      /* ignore */
+    }
+  }, [height]);
+  const clampH = (h: number) => {
+    const room = root.current?.parentElement?.clientHeight ?? window.innerHeight;
+    return Math.round(Math.min(Math.max(h, MIN_H), Math.max(MIN_H, room - MIN_STAGE)));
+  };
+  const onGripMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const parent = root.current?.parentElement;
+    if (parent) setHeight(clampH(parent.getBoundingClientRect().bottom - e.clientY));
+  };
+  const onGripKey = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowUp') setHeight((h) => clampH(h + 24));
+    else if (e.key === 'ArrowDown') setHeight((h) => clampH(h - 24));
+    else return;
+    e.preventDefault();
+  };
+
   const [drag, setDrag] = useState<Metric | null>(null);
   const [overTab, setOverTab] = useState<Metric | null>(null);
   const [overSide, setOverSide] = useState<Side | null>(null);
@@ -238,7 +269,24 @@ export default function ElevationProfile({
   });
 
   return (
-    <div className="ctt-prof" style={{ '--c': clip.color } as CSSProperties}>
+    <div
+      ref={root}
+      className="ctt-prof"
+      style={{ '--c': clip.color, '--h': `${height}px` } as CSSProperties}
+    >
+      <div
+        className="ctt-prof-grip"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize profile"
+        aria-valuenow={height}
+        aria-valuemin={MIN_H}
+        tabIndex={0}
+        onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+        onPointerMove={onGripMove}
+        onKeyDown={onGripKey}
+        onDoubleClick={() => setHeight(clampH(DEFAULT_H))}
+      />
       <div className="ctt-prof-head">
         <SvgIcon name="chart" size={14} />
         <strong>{clip.title}</strong>

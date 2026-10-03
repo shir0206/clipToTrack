@@ -899,11 +899,48 @@
 /* elevation profile dock */
 .ctt-prof {
   --c: #2878ff;
+  --h: 260px;
+  position: relative;
   flex: none;
+  display: flex;
+  flex-direction: column;
+  height: var(--h);
+  min-height: 170px;
+  max-height: calc(100% - 200px); /* the map keeps room */
   background: var(--card);
   border-top: 1px solid var(--border);
 }
+.ctt-prof-grip {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 11px;
+  z-index: 5;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.ctt-prof-grip::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.ctt-prof-grip:hover::after,
+.ctt-prof-grip:focus-visible::after {
+  background: var(--c);
+}
+.ctt-prof-grip:focus-visible {
+  outline: none;
+}
 .ctt-prof-head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -969,18 +1006,24 @@
 /* body: one pane, or two side by side */
 .ctt-prof-body {
   position: relative;
+  flex: 1;
+  min-height: 0;
   display: flex;
   min-width: 0;
 }
 .ctt-prof-pane {
   flex: 1 1 0;
   min-width: 0;
-  padding: 0 12px 10px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 12px;
 }
 .ctt-prof-pane + .ctt-prof-pane {
   border-left: 1px solid var(--border);
 }
 .ctt-prof-pane-head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -999,7 +1042,8 @@
 }
 .ctt-prof-plot {
   position: relative;
-  height: 100px;
+  flex: 1;
+  min-height: 40px;
   cursor: crosshair;
   touch-action: none;
 }
@@ -1026,23 +1070,6 @@
   background: #fff;
   border: 2.5px solid var(--c);
   pointer-events: none;
-}
-.ctt-prof-ctl {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 6px;
-  font-size: 12px;
-}
-.ctt-prof-ctl input[type='range'] {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--c);
-}
-.ctt-prof-ctl .ctt-prof-read {
-  margin: 0;
-  min-width: 70px;
-  text-align: right;
 }
 
 /* drop targets shown while a tab is being dragged */

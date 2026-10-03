@@ -651,6 +651,7 @@ export default function TrackMap({
       m.on('mousemove', (e) => {
         if (measuringRef.current) return hide();
         const h = nearest(e.point.x, e.point.y);
+        if (h && h.clip.id === selIdRef.current) setProbe(h.i); // route hover drives the speedometer / charts
         if (!h || h.key === pinned) return hide();
         if (h.key === shown) return;
         shown = h.key;
@@ -670,6 +671,7 @@ export default function TrackMap({
         }
         const h = nearest(e.point.x, e.point.y);
         if (!h) return;
+        if (h.clip.id === selIdRef.current) setProbe(h.i);
         cb.current.onSelect(h.clip.id);
         pinned = h.key;
         pinnedClip = h.clip.id;
