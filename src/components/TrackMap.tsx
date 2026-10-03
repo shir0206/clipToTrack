@@ -282,6 +282,10 @@ export default function TrackMap({
   const [meas, setMeas] = useState<[number, number][]>([]);
 
   const sel = clips.find((c) => c.id === selectedId);
+  const selIdRef = useRef(selectedId);
+  useEffect(() => {
+    selIdRef.current = selectedId;
+  }, [selectedId]);
 
   useEffect(() => {
     cb.current = { onSelect, onHover };
@@ -726,6 +730,8 @@ export default function TrackMap({
           a[1] + (b[1] - a[1]) * t,
         ];
         src.setData(dotFeature(c, clip.color));
+        // same position, as a sample index: the profile charts and the speedometer follow the video
+        if (clipId === selIdRef.current) setProbe(Math.round(pos));
         if (followRef.current) m.jumpTo({ center: c });
       },
     };

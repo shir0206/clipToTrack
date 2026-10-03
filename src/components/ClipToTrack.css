@@ -912,21 +912,94 @@
 }
 .ctt-prof-tabs {
   display: flex;
+  align-items: center;
   gap: 4px;
-}
-.ctt-prof-read {
-  margin-left: auto;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 .ctt-prof-head .ctt-btn {
   width: 26px;
   height: 26px;
+  margin-left: auto;
+}
+
+/* draggable tabs */
+.ctt-tab {
+  cursor: grab;
+  user-select: none;
+}
+.ctt-tab::before {
+  content: '';
+  width: 6px;
+  height: 10px;
+  opacity: 0.45;
+  background: radial-gradient(circle, currentColor 1px, transparent 1.5px) 0 0 /
+    3px 3.4px;
+}
+.ctt-tab:active {
+  cursor: grabbing;
+}
+.ctt-tab.is-drop {
+  outline: 2px dashed var(--c);
+  outline-offset: 1px;
+}
+.ctt-tab-split {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.ctt-tab-split button {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 9px;
+}
+.ctt-tab-split-x {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px 4px 5px !important;
+  opacity: 0.6;
+}
+.ctt-tab-split-x:hover,
+.ctt-tab-split-x:focus-visible {
+  opacity: 1;
+}
+.ctt-tab-split button:focus-visible {
+  outline: 2px solid #2878ff;
+  outline-offset: -2px;
+}
+
+/* body: one pane, or two side by side */
+.ctt-prof-body {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.ctt-prof-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 12px 10px;
+}
+.ctt-prof-pane + .ctt-prof-pane {
+  border-left: 1px solid var(--border);
+}
+.ctt-prof-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ctt-prof-pane-head b {
+  color: var(--text);
+  font-weight: 600;
+}
+.ctt-prof-read {
+  margin-right: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .ctt-prof-plot {
   position: relative;
   height: 100px;
-  margin: 0 12px 10px;
   cursor: crosshair;
   touch-action: none;
 }
@@ -952,6 +1025,56 @@
   border-radius: 50%;
   background: #fff;
   border: 2.5px solid var(--c);
+  pointer-events: none;
+}
+.ctt-prof-ctl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.ctt-prof-ctl input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--c);
+}
+.ctt-prof-ctl .ctt-prof-read {
+  margin: 0;
+  min-width: 70px;
+  text-align: right;
+}
+
+/* drop targets shown while a tab is being dragged */
+.ctt-prof-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--card) 75%, transparent);
+}
+.ctt-prof-drop-half {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
+}
+.ctt-prof-drop-half.is-over {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  color: var(--text);
+}
+.ctt-prof-drop-half span {
   pointer-events: none;
 }
 
