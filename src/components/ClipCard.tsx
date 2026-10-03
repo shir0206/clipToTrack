@@ -6,6 +6,8 @@ type Props = {
   clip: Clip;
   selected: boolean;
   playing: boolean;
+  /** true while this clip plays in the large player (popup / modal); only drives the visuals */
+  nowPlaying?: boolean;
   onSelect: () => void;
   onHover: (hovering: boolean) => void;
   onTogglePlay: () => void;
@@ -26,6 +28,7 @@ export default function ClipCard({
   clip,
   selected,
   playing,
+  nowPlaying = false,
   onSelect,
   onHover,
   onTogglePlay,
@@ -80,6 +83,7 @@ export default function ClipCard({
     }
   }, [playing]);
 
+  const active = playing || nowPlaying; // visuals only; `playing` alone controls the inline <video>
   const canPlay = !!clip.videoUrl && !videoError;
   const handleStop = () => {
     const v = videoRef.current;
@@ -109,7 +113,7 @@ export default function ClipCard({
       aria-selected={selected}
       tabIndex={0}
       aria-label={`Select track ${clip.index} ${clip.title}`}
-      className={`ctt-card${selected ? ' is-selected' : ''}${playing ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
+      className={`ctt-card${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
       style={{ '--c': clip.color } as CSSProperties}
       onClick={onSelect}
       onKeyDown={(e) => {
@@ -123,10 +127,18 @@ export default function ClipCard({
       onMouseLeave={() => onHover(false)}
     >
       <div
-        className="ctt-thumb"
+        className={`ctt-thumb${canPlay ? ' is-playable' : ''}`}
         style={
           clip.thumbnail
             ? { backgroundImage: `url(${clip.thumbnail})` }
+            : undefined
+        }
+        onClick={
+          canPlay
+            ? (e) => {
+                e.stopPropagation();
+                onMaximize(); // opens the video in its own window
+              }
             : undefined
         }
       >
@@ -157,7 +169,6 @@ export default function ClipCard({
             Re-add video to play
           </span>
         )}
-        {clip.videoUrl && <span className="ctt-duration">{clip.duration}</span>}
       </div>
 
       <div className="ctt-card-body">
@@ -166,7 +177,16 @@ export default function ClipCard({
           <div>
             <div className="ctt-title-row">
               <h3>{clip.title}</h3>
-              {playing && <span className="ctt-playing">Playing</span>}
+              {active && (
+                <span className="ctt-playing" role="status">
+                  <span className="ctt-eq" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  Playing
+                </span>
+              )}
             </div>
             <p>{clip.date}</p>
             <p className="ctt-meta">

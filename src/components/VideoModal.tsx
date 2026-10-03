@@ -6,10 +6,16 @@ type Props = {
   clip: Clip;
   onClose: () => void;
   onProgress?: (frac: number) => void;
+  onPlayingChange?: (playing: boolean) => void;
 };
 
 /** Large player for one clip. Esc / backdrop click / ✕ closes it. */
-export default function VideoModal({ clip, onClose, onProgress }: Props) {
+export default function VideoModal({
+  clip,
+  onClose,
+  onProgress,
+  onPlayingChange,
+}: Props) {
   const closeBtn = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -54,6 +60,9 @@ export default function VideoModal({ clip, onClose, onProgress }: Props) {
           controls
           autoPlay
           playsInline
+          onPlay={() => onPlayingChange?.(true)}
+          onPause={() => onPlayingChange?.(false)}
+          onEnded={() => onPlayingChange?.(false)}
           onTimeUpdate={(e) =>
             e.currentTarget.duration &&
             onProgress?.(e.currentTarget.currentTime / e.currentTarget.duration)

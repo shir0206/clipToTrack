@@ -12,6 +12,7 @@ import TrackMap, { type MapApi } from './TrackMap';
 import UploadZone from './UploadZone';
 import Logo from './Logo';
 import VideoModal from './VideoModal';
+import VideoWindow, { openVideoWindow } from './VideoWindow';
 import SvgIcon, { type IconName } from './SvgIcon';
 import { useClips } from './useClips';
 import './ClipToTrack.css';
@@ -56,6 +57,8 @@ export default function ClipToTrack() {
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   const [playingClipId, setPlayingClipId] = useState<string | null>(null);
   const [maxClipId, setMaxClipId] = useState<string | null>(null);
+  const [maxPlaying, setMaxPlaying] = useState(false); // is the large player (popup / modal) actually playing?
+  const [videoWin, setVideoWin] = useState<Window | null>(null); // popup window; null => in-page modal fallback
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set()); // hidden on the map only
   const [sort, setSort] = useState(loadSort);
   const mapApi = useRef<MapApi | null>(null);
@@ -147,9 +150,24 @@ export default function ClipToTrack() {
     setTimeout(() => select(firstId), 0); // scroll the new card into view after render
   };
 
+  const closeMax = () => {
+    if (videoWin && !videoWin.closed) videoWin.close();
+    setVideoWin(null);
+    setMaxClipId(null);
+    setMaxPlaying(false);
+  };
+  const openMax = (clip: Clip) => {
+    if (videoWin && !videoWin.closed) videoWin.close(); // replaces any popup already open
+    const win = openVideoWindow(clip.title); // must run synchronously inside the click
+    setVideoWin(win); // null (popup blocked) falls back to the modal
+    setPlayingClipId(null); // the large player takes over
+    setSelectedClipId(clip.id);
+    setMaxClipId(clip.id);
+  };
+
   const handleDelete = (id: string) => {
     if (playingClipId === id) setPlayingClipId(null);
-    if (maxClipId === id) setMaxClipId(null);
+    if (maxClipId === id) closeMax();
     if (selectedClipId === id) setSelectedClipId(null);
     setHoveredClipId(null); // the card unmounts, so its mouseleave will never fire
     setHiddenIds((s) => {
@@ -163,7 +181,7 @@ export default function ClipToTrack() {
 
   const handleClear = () => {
     setPlayingClipId(null);
-    setMaxClipId(null);
+    closeMax();
     setHiddenIds(new Set());
     setSelectedClipId(null);
     clear();
@@ -244,6 +262,7 @@ export default function ClipToTrack() {
                 clip={clip}
                 selected={clip.id === selectedClipId}
                 playing={clip.id === playingClipId}
+                nowPlaying={clip.id === maxClipId && maxPlaying}
                 onSelect={() => select(clip.id)}
                 onHover={(h) => setHoveredClipId(h ? clip.id : null)}
                 onTogglePlay={() => {
@@ -255,11 +274,7 @@ export default function ClipToTrack() {
                 onToggleHidden={() => toggleHidden(clip.id)}
                 onProgress={(f) => mapApi.current?.setPlayhead(clip.id, f)}
                 onDelete={() => handleDelete(clip.id)}
-                onMaximize={() => {
-                  setPlayingClipId(null); // the large player takes over
-                  setSelectedClipId(clip.id);
-                  setMaxClipId(clip.id);
-                }}
+                onMaximize={() => openMax(clip)}
               />
             ))}
           </ul>
@@ -305,13 +320,24 @@ export default function ClipToTrack() {
         </section>
       </main>
 
-      {maxClip && (
-        <VideoModal
-          clip={maxClip}
-          onClose={() => setMaxClipId(null)}
-          onProgress={(f) => mapApi.current?.setPlayhead(maxClip.id, f)}
-        />
-      )}
+      {maxClip &&
+        (videoWin ? (
+          <VideoWindow
+            key={maxClip.id}
+            clip={maxClip}
+            win={videoWin}
+            onClose={closeMax}
+            onPlayingChange={setMaxPlaying}
+            onProgress={(f) => mapApi.current?.setPlayhead(maxClip.id, f)}
+          />
+        ) : (
+          <VideoModal
+            clip={maxClip}
+            onClose={closeMax}
+            onPlayingChange={setMaxPlaying}
+            onProgress={(f) => mapApi.current?.setPlayhead(maxClip.id, f)}
+          />
+        ))}
     </div>
   );
 }
