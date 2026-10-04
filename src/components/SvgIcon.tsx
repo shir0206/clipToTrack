@@ -36,7 +36,8 @@ export type IconName =
   | 'shuffle'
   | 'plus'
   | 'check'
-  | 'folder';
+  | 'folder'
+  | 'external';
 
 const solid = { fill: 'currentColor', stroke: 'none' } as const;
 
@@ -147,6 +148,9 @@ const PATHS: Record<IconName, ReactNode> = {
   check: <path d="M20 6 9 17l-5-5" />,
   folder: (
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+  ),
+  external: (
+    <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
   ),
   sliders: (
     <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />

@@ -1,40 +1,58 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import type { Clip } from './types';
-import SvgIcon from './SvgIcon';
+import SvgIcon, { type IconName } from './SvgIcon';
 import {
   CLIP_MIME,
   fmtKm,
   GAP_DAYS,
   MAX_KM,
-  suggestName,
   type Placement,
   type ProjectView,
 } from './projects';
 import './ProjectsUI.css';
 
+const TOAST_MS = 5000;
+
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const stats = (v: ProjectView) =>
-  [
-    plural(v.clipIds.length, 'clip'),
-    v.days ? plural(v.days, 'day') : undefined,
-    v.distanceM ? fmtKm(v.distanceM) : undefined,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-/** The dates stay visible even when the project has a custom name. */
+
+/** clips / days / distance as small icon chips (same look as the GPS-quality chip on a clip card) */
+function StatChips({ v }: { v: ProjectView }) {
+  const chips: [IconName, string][] = [
+    ['camera', plural(v.clipIds.length, 'clip')],
+  ];
+  if (v.days) chips.push(['calendar', plural(v.days, 'day')]);
+  if (v.distanceM) chips.push(['route', fmtKm(v.distanceM)]);
+  return (
+    <p className="ctt-pchips">
+      {chips.map(([icon, text]) => (
+        <span key={icon} className="ctt-pchip">
+          <SvgIcon name={icon} size={12} />
+          {text}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/** Generated names already carry the place ("Fabulous Times in Valencia"), so only custom names repeat it. */
 const where = (v: ProjectView) =>
-  [v.place, v.range].filter(Boolean).join(' · ');
+  (v.custom ? [v.place, v.range] : [v.range]).filter(Boolean).join(' · ');
 const RULE = `Grouped automatically: clips within ${GAP_DAYS} days and ${MAX_KM} km of each other share a project.`;
 
-// ───────── inline rename: Enter / ✓ / clicking away saves, Esc / ✕ cancels, 🎲 suggests a name ─────────
+// ───────── inline rename: Enter / ✓ / clicking away saves, Esc / ✕ cancels ─────────
+// No random-name button here: a new project gets one generated name, "Reset name" brings it back.
 function RenameField({
   value,
-  taken,
   onSave,
   onCancel,
 }: {
   value: string;
-  taken: string[];
   onSave: (name: string) => void;
   onCancel: () => void;
 }) {
@@ -45,13 +63,15 @@ function RenameField({
     settled.current = true;
     fn();
   };
+  // unchanged text is a cancel, so the generated name isn't frozen into a custom one by accident
+  const save = () =>
+    finish(() => (draft.trim() === value ? onCancel() : onSave(draft)));
   const keepFocus = (e: React.MouseEvent) => e.preventDefault(); // buttons must not blur the input first
   return (
     <div
       className="ctt-rn"
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null))
-          finish(() => onSave(draft));
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) save();
       }}
     >
       <input
@@ -62,7 +82,7 @@ function RenameField({
         onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') finish(() => onSave(draft));
+          if (e.key === 'Enter') save();
           else if (e.key === 'Escape') {
             e.stopPropagation(); // closes the editor, not the dialog
             finish(onCancel);
@@ -70,20 +90,11 @@ function RenameField({
         }}
       />
       <button
-        className="ctt-btn"
-        title="Random name"
-        aria-label="Suggest a random name"
-        onMouseDown={keepFocus}
-        onClick={() => setDraft(suggestName(taken))}
-      >
-        <SvgIcon name="shuffle" size={13} />
-      </button>
-      <button
         className="ctt-btn ctt-rn-ok"
         title="Save"
         aria-label="Save name"
         onMouseDown={keepFocus}
-        onClick={() => finish(() => onSave(draft))}
+        onClick={save}
       >
         <SvgIcon name="check" size={13} />
       </button>
@@ -95,6 +106,38 @@ function RenameField({
         onClick={() => finish(onCancel)}
       >
         <SvgIcon name="close" size={12} />
+      </button>
+    </div>
+  );
+}
+
+/** Same confirm pattern as deleting a clip card. Deleting a project also deletes the clips inside it. */
+function DeleteConfirm({
+  v,
+  onDelete,
+  onCancel,
+}: {
+  v: ProjectView;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  const n = v.clipIds.length;
+  return (
+    <div
+      className="ctt-confirm"
+      role="alertdialog"
+      aria-label={`Delete ${v.name}?`}
+    >
+      <span>
+        {n
+          ? `Delete this project and its ${plural(n, 'clip')} from the map and saved data?`
+          : 'Delete this project?'}
+      </span>
+      <button className="ctt-confirm-yes" autoFocus onClick={onDelete}>
+        Delete
+      </button>
+      <button className="ctt-confirm-no" onClick={onCancel}>
+        Cancel
       </button>
     </div>
   );
@@ -135,27 +178,29 @@ function DropChip({
   );
 }
 
-// ───────── sidebar: current project header ─────────
+// ───────── sidebar: current project header (lives inside the project container) ─────────
 function ProjectHead({
   v,
-  taken,
+  startEditing,
   onRename,
   onShowAll,
   onManage,
+  onDelete,
 }: {
   v: ProjectView;
-  taken: string[];
+  startEditing: boolean;
   onRename: (name: string) => void;
   onShowAll: () => void;
   onManage: () => void;
+  onDelete: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
+  const [asking, setAsking] = useState(false);
   return (
     <div className="ctt-phead">
       {editing ? (
         <RenameField
           value={v.name}
-          taken={taken}
           onSave={(n) => {
             onRename(n);
             setEditing(false);
@@ -164,7 +209,9 @@ function ProjectHead({
         />
       ) : (
         <div className="ctt-phead-title">
-          <SvgIcon name="folder" size={16} />
+          <span className="ctt-phead-ico">
+            <SvgIcon name="folder" size={15} />
+          </span>
           <h2 title={v.name}>{v.name}</h2>
           <button
             className="ctt-btn"
@@ -174,17 +221,42 @@ function ProjectHead({
           >
             <SvgIcon name="edit" size={13} />
           </button>
+          <button
+            className="ctt-btn"
+            aria-label="Delete project"
+            title="Delete project"
+            aria-expanded={asking}
+            onClick={() => setAsking((a) => !a)}
+          >
+            <SvgIcon name="trash" size={13} />
+          </button>
         </div>
       )}
       <p className="ctt-phead-sub">{where(v)}</p>
-      <p className="ctt-phead-stats">{stats(v)}</p>
+      <StatChips v={v} />
+      {asking && (
+        <DeleteConfirm
+          v={v}
+          onDelete={onDelete}
+          onCancel={() => setAsking(false)}
+        />
+      )}
       <div className="ctt-phead-act">
         <button className="ctt-link" onClick={onShowAll}>
-          ← All clips
+          ← All projects
         </button>
         <button className="ctt-link" onClick={onManage}>
-          Manage clips
+          Manage project
         </button>
+        {v.custom && (
+          <button
+            className="ctt-link"
+            title="Back to the generated name"
+            onClick={() => onRename('')}
+          >
+            Reset name
+          </button>
+        )}
       </div>
     </div>
   );
@@ -192,87 +264,111 @@ function ProjectHead({
 
 /**
  * Sidebar block above the clip list.
- *  - nothing open: a project switcher
- *  - a project open: its name (renamable), dates, place and stats
+ *  - a project switcher with a "New" button
+ *  - a project open: ONE container holding its header (name, dates, stats) and the `children`
+ *    (sort bar + clip cards), so the clips visibly belong to the project
  *  - while a clip card is being dragged: drop targets for every project
+ * `children` always render at the same spot in the tree, so a drag in progress is never interrupted.
  */
 export function ProjectBar({
   views,
-  total,
   activeId,
   dragging,
   onChange,
   onRename,
   onManage,
+  onCreate,
+  onDelete,
   onDropClip,
+  children,
 }: {
   views: ProjectView[];
-  total: number;
   activeId: string;
   dragging: boolean;
   onChange: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onManage: (id: string) => void;
+  /** creates an empty project and returns its id */
+  onCreate: () => string;
+  onDelete: (id: string) => void;
   onDropClip: (clipId: string, target: string) => void;
+  children?: ReactNode;
 }) {
-  if (!views.length) return null;
+  const [fresh, setFresh] = useState<string | null>(null); // just created: open its name editor
   const active = views.find((v) => v.id === activeId);
 
-  if (dragging)
-    return (
-      <div className="ctt-ptray" aria-label="Drop the clip on a project">
-        <small>Drop on a project</small>
-        <div className="ctt-ptray-chips">
-          {views.map((v) => (
-            <DropChip
-              key={v.id}
-              label={v.name}
-              current={v.id === activeId}
-              onDropClip={(id) => onDropClip(id, v.id)}
-            />
-          ))}
+  const top = dragging ? (
+    <div className="ctt-ptray" aria-label="Drop the clip on a project">
+      <small>Drop on a project</small>
+      <div className="ctt-ptray-chips">
+        {views.map((v) => (
           <DropChip
-            label="＋ New project"
-            onDropClip={(id) => onDropClip(id, 'new')}
+            key={v.id}
+            label={v.name}
+            current={v.id === activeId}
+            onDropClip={(id) => onDropClip(id, v.id)}
           />
-        </div>
+        ))}
+        <DropChip
+          label="＋ New project"
+          onDropClip={(id) => onDropClip(id, 'new')}
+        />
       </div>
-    );
+    </div>
+  ) : (
+    <div className="ctt-pbar-row">
+      <span className="ctt-sort-label">Project</span>
+      <select
+        value={activeId}
+        aria-label="Project"
+        disabled={!views.length}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="all">All projects ({views.length})</option>
+        {views.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.name} ({v.clipIds.length})
+          </option>
+        ))}
+      </select>
+      <button
+        className="ctt-pbar-new"
+        title="Create a new project"
+        onClick={() => setFresh(onCreate())}
+      >
+        <SvgIcon name="plus" size={13} />
+        New
+      </button>
+    </div>
+  );
 
   return (
     <div className="ctt-pbar">
-      <label>
-        <span className="ctt-sort-label">Project</span>
-        <select value={activeId} onChange={(e) => onChange(e.target.value)}>
-          <option value="all">All clips ({total})</option>
-          {views.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name} ({v.clipIds.length})
-            </option>
-          ))}
-        </select>
-      </label>
-      {active && (
-        <ProjectHead
-          key={active.id}
-          v={active}
-          taken={views.map((x) => x.name)}
-          onRename={(n) => onRename(active.id, n)}
-          onShowAll={() => onChange('all')}
-          onManage={() => onManage(active.id)}
-        />
-      )}
+      {top}
+      <div className={`ctt-pgroup${active ? '' : ' is-plain'}`}>
+        {active && !dragging ? (
+          <ProjectHead
+            key={active.id}
+            v={active}
+            startEditing={fresh === active.id}
+            onRename={(n) => onRename(active.id, n)}
+            onShowAll={() => onChange('all')}
+            onManage={() => onManage(active.id)}
+            onDelete={() => onDelete(active.id)}
+          />
+        ) : null}
+        {children}
+      </div>
     </div>
   );
 }
 
-/** Tells the user where a fresh upload was attached (existing / new project) and lets them change it. */
+/** Toast shown for a few seconds after an upload: where the clips went. Hovering pauses the timer. */
 export function ProjectNotice({
   items,
   views,
   clips,
   activeId,
-  onMove,
   onOpen,
   onDismiss,
 }: {
@@ -280,62 +376,70 @@ export function ProjectNotice({
   views: ProjectView[];
   clips: Clip[];
   activeId: string;
-  onMove: (clipId: string, target: string) => void;
   onOpen: (projectId: string) => void;
   onDismiss: () => void;
 }) {
+  const [paused, setPaused] = useState(false);
   useEffect(() => {
-    const t = setTimeout(onDismiss, 20_000);
+    if (paused) return;
+    const t = setTimeout(onDismiss, TOAST_MS);
     return () => clearTimeout(t);
-  }, [items, onDismiss]);
+  }, [items, paused, onDismiss]);
 
-  const rows = items.flatMap((it) => {
+  const groups = new Map<
+    string,
+    { view: ProjectView; clips: Clip[]; created: boolean }
+  >();
+  for (const it of items) {
     const clip = clips.find((c) => c.id === it.clipId);
     const view = views.find((v) => v.id === it.projectId);
-    return clip && view ? [{ it, clip, view }] : [];
-  });
+    if (!clip || !view) continue;
+    const g = groups.get(view.id) ?? { view, clips: [], created: false };
+    g.clips.push(clip);
+    g.created ||= it.created;
+    groups.set(view.id, g);
+  }
+  const rows = [...groups.values()];
   if (!rows.length) return null;
+  const only = rows.length === 1 ? rows[0] : undefined;
 
   return (
-    <div className="ctt-pnote" role="status">
-      <div className="ctt-pnote-head">
-        <SvgIcon name="route" size={14} />
-        <strong>Added to {rows.length > 1 ? 'projects' : 'a project'}</strong>
-        <button className="ctt-btn" aria-label="Dismiss" onClick={onDismiss}>
-          <SvgIcon name="close" size={12} />
-        </button>
-      </div>
-      {rows.slice(0, 3).map(({ it, clip, view }) => (
-        <div key={it.clipId} className="ctt-pnote-row">
-          <p>
-            <b>{clip.title}</b> →{' '}
-            <span className={`ctt-pill${it.created ? ' is-new' : ''}`}>
-              {it.created ? 'New project' : 'Existing project'}
+    <div
+      className="ctt-toast"
+      role="status"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <span className="ctt-toast-ico">
+        <SvgIcon name="folder" size={16} />
+      </span>
+      <div className="ctt-toast-body">
+        <strong>{only ? 'Added to project' : 'Added to projects'}</strong>
+        {rows.slice(0, 3).map(({ view, clips: cs, created }) => (
+          <p key={view.id}>
+            {cs.length === 1 ? cs[0].title : plural(cs.length, 'clip')} →{' '}
+            <span className={`ctt-pill${created ? ' is-new' : ''}`}>
+              {created ? 'New' : 'Existing'}
             </span>{' '}
-            {view.name}
+            <b>{view.name}</b>
           </p>
-          <div className="ctt-pnote-act">
-            <select
-              aria-label={`Project for ${clip.title}`}
-              value={view.id}
-              onChange={(e) => onMove(it.clipId, e.target.value)}
-            >
-              {views.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-              <option value="new">＋ New project…</option>
-            </select>
-            {activeId !== 'all' && activeId !== view.id && (
-              <button className="ctt-link" onClick={() => onOpen(view.id)}>
-                Open project
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-      {rows.length > 3 && <small>+{rows.length - 3} more</small>}
+        ))}
+        {rows.length > 3 && <small>+{rows.length - 3} more projects</small>}
+        {only && activeId !== only.view.id && (
+          <button
+            className="ctt-link"
+            onClick={() => {
+              onOpen(only.view.id);
+              onDismiss();
+            }}
+          >
+            Open project
+          </button>
+        )}
+      </div>
+      <button className="ctt-btn" aria-label="Dismiss" onClick={onDismiss}>
+        <SvgIcon name="close" size={13} />
+      </button>
     </div>
   );
 }
@@ -369,6 +473,8 @@ export function ProjectsDialog({
   onRename,
   onMove,
   onOpen,
+  onCreate,
+  onDelete,
   onClose,
 }: {
   views: ProjectView[];
@@ -377,11 +483,15 @@ export function ProjectsDialog({
   onRename: (id: string, name: string) => void;
   onMove: (clipId: string, target: string) => void;
   onOpen: (id: string) => void;
+  /** creates an empty project and returns its id */
+  onCreate: () => string;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const [selId, setSelId] = useState(initialId ?? views[0]?.id);
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
@@ -404,6 +514,16 @@ export function ProjectsDialog({
         .filter((v) => v.id !== sel.id)
         .flatMap((v) => clipsOf(v).map((c) => ({ c, from: v.name })))
     : [];
+  const choose = (id: string) => {
+    setSelId(id);
+    setEditing(false);
+    setAdding(false);
+    setAsking(false);
+  };
+  const create = () => {
+    choose(onCreate());
+    setEditing(true); // name it right away
+  };
   const dragProps = (c: Clip) => ({
     draggable: true,
     onDragStart: (e: React.DragEvent) => {
@@ -454,6 +574,9 @@ export function ProjectsDialog({
             <SvgIcon name="info" size={14} />
           </span>
           <span className="ctt-pd-sub">Auto-grouped by date &amp; place</span>
+          <button className="ctt-pbtn is-primary" onClick={create}>
+            <SvgIcon name="plus" size={13} /> New project
+          </button>
           <button
             className="ctt-btn"
             aria-label="Close projects"
@@ -465,7 +588,8 @@ export function ProjectsDialog({
 
         {!sel ? (
           <p className="ctt-pd-empty">
-            No projects yet. Upload a clip to start one.
+            No projects yet. Create one, or upload a clip to start one
+            automatically.
           </p>
         ) : (
           <div className="ctt-pd-body">
@@ -476,18 +600,20 @@ export function ProjectsDialog({
                   <li
                     key={v.id}
                     className={`ctt-pitem${v.id === sel.id ? ' is-on' : ''}${overId === v.id ? ' is-over' : ''}`}
-                    onClick={() => {
-                      setSelId(v.id);
-                      setEditing(false);
-                      setAdding(false);
-                    }}
+                    onClick={() => choose(v.id)}
                     {...dropOver(v.id)}
                     onDrop={drop(v.id)}
                   >
                     <span className="ctt-pstack">
-                      {cs.slice(0, 3).map((c) => (
-                        <Thumb key={c.id} clip={c} size="sm" />
-                      ))}
+                      {cs.length ? (
+                        cs
+                          .slice(0, 3)
+                          .map((c) => <Thumb key={c.id} clip={c} size="sm" />)
+                      ) : (
+                        <span className="ctt-pthumb is-sm is-empty">
+                          <SvgIcon name="folder" size={13} />
+                        </span>
+                      )}
                     </span>
                     <span className="ctt-pitem-tx">
                       <b>{v.name}</b>
@@ -513,7 +639,6 @@ export function ProjectsDialog({
                 {editing ? (
                   <RenameField
                     value={sel.name}
-                    taken={views.map((v) => v.name)}
                     onSave={(n) => {
                       onRename(sel.id, n);
                       setEditing(false);
@@ -522,7 +647,10 @@ export function ProjectsDialog({
                   />
                 ) : (
                   <div className="ctt-phead-title">
-                    <h3>{sel.name}</h3>
+                    <span className="ctt-phead-ico">
+                      <SvgIcon name="folder" size={15} />
+                    </span>
+                    <h3 title={sel.name}>{sel.name}</h3>
                     <button
                       className="ctt-btn"
                       aria-label="Rename project"
@@ -530,6 +658,15 @@ export function ProjectsDialog({
                       onClick={() => setEditing(true)}
                     >
                       <SvgIcon name="edit" size={13} />
+                    </button>
+                    <button
+                      className="ctt-btn"
+                      aria-label="Delete project"
+                      title="Delete project"
+                      aria-expanded={asking}
+                      onClick={() => setAsking((a) => !a)}
+                    >
+                      <SvgIcon name="trash" size={13} />
                     </button>
                     {sel.custom && (
                       <button
@@ -543,10 +680,21 @@ export function ProjectsDialog({
                   </div>
                 )}
                 <p className="ctt-phead-sub">{where(sel)}</p>
-                <p className="ctt-phead-stats">{stats(sel)}</p>
+                <StatChips v={sel} />
+                {asking && (
+                  <DeleteConfirm
+                    v={sel}
+                    onDelete={() => {
+                      setAsking(false);
+                      onDelete(sel.id);
+                    }}
+                    onCancel={() => setAsking(false)}
+                  />
+                )}
                 <div className="ctt-pd-act">
                   <button
                     className="ctt-pbtn is-primary"
+                    disabled={!sel.clipIds.length}
                     onClick={() => onOpen(sel.id)}
                   >
                     Open on map
@@ -586,37 +734,46 @@ export function ProjectsDialog({
                 </div>
               )}
 
-              <p className="ctt-pd-legend">
-                Border colour = route on the map · drag a clip onto a project to
-                move it
-              </p>
-              <ul className="ctt-pclips">
-                {selClips.map((c) => (
-                  <li
-                    key={c.id}
-                    className={dragId === c.id ? 'is-drag' : ''}
-                    style={{ '--c': c.color } as CSSProperties}
-                    {...dragProps(c)}
-                  >
-                    <Thumb clip={c} />
-                    <span className="ctt-pitem-tx">
-                      <b>{c.title}</b>
-                      <small>
-                        {c.date} · {c.distance}
-                      </small>
-                    </span>
-                    <button
-                      className="ctt-btn"
-                      aria-label={`Remove ${c.title} from this project`}
-                      title="Remove from project (moves to its own project)"
-                      disabled={selClips.length < 2}
-                      onClick={() => onMove(c.id, 'new')}
-                    >
-                      <SvgIcon name="close" size={13} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {selClips.length ? (
+                <>
+                  <p className="ctt-pd-legend">
+                    Border colour = route on the map · drag a clip onto a
+                    project to move it
+                  </p>
+                  <ul className="ctt-pclips">
+                    {selClips.map((c) => (
+                      <li
+                        key={c.id}
+                        className={dragId === c.id ? 'is-drag' : ''}
+                        style={{ '--c': c.color } as CSSProperties}
+                        {...dragProps(c)}
+                      >
+                        <Thumb clip={c} />
+                        <span className="ctt-pitem-tx">
+                          <b>{c.title}</b>
+                          <small>
+                            {c.date} · {c.distance}
+                          </small>
+                        </span>
+                        <button
+                          className="ctt-btn"
+                          aria-label={`Remove ${c.title} from this project`}
+                          title="Remove from project (moves to its own project)"
+                          disabled={selClips.length < 2}
+                          onClick={() => onMove(c.id, 'new')}
+                        >
+                          <SvgIcon name="close" size={13} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="ctt-pd-none">
+                  This project is empty. Upload a clip, or use “Add clips” to
+                  bring some in from other projects.
+                </p>
+              )}
             </section>
           </div>
         )}

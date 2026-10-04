@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import type { Clip } from './types';
 import {
   assign,
@@ -6,12 +13,46 @@ import {
   newProjectId,
   pickTitle,
   projectViews,
+  suggestName,
   UNDATED_ID,
   type Placement,
   type Project,
 } from './projects';
 
 const KEY = 'clip-to-track:projects:v1';
+const PLACES_KEY = 'clip-to-track:clip-places:v1';
+const MODE_KEY = 'clip-to-track:project-mode:v1';
+
+// ───────── "Group clips into projects" preference (on by default) ─────────
+// A tiny shared store so the Settings dialog and the sidebar always agree.
+let projectModeOn = (() => {
+  try {
+    return localStorage.getItem(MODE_KEY) !== '0';
+  } catch {
+    return true;
+  }
+})();
+const modeListeners = new Set<() => void>();
+export function setProjectMode(on: boolean) {
+  projectModeOn = on;
+  try {
+    localStorage.setItem(MODE_KEY, on ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+  modeListeners.forEach((l) => l());
+}
+export const useProjectMode = () =>
+  useSyncExternalStore(
+    (cb) => {
+      modeListeners.add(cb);
+      return () => {
+        modeListeners.delete(cb);
+      };
+    },
+    () => projectModeOn,
+    () => true,
+  );
 
 function load(): Project[] {
   try {
@@ -24,12 +65,38 @@ function load(): Project[] {
   }
 }
 
+function loadPlaces(): Record<string, string> {
+  try {
+    const o: unknown = JSON.parse(localStorage.getItem(PLACES_KEY) ?? '{}');
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return {};
+    return Object.fromEntries(
+      Object.entries(o).filter(([, v]) => typeof v === 'string'),
+    ) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+/** Nominatim reverse lookup: the town / city a point is in ('' = nothing found). */
+async function reverse(lon: number, lat: number): Promise<string> {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=en&lat=${lat}&lon=${lon}`,
+  );
+  const a = (await res.json())?.address ?? {};
+  return (
+    a.city || a.town || a.village || a.municipality || a.county || a.state || ''
+  );
+}
+
 /**
  * Keeps every clip in a project, automatically. Pass the current clips; the hook assigns new ones
  * (during render, so the first paint is already consistent) and reports where uploads landed.
+ * It also looks up the place name of every clip (shown on the card) and of every project.
  */
 export function useProjects(clips: Clip[]) {
   const [projects, setProjects] = useState<Project[]>(load);
+  const [clipPlace, setClipPlace] =
+    useState<Record<string, string>>(loadPlaces);
   const [notice, setNotice] = useState<Placement[] | null>(null);
   // clips present at startup are migrated silently; only later additions produce a notice
   const [initialIds] = useState(() => new Set(clips.map((c) => c.id)));
@@ -48,42 +115,56 @@ export function useProjects(clips: Clip[]) {
       /* ignore */
     }
   }, [projects]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(PLACES_KEY, JSON.stringify(clipPlace));
+    } catch {
+      /* ignore */
+    }
+  }, [clipPlace]);
 
-  // name each new project after its place (Nominatim, one request per second at most)
+  // Place names (Nominatim allows one request per second): projects first, then each clip.
   const asked = useRef(new Set<string>());
   const busy = useRef(false);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (busy.current) return;
+    let key: string | undefined;
+    let clip: Clip | undefined;
+    let save: ((place: string) => void) | undefined;
+
     const p = projects.find(
       (x) =>
         x.place === undefined &&
+        x.clipIds.length > 0 && // an empty manual project has nothing to look up yet
         x.id !== UNDATED_ID &&
-        !asked.current.has(x.id),
+        !asked.current.has(`p:${x.id}`),
     );
-    const clip = p && clips.find((c) => c.id === p.clipIds[0]);
-    if (!p || !clip) return;
-    asked.current.add(p.id);
-    busy.current = true;
-    const [lon, lat] = clip.coordinates[0];
-    fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=en&lat=${lat}&lon=${lon}`,
-    )
-      .then((res) => res.json())
-      .then((j) => {
-        const a = j?.address ?? {};
-        const place: string =
-          a.city ||
-          a.town ||
-          a.village ||
-          a.municipality ||
-          a.county ||
-          a.state ||
-          '';
+    const first = p && clips.find((c) => c.id === p.clipIds[0]);
+    if (p && first) {
+      key = `p:${p.id}`;
+      clip = first;
+      save = (place) =>
         setProjects((ps) =>
           ps.map((x) => (x.id === p.id ? { ...x, place } : x)),
         );
-      })
+    } else {
+      const c = clips.find(
+        (x) => clipPlace[x.id] === undefined && !asked.current.has(`c:${x.id}`),
+      );
+      if (c) {
+        key = `c:${c.id}`;
+        clip = c;
+        save = (place) => setClipPlace((m) => ({ ...m, [c.id]: place }));
+      }
+    }
+    if (!key || !clip || !save) return;
+
+    asked.current.add(key);
+    busy.current = true;
+    const [lon, lat] = clip.coordinates[0];
+    reverse(lon, lat)
+      .then(save)
       .catch(() => {
         /* offline: tried once this session; retried on the next visit */
       })
@@ -93,7 +174,7 @@ export function useProjects(clips: Clip[]) {
           setTick((t) => t + 1);
         }, 1100),
       );
-  }, [projects, clips, tick]);
+  }, [projects, clips, clipPlace, tick]);
 
   const views = useMemo(() => projectViews(projects, clips), [projects, clips]);
   const projectOf = useMemo(
@@ -121,7 +202,7 @@ export function useProjects(clips: Clip[]) {
         : rest.map((p) =>
             p.id === id ? { ...p, clipIds: [...p.clipIds, clipId] } : p,
           );
-    setProjects(next.filter((p) => p.clipIds.length));
+    setProjects(next.filter((p) => p.clipIds.length || p.manual));
     setNotice(
       (n) =>
         n &&
@@ -133,6 +214,36 @@ export function useProjects(clips: Clip[]) {
     );
   };
 
+  /**
+   * Puts freshly uploaded clips into the project the person was looking at, instead of letting the
+   * automatic grouping decide. Safe to call before or after the automatic placement has run.
+   */
+  const adopt = useCallback((clipIds: string[], target: string) => {
+    const moving = new Set(clipIds);
+    setProjects((ps) => {
+      if (!ps.some((p) => p.id === target)) return ps;
+      return ps
+        .map((p) =>
+          p.id === target
+            ? {
+                ...p,
+                clipIds: [
+                  ...p.clipIds,
+                  ...clipIds.filter((id) => !p.clipIds.includes(id)),
+                ],
+              }
+            : { ...p, clipIds: p.clipIds.filter((id) => !moving.has(id)) },
+        )
+        .filter((p) => p.clipIds.length || p.manual);
+    });
+    // the person chose the destination, so the "where did it go?" toast is not needed
+    setNotice((n) => {
+      const rest = n?.filter((x) => !moving.has(x.clipId));
+      return rest?.length ? rest : null;
+    });
+  }, []);
+
+  /** '' (or the generated name) resets to the generated name. */
   const rename = (id: string, name: string) =>
     setProjects((ps) =>
       ps.map((p) =>
@@ -142,5 +253,36 @@ export function useProjects(clips: Clip[]) {
 
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  return { views, projectOf, notice, dismissNotice, moveClip, rename };
+  /** Creates an empty project with a random name; returns its id. */
+  const createProject = () => {
+    const id = `manual-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    setProjects((ps) => [
+      ...ps,
+      { id, clipIds: [], manual: true, title: suggestName(namesOf(projects)) },
+    ]);
+    return id;
+  };
+
+  /** Removes the project itself. Deleting its clips is the caller's job. */
+  const removeProject = (id: string) => {
+    setProjects((ps) => ps.filter((p) => p.id !== id));
+    setNotice((n) => {
+      const rest = n?.filter((x) => x.projectId !== id);
+      return rest?.length ? rest : null;
+    });
+  };
+
+  return {
+    views,
+    projectOf,
+    /** clip id → place name ('' = looked up, nothing found; missing = not yet) */
+    clipPlace,
+    notice,
+    dismissNotice,
+    moveClip,
+    adopt,
+    rename,
+    createProject,
+    removeProject,
+  };
 }

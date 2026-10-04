@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadOpts } from './MapPanel';
 import SvgIcon from './SvgIcon';
+import { setProjectMode, useProjectMode } from './useProjects';
 import {
   DEFAULT_SETTINGS,
   resetView,
@@ -44,6 +45,7 @@ export default function SettingsDialog({
   onClearClips,
 }: Props) {
   const { view } = useSettings();
+  const projectMode = useProjectMode();
   const [confirmClear, setConfirmClear] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   // the dialog mounts fresh each time it opens, so this is the current map colour mode
@@ -85,6 +87,27 @@ export default function SettingsDialog({
             <SvgIcon name="close" size={14} />
           </button>
         </div>
+
+        <section aria-labelledby="set-projects">
+          <h3 id="set-projects">Projects</h3>
+          <label className="ctt-set-row">
+            <span>
+              <b>Group clips into projects</b>
+              <small>
+                {projectMode
+                  ? 'Clips are grouped into trips by date and place'
+                  : 'Showing a plain list of clips. Your projects are kept and come back when you turn this on'}
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="ctt-switch"
+              checked={projectMode}
+              onChange={(e) => setProjectMode(e.target.checked)}
+            />
+          </label>
+        </section>
 
         <section aria-labelledby="set-view">
           <h3 id="set-view">View · map toolbars</h3>

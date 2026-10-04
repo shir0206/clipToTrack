@@ -18,7 +18,7 @@ import SettingsDialog from './SettingsDialog';
 import PlaybackHelp, { playbackHelpDismissed } from './PlaybackHelp';
 import { probeDecode } from './videoSupport';
 import { useClips } from './useClips';
-import { useProjects } from './useProjects';
+import { useProjectMode, useProjects } from './useProjects';
 import { ProjectBar, ProjectNotice, ProjectsDialog } from './ProjectsUI';
 import './ClipToTrack.css';
 
@@ -58,14 +58,16 @@ const clampW = (w: number) =>
 export default function ClipToTrack() {
   const { clips, error, busy, progress, addFiles, remove, clear } = useClips(); // clips persist in localStorage
   const projects = useProjects(clips); // every clip is placed in a project automatically
+  const projectMode = useProjectMode(); // Settings → "Group clips into projects"; off = plain clip list
   const [projectFilter, setProjectFilter] = useState('all');
   const [projectsDialog, setProjectsDialog] = useState<{ id?: string } | null>(
     null,
   );
   const [dragClipId, setDragClipId] = useState<string | null>(null); // a card is being dragged
-  const activeProject = projects.views.some((v) => v.id === projectFilter)
-    ? projectFilter
-    : 'all';
+  const activeProject =
+    projectMode && projects.views.some((v) => v.id === projectFilter)
+      ? projectFilter
+      : 'all';
   // clips not placed yet (a render-phase transient) stay visible
   const visible = useMemo(
     () =>
@@ -178,8 +180,13 @@ export default function ClipToTrack() {
       void probeDecode(video).then(
         (r) => r === 'no-picture' && setPlaybackHelp(true),
       );
-    const firstId = await addFiles(files);
-    if (!firstId) return;
+    // an upload made while a project is open belongs to that project (not to the automatic grouping)
+    const target =
+      projectMode && activeProject !== 'all' ? activeProject : null;
+    const ids = await addFiles(files);
+    if (!ids.length) return;
+    if (target) projects.adopt(ids, target);
+    const firstId = ids[0];
     setSelectedClipId(firstId);
     setTimeout(() => select(firstId), 0); // scroll the new card into view after render
   };
@@ -213,6 +220,14 @@ export default function ClipToTrack() {
     remove(id); // -> map layers, pinned bubble and localStorage all follow from `clips`
   };
 
+  // a project owns its clips: deleting it removes them too (the UI asks for confirmation first)
+  const handleDeleteProject = (id: string) => {
+    const ids = projects.views.find((v) => v.id === id)?.clipIds ?? [];
+    ids.forEach(handleDelete);
+    projects.removeProject(id);
+    if (projectFilter === id) setProjectFilter('all');
+  };
+
   const handleClear = () => {
     setPlayingClipId(null);
     closeMax();
@@ -223,20 +238,113 @@ export default function ClipToTrack() {
 
   const maxClip = clips.find((c) => c.id === maxClipId && c.videoUrl);
 
+  const emptyProject =
+    projectMode && activeProject !== 'all' && visible.length === 0;
+  const upload = (
+    <UploadZone onFiles={handleFiles} busy={busy} progress={progress} />
+  );
+  // sort bar + cards: inside the project container when a project is open, plain otherwise
+  const panelBody = (
+    <>
+      {!emptyProject && (
+        <div className="ctt-sort" role="group" aria-label="Sort clips">
+          <span className="ctt-sort-label">Sort</span>
+          <div className="ctt-sort-chips">
+            {SORTS.map(([k, label, icon]) => {
+              const on = sort.key === k;
+              const asc = sort.dir === 1;
+              return (
+                <button
+                  key={k}
+                  className={`ctt-sort-chip${on ? ' is-on' : ''}`}
+                  disabled={visible.length < 2}
+                  aria-pressed={on}
+                  title={
+                    on
+                      ? `${label}: ${asc ? 'ascending' : 'descending'} — click to reverse`
+                      : `Sort by ${label.toLowerCase()}`
+                  }
+                  onClick={() =>
+                    setSort(
+                      on
+                        ? { key: k, dir: asc ? -1 : 1 }
+                        : {
+                            key: k,
+                            dir: k === 'name' || k === 'added' ? 1 : -1,
+                          },
+                    )
+                  }
+                >
+                  <SvgIcon name={icon} size={13} />
+                  {label}
+                  {on && (
+                    <SvgIcon
+                      name={asc ? 'arrowUp' : 'arrowDown'}
+                      size={12}
+                      className="ctt-sort-dir"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {emptyProject ? (
+        <div className="ctt-pempty">
+          <p>
+            This project is empty. Drop GoPro clips here and they’ll be added to
+            it.
+          </p>
+          {upload}
+        </div>
+      ) : (
+        <ul className="ctt-list" role="listbox" aria-label="Clips">
+          {sorted.map((clip) => (
+            <ClipCard
+              key={clip.id}
+              clip={clip}
+              place={projects.clipPlace[clip.id]}
+              selected={clip.id === selectedClipId}
+              playing={clip.id === playingClipId}
+              nowPlaying={clip.id === maxClipId && maxPlaying}
+              onSelect={() => select(clip.id)}
+              onHover={(h) => setHoveredClipId(h ? clip.id : null)}
+              onTogglePlay={() => {
+                setSelectedClipId(clip.id);
+                setPlayingClipId((p) => (p === clip.id ? null : clip.id));
+              }}
+              onStop={() => setPlayingClipId(null)}
+              hidden={hiddenIds.has(clip.id)}
+              onToggleHidden={() => toggleHidden(clip.id)}
+              onProgress={(f) => mapApi.current?.setPlayhead(clip.id, f)}
+              onDelete={() => handleDelete(clip.id)}
+              onDragStart={() => setDragClipId(clip.id)}
+              onDragEnd={() => setDragClipId(null)}
+              onMaximize={() => openMax(clip)}
+            />
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
   return (
     <div className={`ctt-app${dragging ? ' is-resizing' : ''}`}>
       <header className="ctt-header">
         <Logo tagline="GoPro clips. Mapped to your adventures." />
         <div className="ctt-header-actions">
-          <button
-            onClick={() =>
-              setProjectsDialog({
-                id: activeProject === 'all' ? undefined : activeProject,
-              })
-            }
-          >
-            Projects
-          </button>
+          {projectMode && (
+            <button
+              onClick={() =>
+                setProjectsDialog({
+                  id: activeProject === 'all' ? undefined : activeProject,
+                })
+              }
+            >
+              Projects
+            </button>
+          )}
           <button onClick={() => setSettingsOpen(true)}>Settings</button>
         </div>
       </header>
@@ -255,103 +363,36 @@ export default function ClipToTrack() {
               {visible.length}
             </span>
           </div>
-          <ProjectBar
-            views={projects.views}
-            total={clips.length}
-            activeId={activeProject}
-            dragging={dragClipId !== null}
-            onChange={setProjectFilter}
-            onRename={projects.rename}
-            onManage={(id) => setProjectsDialog({ id })}
-            onDropClip={(clipId, target) => {
-              projects.moveClip(clipId, target);
-              setDragClipId(null);
-            }}
-          />
-          <div className="ctt-sort" role="group" aria-label="Sort clips">
-            <span className="ctt-sort-label">Sort</span>
-            <div className="ctt-sort-chips">
-              {SORTS.map(([k, label, icon]) => {
-                const on = sort.key === k;
-                const asc = sort.dir === 1;
-                return (
-                  <button
-                    key={k}
-                    className={`ctt-sort-chip${on ? ' is-on' : ''}`}
-                    disabled={visible.length < 2}
-                    aria-pressed={on}
-                    title={
-                      on
-                        ? `${label}: ${asc ? 'ascending' : 'descending'} — click to reverse`
-                        : `Sort by ${label.toLowerCase()}`
-                    }
-                    onClick={() =>
-                      setSort(
-                        on
-                          ? { key: k, dir: asc ? -1 : 1 }
-                          : {
-                              key: k,
-                              dir: k === 'name' || k === 'added' ? 1 : -1,
-                            },
-                      )
-                    }
-                  >
-                    <SvgIcon name={icon} size={13} />
-                    {label}
-                    {on && (
-                      <SvgIcon
-                        name={asc ? 'arrowUp' : 'arrowDown'}
-                        size={12}
-                        className="ctt-sort-dir"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <ul className="ctt-list" role="listbox" aria-label="Clips">
-            {sorted.map((clip) => (
-              <ClipCard
-                key={clip.id}
-                clip={clip}
-                selected={clip.id === selectedClipId}
-                playing={clip.id === playingClipId}
-                nowPlaying={clip.id === maxClipId && maxPlaying}
-                onSelect={() => select(clip.id)}
-                onHover={(h) => setHoveredClipId(h ? clip.id : null)}
-                onTogglePlay={() => {
-                  setSelectedClipId(clip.id);
-                  setPlayingClipId((p) => (p === clip.id ? null : clip.id));
-                }}
-                onStop={() => setPlayingClipId(null)}
-                hidden={hiddenIds.has(clip.id)}
-                onToggleHidden={() => toggleHidden(clip.id)}
-                onProgress={(f) => mapApi.current?.setPlayhead(clip.id, f)}
-                onDelete={() => handleDelete(clip.id)}
-                onDragStart={() => setDragClipId(clip.id)}
-                onDragEnd={() => setDragClipId(null)}
-                onMaximize={() => openMax(clip)}
-              />
-            ))}
-          </ul>
+          {projectMode ? (
+            <ProjectBar
+              views={projects.views}
+              activeId={activeProject}
+              dragging={dragClipId !== null}
+              onChange={setProjectFilter}
+              onRename={projects.rename}
+              onManage={(id) => setProjectsDialog({ id })}
+              onCreate={() => {
+                const id = projects.createProject();
+                setProjectFilter(id);
+                return id;
+              }}
+              onDelete={handleDeleteProject}
+              onDropClip={(clipId, target) => {
+                projects.moveClip(clipId, target);
+                setDragClipId(null);
+              }}
+            >
+              {panelBody}
+            </ProjectBar>
+          ) : (
+            panelBody
+          )}
           {error && (
             <p className="ctt-error" role="alert">
               Couldn’t load {error}
             </p>
           )}
-          {projects.notice && (
-            <ProjectNotice
-              items={projects.notice}
-              views={projects.views}
-              clips={clips}
-              activeId={activeProject}
-              onMove={projects.moveClip}
-              onOpen={setProjectFilter}
-              onDismiss={projects.dismissNotice}
-            />
-          )}
-          <UploadZone onFiles={handleFiles} busy={busy} progress={progress} />
+          {!emptyProject && upload}
         </aside>
 
         <div
@@ -388,13 +429,26 @@ export default function ClipToTrack() {
         </section>
       </main>
 
-      {projectsDialog && (
+      {projectMode && projects.notice && (
+        <ProjectNotice
+          items={projects.notice}
+          views={projects.views}
+          clips={clips}
+          activeId={activeProject}
+          onOpen={setProjectFilter}
+          onDismiss={projects.dismissNotice}
+        />
+      )}
+
+      {projectMode && projectsDialog && (
         <ProjectsDialog
           views={projects.views}
           clips={clips}
           initialId={projectsDialog.id}
           onRename={projects.rename}
           onMove={projects.moveClip}
+          onCreate={projects.createProject}
+          onDelete={handleDeleteProject}
           onOpen={(id) => {
             setProjectFilter(id);
             setProjectsDialog(null);

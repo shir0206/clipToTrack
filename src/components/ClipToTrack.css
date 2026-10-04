@@ -1652,3 +1652,50 @@
 .ctt-controls {
   flex-wrap: wrap; /* the buttons wrap instead of overflowing when the text column is narrow */
 }
+
+/* ───────── card: file name – place ───────── */
+.ctt-place {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* ───────── altitude / speed pop-out windows ───────── */
+.ctt-prof-pane {
+  position: relative;
+}
+.ctt-pane-pop {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+/* the speedometer has no pane header, so its button floats in the corner */
+.ctt-prof-pane.is-dial .ctt-pane-pop {
+  position: absolute;
+  top: 4px;
+  right: 16px;
+  z-index: 2;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+/* inside the popup the dock fills the whole window and has no toolbar */
+.ctt-pop {
+  background: var(--card);
+}
+.ctt-pop .ctt-prof {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  border-top: 0;
+}
+.ctt-pop .ctt-prof-pane {
+  padding-top: 12px;
+}
+
+/* large player without the native toolbar: click toggles play / pause */
+.ctt-modal-box {
+  outline: none;
+}
+.ctt-modal-video {
+  cursor: pointer;
+}

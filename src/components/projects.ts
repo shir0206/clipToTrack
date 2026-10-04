@@ -117,6 +117,8 @@ export type Project = {
   title?: string;
   /** user-chosen name; wins over title */
   name?: string;
+  /** created by hand: survives being empty (auto projects vanish with their last clip) */
+  manual?: boolean;
 };
 
 export type Placement = {
@@ -206,7 +208,7 @@ export function assign(prev: Project[], clips: Clip[]) {
       return { ...p, clipIds: ids };
     })
     .filter((p) => {
-      if (p.clipIds.length) return true;
+      if (p.clipIds.length || p.manual) return true;
       changed = true;
       return false;
     });
@@ -309,12 +311,17 @@ export function projectViews(
           .filter((n): n is number => n !== undefined);
         const from = starts.length ? Math.min(...starts) : undefined;
         const to = starts.length ? Math.max(...starts) : undefined;
-        const range = fmtRange(from, to);
+        const range = cs.length ? fmtRange(from, to) : 'No clips yet';
+        // generated names read "Fabulous Times in Valencia" once the place is known
+        const generated =
+          p.id === UNDATED_ID ? 'Undated' : (p.title ?? 'Project');
         return {
           id: p.id,
           name:
             p.name ??
-            (p.id === UNDATED_ID ? 'Undated clips' : (p.title ?? 'Project')),
+            (p.place && p.id !== UNDATED_ID
+              ? `${generated} in ${p.place}`
+              : generated),
           custom: !!p.name,
           place: p.place || undefined,
           range,
@@ -327,16 +334,19 @@ export function projectViews(
           distanceM: cs.reduce((s, c) => s + (c.sort.distance ?? 0), 0),
         } satisfies ProjectView;
       })
-      // newest first, undated last
-      .sort((a, b) =>
-        a.from === undefined
+      // empty (just created) first, then newest first, undated last
+      .sort((a, b) => {
+        const ea = a.clipIds.length === 0;
+        const eb = b.clipIds.length === 0;
+        if (ea !== eb) return ea ? -1 : 1;
+        return a.from === undefined
           ? b.from === undefined
             ? 0
             : 1
           : b.from === undefined
             ? -1
-            : b.from - a.from,
-      )
+            : b.from - a.from;
+      })
   );
 }
 

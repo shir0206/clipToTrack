@@ -6,6 +6,8 @@ import { CLIP_MIME } from './projects';
 
 type Props = {
   clip: Clip;
+  /** town / city of the clip's start, shown after the file name once looked up */
+  place?: string;
   selected: boolean;
   playing: boolean;
   /** true while this clip plays in the large player (popup / modal); only drives the visuals */
@@ -31,6 +33,7 @@ const UNPLAYABLE =
 
 export default function ClipCard({
   clip,
+  place,
   selected,
   playing,
   nowPlaying = false,
@@ -130,7 +133,7 @@ export default function ClipCard({
       role="option"
       aria-selected={selected}
       tabIndex={0}
-      aria-label={`Select track ${clip.index} ${clip.title}`}
+      aria-label={`Select track ${clip.index} ${clip.title}${place ? ` - ${place}` : ''}`}
       className={`ctt-card${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
       style={{ '--c': clip.color } as CSSProperties}
       onClick={onSelect}
@@ -203,6 +206,7 @@ export default function ClipCard({
           <div>
             <div className="ctt-title-row">
               <h3>{clip.title}</h3>
+              {place && <h3 className="ctt-place">{place}</h3>}
               {active && (
                 <span className="ctt-playing" role="status">
                   <span className="ctt-eq" aria-hidden="true">

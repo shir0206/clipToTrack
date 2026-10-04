@@ -122,9 +122,9 @@ export function useClips() {
     [],
   );
 
-  /** Accepts GoPro .mp4 files (telemetry is extracted) or metadata .json. Resolves to the first added clip id. */
+  /** Accepts GoPro .mp4 files (telemetry is extracted) or metadata .json. Resolves to the ids of every clip added (upload order). */
   const addFiles = useCallback(
-    async (files: File[]): Promise<string | undefined> => {
+    async (files: File[]): Promise<string[]> => {
       setBusy(true);
       const added: (Omit<Entry, 'slot'> & { id: string })[] = [];
       const errors: string[] = [];
@@ -243,7 +243,7 @@ export function useClips() {
         });
       setProgress(null);
       setBusy(false);
-      return added[0]?.id;
+      return added.map((a) => a.id);
     },
     [],
   );
