@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Clip } from './types';
 import SvgIcon, { type IconName } from './SvgIcon';
 import { watchPicture } from './videoSupport';
+import { CLIP_MIME } from './projects';
 
 type Props = {
   clip: Clip;
@@ -20,6 +21,9 @@ type Props = {
   onProgress: (frac: number | null) => void;
   /** removes the clip from the map and from localStorage */
   onDelete: () => void;
+  /** the card can be dragged onto a project (see ProjectBar) */
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 };
 
 const UNPLAYABLE =
@@ -39,6 +43,8 @@ export default function ClipCard({
   onToggleHidden,
   onProgress,
   onDelete,
+  onDragStart,
+  onDragEnd,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
   const stop = (fn: () => void) => (e: React.MouseEvent) => {
@@ -128,6 +134,14 @@ export default function ClipCard({
       className={`ctt-card${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
       style={{ '--c': clip.color } as CSSProperties}
       onClick={onSelect}
+      draggable={!!onDragStart}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(CLIP_MIME, clip.id);
+        e.dataTransfer.setData('text/plain', clip.title);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.();
+      }}
+      onDragEnd={() => onDragEnd?.()}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return; // let the inner buttons handle their own keys
         if (e.key === 'Enter' || e.key === ' ') {

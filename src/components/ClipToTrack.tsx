@@ -18,6 +18,8 @@ import SettingsDialog from './SettingsDialog';
 import PlaybackHelp, { playbackHelpDismissed } from './PlaybackHelp';
 import { probeDecode } from './videoSupport';
 import { useClips } from './useClips';
+import { useProjects } from './useProjects';
+import { ProjectBar, ProjectNotice, ProjectsDialog } from './ProjectsUI';
 import './ClipToTrack.css';
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
@@ -55,6 +57,26 @@ const clampW = (w: number) =>
 
 export default function ClipToTrack() {
   const { clips, error, busy, progress, addFiles, remove, clear } = useClips(); // clips persist in localStorage
+  const projects = useProjects(clips); // every clip is placed in a project automatically
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [projectsDialog, setProjectsDialog] = useState<{ id?: string } | null>(
+    null,
+  );
+  const [dragClipId, setDragClipId] = useState<string | null>(null); // a card is being dragged
+  const activeProject = projects.views.some((v) => v.id === projectFilter)
+    ? projectFilter
+    : 'all';
+  // clips not placed yet (a render-phase transient) stay visible
+  const visible = useMemo(
+    () =>
+      activeProject === 'all'
+        ? clips
+        : clips.filter((c) => {
+            const p = projects.projectOf.get(c.id);
+            return !p || p === activeProject;
+          }),
+    [clips, activeProject, projects.projectOf],
+  );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(
     clips[0]?.id ?? null,
   ); // single source of truth
@@ -80,7 +102,7 @@ export default function ClipToTrack() {
   // Sorting only changes the list order. Clip.index / colour stay tied to upload order, so the map never recolours.
   const sorted = useMemo(
     () =>
-      [...clips].sort((a, b) => {
+      [...visible].sort((a, b) => {
         const x = value(a, sort.key);
         const y = value(b, sort.key);
         if (x === undefined) return y === undefined ? 0 : 1; // missing values always last
@@ -95,11 +117,11 @@ export default function ClipToTrack() {
         // ties fall back to upload order, and flip with the direction so the toggle always visibly does something
         return (r || a.index - b.index) * sort.dir;
       }),
-    [clips, sort],
+    [visible, sort],
   );
   const mapClips = useMemo(
-    () => clips.filter((c) => !hiddenIds.has(c.id)),
-    [clips, hiddenIds],
+    () => visible.filter((c) => !hiddenIds.has(c.id)),
+    [visible, hiddenIds],
   );
   const toggleHidden = (id: string) =>
     setHiddenIds((s) => {
@@ -206,7 +228,15 @@ export default function ClipToTrack() {
       <header className="ctt-header">
         <Logo tagline="GoPro clips. Mapped to your adventures." />
         <div className="ctt-header-actions">
-          <button>Projects</button>
+          <button
+            onClick={() =>
+              setProjectsDialog({
+                id: activeProject === 'all' ? undefined : activeProject,
+              })
+            }
+          >
+            Projects
+          </button>
           <button onClick={() => setSettingsOpen(true)}>Settings</button>
         </div>
       </header>
@@ -222,9 +252,22 @@ export default function ClipToTrack() {
                   Clear all
                 </button>
               )}
-              {clips.length}
+              {visible.length}
             </span>
           </div>
+          <ProjectBar
+            views={projects.views}
+            total={clips.length}
+            activeId={activeProject}
+            dragging={dragClipId !== null}
+            onChange={setProjectFilter}
+            onRename={projects.rename}
+            onManage={(id) => setProjectsDialog({ id })}
+            onDropClip={(clipId, target) => {
+              projects.moveClip(clipId, target);
+              setDragClipId(null);
+            }}
+          />
           <div className="ctt-sort" role="group" aria-label="Sort clips">
             <span className="ctt-sort-label">Sort</span>
             <div className="ctt-sort-chips">
@@ -235,7 +278,7 @@ export default function ClipToTrack() {
                   <button
                     key={k}
                     className={`ctt-sort-chip${on ? ' is-on' : ''}`}
-                    disabled={clips.length < 2}
+                    disabled={visible.length < 2}
                     aria-pressed={on}
                     title={
                       on
@@ -286,6 +329,8 @@ export default function ClipToTrack() {
                 onToggleHidden={() => toggleHidden(clip.id)}
                 onProgress={(f) => mapApi.current?.setPlayhead(clip.id, f)}
                 onDelete={() => handleDelete(clip.id)}
+                onDragStart={() => setDragClipId(clip.id)}
+                onDragEnd={() => setDragClipId(null)}
                 onMaximize={() => openMax(clip)}
               />
             ))}
@@ -294,6 +339,17 @@ export default function ClipToTrack() {
             <p className="ctt-error" role="alert">
               Couldn’t load {error}
             </p>
+          )}
+          {projects.notice && (
+            <ProjectNotice
+              items={projects.notice}
+              views={projects.views}
+              clips={clips}
+              activeId={activeProject}
+              onMove={projects.moveClip}
+              onOpen={setProjectFilter}
+              onDismiss={projects.dismissNotice}
+            />
           )}
           <UploadZone onFiles={handleFiles} busy={busy} progress={progress} />
         </aside>
@@ -331,6 +387,21 @@ export default function ClipToTrack() {
           )}
         </section>
       </main>
+
+      {projectsDialog && (
+        <ProjectsDialog
+          views={projects.views}
+          clips={clips}
+          initialId={projectsDialog.id}
+          onRename={projects.rename}
+          onMove={projects.moveClip}
+          onOpen={(id) => {
+            setProjectFilter(id);
+            setProjectsDialog(null);
+          }}
+          onClose={() => setProjectsDialog(null)}
+        />
+      )}
 
       {settingsOpen && (
         <SettingsDialog
