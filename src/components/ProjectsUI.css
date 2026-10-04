@@ -74,11 +74,20 @@
   background: var(--card);
   border: 1px solid var(--border);
 }
-.ctt-pbar-row select {
+.ctt-pbar-row {
+  position: relative;
+}
+.ctt-psel {
   flex: 1;
   min-width: 0;
+}
+.ctt-psel-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   height: 28px;
-  padding: 0 4px;
+  padding: 0 8px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -86,14 +95,95 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  text-overflow: ellipsis;
+  text-align: left;
   cursor: pointer;
+  transition: background 0.15s;
 }
-.ctt-pbar-row select:disabled {
+.ctt-psel-btn:hover:not(:disabled),
+.ctt-psel-btn.is-open {
+  background: var(--bg);
+}
+.ctt-psel-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
-.ctt-pbar-row select:focus-visible,
+.ctt-psel-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctt-psel-btn em,
+.ctt-psel-list em {
+  flex: none;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ctt-psel-chev {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.ctt-psel-btn.is-open .ctt-psel-chev {
+  transform: rotate(180deg);
+}
+.ctt-psel-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 300px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 0 0 1px rgb(21 32 51 / 0.04),
+    0 10px 28px rgb(21 32 51 / 0.2);
+}
+.ctt-psel-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ctt-psel-list li > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctt-psel-list li.is-all {
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+  border-radius: 8px 8px 0 0;
+}
+.ctt-psel-list li.is-hi {
+  background: var(--bg);
+}
+.ctt-psel-list li.is-on {
+  background: #eef4ff;
+  color: #1f5fd6;
+  font-weight: 600;
+}
+.ctt-psel-ico {
+  color: var(--muted);
+}
+.ctt-psel-list li.is-on .ctt-psel-ico {
+  color: #2878ff;
+}
+.ctt-psel-btn:focus-visible,
 .ctt-pbar-new:focus-visible {
   outline: 2px solid #2878ff;
   outline-offset: 1px;

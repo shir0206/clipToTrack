@@ -314,8 +314,19 @@ export function projectViews(
         const from = starts.length ? Math.min(...starts) : undefined;
         const to = starts.length ? Math.max(...starts) : undefined;
         const range = cs.length ? fmtRange(from, to) : 'No clips yet';
-        // generated names read "[Adjective] [Noun] in [place]" once the place is known
-        const place = (p.clipIds[0] && clipPlace[p.clipIds[0]]) || p.place || '';
+        // generated names read "[Adjective] [Noun] in [place]" once the place is known.
+        // The place is the area most of the project's clips are in (ties: the earliest clip's),
+        // not simply where the first clip happens to start.
+        const counts = new Map<string, number>();
+        for (const id of p.clipIds) {
+          const pl = clipPlace[id];
+          if (pl) counts.set(pl, (counts.get(pl) ?? 0) + 1);
+        }
+        let place = '';
+        let top = 0;
+        for (const [pl, n] of counts)
+          if (n > top) [place, top] = [pl, n];
+        place = place || p.place || '';
         const generated =
           p.id === UNDATED_ID ? 'Undated' : (p.title ?? 'Project');
         return {

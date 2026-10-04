@@ -14,6 +14,14 @@ export type ViewSettings = {
   legend: boolean;
   /** lat, lon readout in the corner */
   coords: boolean;
+  /** zoom +/- buttons and compass */
+  zoom: boolean;
+  /** "show my location" (GPS) button */
+  gps: boolean;
+  /** 3D terrain button */
+  terrain: boolean;
+  /** distance scale bar */
+  scale: boolean;
 };
 
 export type AppSettings = { view: ViewSettings };
@@ -26,6 +34,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     tools: true,
     legend: true,
     coords: true,
+    zoom: true,
+    gps: true,
+    terrain: true,
+    scale: true,
   },
 };
 
@@ -64,6 +76,16 @@ function commit(next: AppSettings) {
 
 export const setView = (patch: Partial<ViewSettings>) =>
   commit({ ...state, view: { ...state.view, ...patch } });
+/** show (true) or hide (false) every map UI element at once */
+export const setAllView = (on: boolean) =>
+  commit({
+    ...state,
+    view: Object.fromEntries(
+      (Object.keys(DEFAULT_SETTINGS.view) as (keyof ViewSettings)[]).map(
+        (k) => [k, on],
+      ),
+    ) as ViewSettings,
+  });
 export const resetView = () =>
   commit({ ...state, view: DEFAULT_SETTINGS.view });
 

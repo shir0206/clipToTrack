@@ -179,6 +179,105 @@ function DropChip({
   );
 }
 
+// ───────── styled project picker (replaces the native <select>) ─────────
+function ProjectSelect({
+  views,
+  activeId,
+  onChange,
+}: {
+  views: ProjectView[];
+  activeId: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const items: { id: string; label: string; n: number }[] = [
+    { id: 'all', label: 'All projects', n: views.length },
+    ...views.map((v) => ({ id: v.id, label: v.name, n: v.clipIds.length })),
+  ];
+  const cur = Math.max(
+    0,
+    items.findIndex((i) => i.id === activeId),
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: PointerEvent) =>
+      !root.current?.contains(e.target as Node) && setOpen(false);
+    document.addEventListener('pointerdown', down);
+    return () => document.removeEventListener('pointerdown', down);
+  }, [open]);
+
+  const show = () => {
+    setHi(cur);
+    setOpen(true);
+  };
+  const pick = (id: string) => {
+    onChange(id);
+    setOpen(false);
+  };
+
+  return (
+    <div className="ctt-psel" ref={root}>
+      <button
+        type="button"
+        className={`ctt-psel-btn${open ? ' is-open' : ''}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Project"
+        aria-activedescendant={open ? `ctt-psel-${hi}` : undefined}
+        disabled={!views.length}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            if (open) {
+              e.stopPropagation();
+              setOpen(false);
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!open) return show();
+            const d = e.key === 'ArrowDown' ? 1 : -1;
+            setHi((h) => (h + d + items.length) % items.length);
+          } else if ((e.key === 'Enter' || e.key === ' ') && open) {
+            e.preventDefault();
+            pick(items[hi].id);
+          }
+        }}
+      >
+        <span className="ctt-psel-label">{items[cur].label}</span>
+        <em>{items[cur].n}</em>
+        <SvgIcon name="chevron" size={13} className="ctt-psel-chev" />
+      </button>
+      {open && (
+        <ul className="ctt-psel-list" role="listbox" aria-label="Projects">
+          {items.map((it, i) => (
+            <li
+              key={it.id}
+              id={`ctt-psel-${i}`}
+              role="option"
+              aria-selected={it.id === activeId}
+              className={`${it.id === activeId ? 'is-on' : ''}${i === hi ? ' is-hi' : ''}${it.id === 'all' ? ' is-all' : ''}`}
+              onMouseEnter={() => setHi(i)}
+              onClick={() => pick(it.id)}
+            >
+              <SvgIcon
+                name={it.id === 'all' ? 'layers' : 'folder'}
+                size={14}
+                className="ctt-psel-ico"
+              />
+              <span>{it.label}</span>
+              <em>{it.n}</em>
+              {it.id === activeId && <SvgIcon name="check" size={13} />}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ───────── sidebar: current project header (lives inside the project container) ─────────
 function ProjectHead({
   v,
@@ -324,19 +423,7 @@ export function ProjectBar({
   ) : (
     <div className="ctt-pbar-row">
       <span className="ctt-sort-label">Project</span>
-      <select
-        value={activeId}
-        aria-label="Project"
-        disabled={!views.length}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="all">All projects ({views.length})</option>
-        {views.map((v) => (
-          <option key={v.id} value={v.id}>
-            {v.name} ({v.clipIds.length})
-          </option>
-        ))}
-      </select>
+      <ProjectSelect views={views} activeId={activeId} onChange={onChange} />
       <button
         className="ctt-pbar-new"
         title="Create a new project"

@@ -89,7 +89,11 @@ const STYLE = {
     layout: { visibility: k === 'streets' ? 'visible' : 'none' },
     paint:
       k === 'streets'
-        ? { 'raster-saturation': -0.6, 'raster-opacity': 0.9 }
+        ? {
+            'raster-saturation': -0.6,
+            'raster-contrast': 0.1,
+            'raster-opacity': 0.95,
+          }
         : {},
   })),
 } as maplibregl.StyleSpecification;
@@ -950,7 +954,9 @@ export default function TrackMap({
   const unit = opts.color === 'speed' ? 'km/h' : 'm';
 
   return (
-    <div className="ctt-mapcol">
+    <div
+      className={`ctt-mapcol${view.zoom ? '' : ' hide-zoom'}${view.gps ? '' : ' hide-gps'}${view.terrain ? '' : ' hide-terrain'}${view.scale ? '' : ' hide-scale'}`}
+    >
       <div className="ctt-mapstage">
         <div ref={el} className="ctt-map" />
         <MapPanel

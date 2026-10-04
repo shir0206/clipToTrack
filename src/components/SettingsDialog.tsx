@@ -3,8 +3,7 @@ import { loadOpts } from './MapPanel';
 import SvgIcon from './SvgIcon';
 import { setProjectMode, useProjectMode } from './useProjects';
 import {
-  DEFAULT_SETTINGS,
-  resetView,
+  setAllView,
   setView,
   useSettings,
   type ViewSettings,
@@ -35,6 +34,10 @@ const VIEW_ITEMS: [keyof ViewSettings, string, string][] = [
     'Scale shown when colouring by speed or altitude',
   ],
   ['coords', 'Coordinates', 'Lat / lon readout in the map corner'],
+  ['zoom', 'Zoom & compass', 'Zoom in / out buttons and the compass'],
+  ['gps', 'My location (GPS)', 'Button that shows where you are'],
+  ['terrain', '3D terrain', 'Button that tilts the map into 3D relief'],
+  ['scale', 'Scale bar', 'Distance scale in the map corner'],
 ];
 
 export default function SettingsDialog({
@@ -50,9 +53,8 @@ export default function SettingsDialog({
   const box = useRef<HTMLDivElement>(null);
   // the dialog mounts fresh each time it opens, so this is the current map colour mode
   const [colorMode] = useState(() => loadOpts().color);
-  const isDefault = VIEW_ITEMS.every(
-    ([k]) => view[k] === DEFAULT_SETTINGS.view[k],
-  );
+  const allOn = VIEW_ITEMS.every(([k]) => view[k]);
+  const allOff = VIEW_ITEMS.every(([k]) => !view[k]);
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
@@ -139,8 +141,15 @@ export default function SettingsDialog({
           <div className="ctt-set-foot">
             <button
               className="ctt-link"
-              disabled={isDefault}
-              onClick={resetView}
+              disabled={allOff}
+              onClick={() => setAllView(false)}
+            >
+              Hide all
+            </button>
+            <button
+              className="ctt-link"
+              disabled={allOn}
+              onClick={() => setAllView(true)}
             >
               Show all
             </button>

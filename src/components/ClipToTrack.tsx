@@ -26,17 +26,26 @@ const WIDTH_KEY = 'clip-to-track:panel-width';
 const PROFILE_HEIGHT_KEY = 'clip-to-track:profile-height'; // owned by ElevationProfile
 const SORT_KEY = 'clip-to-track:sort';
 
-type SortKey = 'added' | 'name' | 'date' | 'duration' | 'distance' | 'speed';
+type SortKey = 'added' | 'name' | 'date' | 'location' | 'speed';
 const SORTS: [SortKey, string, IconName][] = [
   ['added', 'Uploaded', 'upload'],
   ['name', 'Name', 'type'],
   ['date', 'Date', 'calendar'],
-  ['duration', 'Duration', 'clock'],
-  ['distance', 'Distance', 'route'],
+  ['location', 'Location', 'gps'],
   ['speed', 'Max speed', 'gauge'],
 ];
-const value = (c: Clip, k: SortKey): number | string | undefined =>
-  k === 'added' ? c.addedAt : k === 'name' ? c.title : c.sort[k];
+const value = (
+  c: Clip,
+  k: SortKey,
+  place?: string,
+): number | string | undefined =>
+  k === 'added'
+    ? c.addedAt
+    : k === 'name'
+      ? c.title
+      : k === 'location'
+        ? place || undefined // not looked up yet / nothing found: sorts last
+        : c.sort[k];
 const loadSort = (): { key: SortKey; dir: 1 | -1 } => {
   try {
     const s = JSON.parse(localStorage.getItem(SORT_KEY) ?? '');
@@ -105,8 +114,8 @@ export default function ClipToTrack() {
   const sorted = useMemo(
     () =>
       [...visible].sort((a, b) => {
-        const x = value(a, sort.key);
-        const y = value(b, sort.key);
+        const x = value(a, sort.key, projects.clipPlace[a.id]);
+        const y = value(b, sort.key, projects.clipPlace[b.id]);
         if (x === undefined) return y === undefined ? 0 : 1; // missing values always last
         if (y === undefined) return -1;
         const r =
@@ -119,7 +128,7 @@ export default function ClipToTrack() {
         // ties fall back to upload order, and flip with the direction so the toggle always visibly does something
         return (r || a.index - b.index) * sort.dir;
       }),
-    [visible, sort],
+    [visible, sort, projects.clipPlace],
   );
   const mapClips = useMemo(
     () => visible.filter((c) => !hiddenIds.has(c.id)),
@@ -271,7 +280,10 @@ export default function ClipToTrack() {
                         ? { key: k, dir: asc ? -1 : 1 }
                         : {
                             key: k,
-                            dir: k === 'name' || k === 'added' ? 1 : -1,
+                            dir:
+                              k === 'name' || k === 'added' || k === 'location'
+                                ? 1
+                                : -1,
                           },
                     )
                   }

@@ -227,11 +227,6 @@
 .ctt-controls {
   display: flex;
   align-items: center;
-  gap: 16px;
-}
-.ctt-controls-btns {
-  display: flex;
-  align-items: center;
   gap: 8px;
 }
 .ctt-btn {
@@ -1704,6 +1699,14 @@
 }
 .ctt-pop .ctt-prof-pane {
   padding-top: 12px;
+}
+
+/* Settings → hide individual MapLibre controls (each control sits in its own .maplibregl-ctrl-group) */
+.ctt-mapcol.hide-zoom .maplibregl-ctrl-group:has(.maplibregl-ctrl-zoom-in),
+.ctt-mapcol.hide-gps .maplibregl-ctrl-group:has(.maplibregl-ctrl-geolocate),
+.ctt-mapcol.hide-terrain .maplibregl-ctrl-group:has(.maplibregl-ctrl-terrain),
+.ctt-mapcol.hide-scale .maplibregl-ctrl-scale {
+  display: none;
 }
 
 /* large player without the native toolbar: click toggles play / pause */
