@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Clip } from './types';
 import SvgIcon, { type IconName } from './SvgIcon';
+import { watchPicture } from './videoSupport';
 
 type Props = {
   clip: Clip;
@@ -22,7 +23,7 @@ type Props = {
 };
 
 const UNPLAYABLE =
-  "This browser can't play this video (HEVC/10-bit often needs Safari or hardware support).";
+  "This PC can't decode the picture of this video (GoPro HEVC / 10-bit). Windows: use Edge with “HEVC Video Extensions” installed, or add the clip's .LRV proxy (H.264) instead.";
 
 export default function ClipCard({
   clip,
@@ -51,6 +52,17 @@ export default function ClipCard({
   useEffect(() => {
     onStopRef.current = onStop;
   });
+
+  // audio-only playback (video track not decodable) never raises an error by itself: detect it
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    return watchPicture(v, () => {
+      v.pause();
+      setVideoError(UNPLAYABLE);
+      onStopRef.current();
+    });
+  }, [clip.videoUrl, videoError]);
 
   const onProgressRef = useRef(onProgress);
   useEffect(() => {

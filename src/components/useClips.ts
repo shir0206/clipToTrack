@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clipFromMetadata, type ClipMetadata } from './clipFromMetadata';
-import { extractGoProMetadata } from './extractGoProMetadata';
+import { extractGoProMetadata, NoGpsFixError } from './extractGoProMetadata';
+import { pickAnchors } from './gpsBridge';
 import { captureThumbnail } from './videoThumbnail';
 import type { Clip, UploadProgress } from './types';
 
@@ -64,6 +65,10 @@ export function useClips() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
+  const entriesRef = useRef(entries); // lets addFiles see current clips without re-creating the callback
+  useEffect(() => {
+    entriesRef.current = entries;
+  });
 
   // Clip = pure function of the stored metadata (+ session-only video URL)
   const clips: Clip[] = useMemo(
@@ -123,6 +128,17 @@ export function useClips() {
       setBusy(true);
       const added: (Omit<Entry, 'slot'> & { id: string })[] = [];
       const errors: string[] = [];
+      // clips without any GPS fix (tunnel…): placed afterwards, between the clips that do have one
+      const unlocated: {
+        file: File;
+        err: NoGpsFixError;
+        videoUrl: string;
+        thumbnail?: string;
+      }[] = [];
+      const asVideoUrl = (f: File) =>
+        URL.createObjectURL(
+          f.type ? f : new Blob([f], { type: 'video/mp4' }),
+        );
 
       for (let n = 0; n < files.length; n++) {
         const file = files[n];
@@ -151,9 +167,7 @@ export function useClips() {
             );
             const id = clipFromMetadata(metadata).id; // validates too
             // .lrv has no MIME type; label it so <video> doesn't have to guess (wrapping a File in a Blob copies nothing)
-            const videoUrl = URL.createObjectURL(
-              file.type ? file : new Blob([file], { type: 'video/mp4' }),
-            );
+            const videoUrl = asVideoUrl(file);
             setProgress({ ...base, phase: 'thumbnail', frac: null });
             const thumbnail = await captureThumbnail(videoUrl);
             added.push({
@@ -165,8 +179,41 @@ export function useClips() {
             });
           }
         } catch (e) {
-          errors.push(`${file.name}: ${message(e)}`);
+          if (e instanceof NoGpsFixError) {
+            const videoUrl = asVideoUrl(file);
+            setProgress({ ...base, phase: 'thumbnail', frac: null });
+            const thumbnail = await captureThumbnail(videoUrl).catch(
+              () => undefined,
+            );
+            unlocated.push({ file, err: e, videoUrl, thumbnail });
+          } else errors.push(`${file.name}: ${message(e)}`);
         }
+      }
+
+      // tunnel clips: interpolate between the real-fix clips just before / after them
+      for (const u of unlocated) {
+        const { startMs, endMs, place } = u.err.info;
+        const metas = [
+          ...entriesRef.current.map((e) => e.metadata),
+          ...added.map((a) => a.metadata),
+        ];
+        const { prev, next } =
+          startMs !== undefined && endMs !== undefined
+            ? pickAnchors(metas, startMs, endMs)
+            : {};
+        if (!prev && !next) {
+          errors.push(`${u.file.name}: ${u.err.message}`);
+          URL.revokeObjectURL(u.videoUrl);
+          continue;
+        }
+        const metadata = compact(place(prev, next));
+        added.push({
+          metadata,
+          thumbnail: u.thumbnail,
+          videoUrl: u.videoUrl,
+          id: clipFromMetadata(metadata).id,
+          addedAt: Date.now(),
+        });
       }
 
       setError(errors.length ? errors.join(' · ') : null);

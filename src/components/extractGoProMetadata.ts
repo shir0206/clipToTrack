@@ -351,7 +351,10 @@ function parseGpmf(
 
 const R = 6_371_008.8;
 const rad = (d: number) => (d * Math.PI) / 180;
-const haversine = (a: RawSample, b: RawSample) => {
+const haversine = (
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+) => {
   const dLat = rad(b.lat - a.lat);
   const dLon = rad(b.lon - a.lon);
   const h =
@@ -458,6 +461,113 @@ async function readTelemetry(
   return perSample.flat();
 }
 
+// ───────────────────────── tunnels / lost fix ─────────────────────────
+
+/** A known position at a known time (end of the clip before, start of the clip after). */
+export type Anchor = { lat: number; lon: number; altM?: number; utcMs: number };
+
+/**
+ * Thrown when a clip has telemetry but (almost) no GPS fix, e.g. it was filmed inside a tunnel.
+ * `info.place()` builds an ESTIMATED track between two neighbouring anchors, so the caller can
+ * still put the clip on the map when the clips before / after it have a real fix.
+ */
+export class NoGpsFixError extends Error {
+  constructor(
+    message: string,
+    readonly info: {
+      /** clip time window (GPS clock, falls back to the MP4 creation time) */
+      startMs?: number;
+      endMs?: number;
+      place: (prev?: Anchor, next?: Anchor) => ClipMetadata;
+    },
+  ) {
+    super(message);
+    this.name = 'NoGpsFixError';
+  }
+}
+
+const isGood = (s: RawSample) =>
+  Number.isFinite(s.lat) &&
+  Number.isFinite(s.lon) &&
+  Math.abs(s.lat) <= 90 &&
+  Math.abs(s.lon) <= 180 &&
+  !(s.lat === 0 && s.lon === 0) &&
+  s.fix >= 2;
+
+/**
+ * Keeps the clip's whole time line even when the fix drops (tunnel, garage, canyon):
+ *  - between two good samples  -> positions are interpolated by time (speed = average over the gap)
+ *  - before the first / after the last good sample -> the nearest good position is held
+ * Samples the camera reported without a fix are never trusted (it extrapolates "last known" positions).
+ * `estimated[i]` is true for every sample that was filled in.
+ */
+export function fillGaps(raw: RawSample[], durationSec?: number) {
+  const n = raw.length;
+  const good = raw.map(isGood);
+  const prev: number[] = new Array(n).fill(-1);
+  const next: number[] = new Array(n).fill(-1);
+  for (let i = 0, p = -1; i < n; i++) {
+    if (good[i]) p = i;
+    prev[i] = p;
+  }
+  for (let i = n - 1, q = -1; i >= 0; i--) {
+    if (good[i]) q = i;
+    next[i] = q;
+  }
+  const secPerSample = durationSec && n ? durationSec / n : 0.1;
+
+  const samples = raw.map((s, i): RawSample => {
+    if (good[i]) return s;
+    const p = prev[i];
+    const q = next[i];
+    if (p < 0 && q < 0) return s;
+    if (p >= 0 && q >= 0) {
+      const a = raw[p];
+      const b = raw[q];
+      const hasT =
+        a.utcMs !== undefined &&
+        b.utcMs !== undefined &&
+        s.utcMs !== undefined &&
+        b.utcMs > a.utcMs;
+      const u = Math.min(
+        1,
+        Math.max(
+          0,
+          hasT
+            ? (s.utcMs! - a.utcMs!) / (b.utcMs! - a.utcMs!)
+            : (i - p) / (q - p),
+        ),
+      );
+      const dt = hasT ? (b.utcMs! - a.utcMs!) / 1000 : (q - p) * secPerSample;
+      const v = dt > 0 ? haversine(a, b) / dt : 0;
+      return {
+        ...s,
+        lat: a.lat + (b.lat - a.lat) * u,
+        lon: a.lon + (b.lon - a.lon) * u,
+        alt: a.alt + (b.alt - a.alt) * u,
+        speed2d: v,
+        speed3d: v,
+        fix: 0,
+      };
+    }
+    const h = raw[p >= 0 ? p : q];
+    return {
+      ...s,
+      lat: h.lat,
+      lon: h.lon,
+      alt: h.alt,
+      speed2d: 0,
+      speed3d: 0,
+      fix: 0,
+    };
+  });
+  return {
+    samples,
+    estimated: good.map((g) => !g),
+    goodCount: good.filter(Boolean).length,
+  };
+}
+
 // ───────────────────────── public API ─────────────────────────
 
 export async function extractGoProMetadata(
@@ -501,48 +611,7 @@ export async function extractGoProMetadata(
   const gp: { device?: string } = {};
   const raw = await readTelemetry(file, gpmd.samples, gp, onProgress);
 
-  const valid = raw.filter(
-    (s) =>
-      Number.isFinite(s.lat) &&
-      Number.isFinite(s.lon) &&
-      Math.abs(s.lat) <= 90 &&
-      Math.abs(s.lon) <= 180 &&
-      !(s.lat === 0 && s.lon === 0) &&
-      s.fix >= 2,
-  );
-  if (valid.length < 2)
-    throw new Error(
-      raw.length
-        ? 'no GPS lock in this clip (recorded without a 2D/3D fix)'
-        : 'telemetry track has no GPS data (was GPS enabled?)',
-    );
-
-  let cum = 0;
-  const track: GpsPoint[] = valid.map((s, i) => {
-    const seg = i ? haversine(valid[i - 1], s) : 0;
-    cum += seg;
-    return {
-      index: i + 1,
-      lat: round(s.lat, 7),
-      lon: round(s.lon, 7),
-      altM: round(s.alt, 3),
-      speed2dMs: round(s.speed2d, 3),
-      speed3dMs: round(s.speed3d, 3),
-      dop: round(s.dop, 2),
-      fix: s.fix,
-      ...(s.utcMs !== undefined && { utc: iso(s.utcMs) }),
-      speed3dKmh: round(s.speed3d * 3.6, 3),
-      segmentDistM: round(seg, 4),
-      cumulativeDistM: round(cum, 4),
-    };
-  });
-
-  const alts = valid.map((s) => s.alt);
-  const spd = valid.map((s) => s.speed3d * 3.6);
-  const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
-  const dops = valid.map((s) => s.dop).filter(Number.isFinite);
-  const first = valid[0];
-  const last = valid[valid.length - 1];
+  const { samples, estimated, goodCount } = fillGaps(raw, durationSec);
 
   const device = gp.device?.trim();
   const camera = device
@@ -562,45 +631,151 @@ export async function extractGoProMetadata(
     ? round(video.timescale / video.frameDelta, 2)
     : undefined;
 
-  return {
-    schemaVersion: 1,
-    source: {
-      fileName: file.name,
-      fileSizeMB: round(file.size / 1_048_576, 1),
-    },
-    file: {
-      camera,
-      ...(createdMs !== undefined && { createdUtc: iso(createdMs, false) }),
-      ...(durationSec !== undefined && { durationSec: round(durationSec, 2) }),
-      ...(fps !== undefined && { frameRate: fps }),
-      ...(video && { frames: video.sampleCount, videoCodec: codec }),
-      ...(w &&
-        h && { resolution: `${w} x ${h}${label(w) ? ` (${label(w)})` : ''}` }),
-    },
-    gps: {
-      samples: valid.length,
-      fixType: Math.min(...valid.map((s) => s.fix)),
-      ...(dops.length && { dopMean: round(mean(dops), 2) }),
-      ...(first.utcMs !== undefined && {
-        startUtc: iso(first.utcMs),
-        endUtc: iso(last.utcMs ?? first.utcMs),
-      }),
-      start: { lat: track[0].lat, lon: track[0].lon },
-      end: {
-        lat: track[track.length - 1].lat,
-        lon: track[track.length - 1].lon,
+  /** Builds the metadata from a full time line; `est[i]` marks samples that are not real fixes. */
+  const assemble = (all: RawSample[], est: boolean[]): ClipMetadata => {
+    const real = all.filter((_, i) => !est[i]);
+    const ref = real.length ? real : all; // statistics come from real fixes whenever there are any
+
+    let cum = 0;
+    const track: GpsPoint[] = all.map((s, i) => {
+      const seg = i ? haversine(all[i - 1], s) : 0;
+      cum += seg;
+      return {
+        index: i + 1,
+        lat: round(s.lat, 7),
+        lon: round(s.lon, 7),
+        altM: round(s.alt, 3),
+        speed2dMs: round(s.speed2d, 3),
+        speed3dMs: round(s.speed3d, 3),
+        dop: round(s.dop, 2),
+        fix: s.fix,
+        ...(s.utcMs !== undefined && { utc: iso(s.utcMs) }),
+        speed3dKmh: round(s.speed3d * 3.6, 3),
+        segmentDistM: round(seg, 4),
+        cumulativeDistM: round(cum, 4),
+        ...(est[i] && { estimated: true }),
+      };
+    });
+
+    const alts = ref.map((s) => s.alt);
+    const spd = ref.map((s) => s.speed3d * 3.6);
+    const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+    const dops = real.map((s) => s.dop).filter(Number.isFinite);
+    const first = ref[0];
+    const last = ref[ref.length - 1];
+
+    return {
+      schemaVersion: 1,
+      source: {
+        fileName: file.name,
+        fileSizeMB: round(file.size / 1_048_576, 1),
       },
-      totalDistanceM: round(cum, 4),
-      altitudeM: {
-        min: round(Math.min(...alts), 3),
-        max: round(Math.max(...alts), 3),
-        mean: round(mean(alts), 3),
+      file: {
+        camera,
+        ...(createdMs !== undefined && { createdUtc: iso(createdMs, false) }),
+        ...(durationSec !== undefined && {
+          durationSec: round(durationSec, 2),
+        }),
+        ...(fps !== undefined && { frameRate: fps }),
+        ...(video && { frames: video.sampleCount, videoCodec: codec }),
+        ...(w &&
+          h && {
+            resolution: `${w} x ${h}${label(w) ? ` (${label(w)})` : ''}`,
+          }),
       },
-      speed3dKmh: {
-        max: round(Math.max(...spd), 3),
-        mean: round(mean(spd), 3),
+      gps: {
+        samples: all.length,
+        // 0 = nothing in this clip was a real fix (position fully estimated)
+        fixType: real.length ? Math.min(...real.map((s) => s.fix)) : 0,
+        ...(dops.length && { dopMean: round(mean(dops), 2) }),
+        // the window of REAL fixes: neighbouring-clip bridging relies on time + position matching
+        ...(first.utcMs !== undefined && {
+          startUtc: iso(first.utcMs),
+          endUtc: iso(last.utcMs ?? first.utcMs),
+        }),
+        start: { lat: track[0].lat, lon: track[0].lon },
+        end: {
+          lat: track[track.length - 1].lat,
+          lon: track[track.length - 1].lon,
+        },
+        totalDistanceM: round(cum, 4),
+        altitudeM: {
+          min: round(Math.min(...alts), 3),
+          max: round(Math.max(...alts), 3),
+          mean: round(mean(alts), 3),
+        },
+        speed3dKmh: {
+          max: round(Math.max(...spd), 3),
+          mean: round(mean(spd), 3),
+        },
+        track,
       },
-      track,
-    },
+    };
   };
+
+  if (goodCount >= 2) return assemble(samples, estimated);
+
+  // ── no usable fix at all (tunnel / garage / GPS never locked) ──
+  if (!raw.length)
+    throw new Error('telemetry track has no GPS data (was GPS enabled?)');
+
+  const n = raw.length;
+  const t0 = raw[0].utcMs ?? createdMs;
+  const timeOf = (i: number) =>
+    raw[i].utcMs ??
+    (t0 !== undefined
+      ? t0 + (n > 1 ? ((durationSec ?? 0) * 1000 * i) / (n - 1) : 0)
+      : undefined);
+
+  /** Fills the whole clip with positions interpolated (by time) between the neighbouring clips. */
+  const place = (prev?: Anchor, next?: Anchor): ClipMetadata => {
+    const both = !!prev && !!next && next.utcMs > prev.utcMs;
+    const v = both
+      ? haversine(prev!, next!) / ((next!.utcMs - prev!.utcMs) / 1000)
+      : 0;
+    const synth = raw.map((s, i): RawSample => {
+      const t = timeOf(i);
+      let lat: number;
+      let lon: number;
+      let alt: number;
+      if (both && t !== undefined) {
+        const u = Math.min(
+          1,
+          Math.max(0, (t - prev!.utcMs) / (next!.utcMs - prev!.utcMs)),
+        );
+        lat = prev!.lat + (next!.lat - prev!.lat) * u;
+        lon = prev!.lon + (next!.lon - prev!.lon) * u;
+        const a0 = prev!.altM ?? next!.altM ?? 0;
+        const a1 = next!.altM ?? a0;
+        alt = a0 + (a1 - a0) * u;
+      } else {
+        const h = (prev ?? next)!;
+        lat = h.lat;
+        lon = h.lon;
+        alt = h.altM ?? 0;
+      }
+      return {
+        lat,
+        lon,
+        alt,
+        speed2d: v,
+        speed3d: v,
+        dop: 99.99,
+        fix: 0,
+        utcMs: t,
+      };
+    });
+    return assemble(
+      synth,
+      synth.map(() => true),
+    );
+  };
+
+  const bestDop = Math.min(...raw.map((s) => s.dop).filter(Number.isFinite));
+  throw new NoGpsFixError(
+    `no GPS lock: ${goodCount} of ${n} GPS samples had a 2D/3D fix` +
+      (Number.isFinite(bestDop) ? ` (best DOP ${bestDop.toFixed(2)})` : '') +
+      '. Filmed in a tunnel or under cover? Add the clips recorded just before / after it in the same upload and it will be placed between them.',
+    { startMs: timeOf(0), endMs: timeOf(n - 1), place },
+  );
 }
