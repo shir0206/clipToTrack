@@ -34,6 +34,10 @@ export function openVideoWindow(title: string): Window | null {
   return win;
 }
 
+function setVideoWindowTitle(win: Window, title: string) {
+  win.document.title = title;
+}
+
 type Props = {
   clip: Clip;
   win: Window;
@@ -78,7 +82,7 @@ export default function VideoWindow({
   });
 
   useEffect(() => {
-    win.document.title = clip.title;
+    setVideoWindowTitle(win, clip.title);
   }, [win, clip.title]);
 
   useEffect(() => {
