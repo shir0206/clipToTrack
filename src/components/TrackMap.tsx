@@ -20,6 +20,7 @@ import MapPanel, {
 } from './MapPanel';
 import ElevationProfile from './ElevationProfile';
 import SvgIcon from './SvgIcon';
+import { useSettings } from './settings';
 import { clipToGeoJson, clipToGpx, download } from './exportTrack';
 
 // Let Vite fingerprint and serve MapLibre's worker as a real JS asset.
@@ -273,6 +274,7 @@ export default function TrackMap({
   const playheadClip = useRef<string | null>(null);
   const prevIds = useRef(new Set<string>());
 
+  const { view } = useSettings();
   const [opts, setOpts] = useState<MapOpts>(loadOpts);
   const set = (p: Partial<MapOpts>) => setOpts((o) => ({ ...o, ...p }));
   const followRef = useRef(opts.follow);
@@ -971,7 +973,7 @@ export default function TrackMap({
           }
         />
 
-        {range && (
+        {range && view.legend && (
           <div
             className="ctt-legend"
             aria-label={`Colour scale: ${opts.color}`}
@@ -1016,17 +1018,19 @@ export default function TrackMap({
           </div>
         )}
 
-        <button
-          ref={coordEl}
-          className="ctt-coords"
-          title="Click to copy coordinates"
-          onClick={() =>
-            lastCoord.current &&
-            void navigator.clipboard?.writeText(lastCoord.current)
-          }
-        >
-          lat, lon
-        </button>
+        {view.coords && (
+          <button
+            ref={coordEl}
+            className="ctt-coords"
+            title="Click to copy coordinates"
+            onClick={() =>
+              lastCoord.current &&
+              void navigator.clipboard?.writeText(lastCoord.current)
+            }
+          >
+            lat, lon
+          </button>
+        )}
       </div>
 
       {opts.profile && sel && (

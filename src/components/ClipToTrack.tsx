@@ -14,12 +14,14 @@ import Logo from './Logo';
 import VideoModal from './VideoModal';
 import VideoWindow, { openVideoWindow } from './VideoWindow';
 import SvgIcon, { type IconName } from './SvgIcon';
+import SettingsDialog from './SettingsDialog';
 import PlaybackHelp, { playbackHelpDismissed } from './PlaybackHelp';
 import { probeDecode } from './videoSupport';
 import { useClips } from './useClips';
 import './ClipToTrack.css';
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
+const PROFILE_HEIGHT_KEY = 'clip-to-track:profile-height'; // owned by ElevationProfile
 const SORT_KEY = 'clip-to-track:sort';
 
 type SortKey = 'added' | 'name' | 'date' | 'duration' | 'distance' | 'speed';
@@ -64,6 +66,7 @@ export default function ClipToTrack() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set()); // hidden on the map only
   const [sort, setSort] = useState(loadSort);
   const [playbackHelp, setPlaybackHelp] = useState(false); // browser can't draw the video's picture
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const mapApi = useRef<MapApi | null>(null);
 
   useEffect(() => {
@@ -204,7 +207,7 @@ export default function ClipToTrack() {
         <Logo tagline="GoPro clips. Mapped to your adventures." />
         <div className="ctt-header-actions">
           <button>Projects</button>
-          <button>Settings</button>
+          <button onClick={() => setSettingsOpen(true)}>Settings</button>
         </div>
       </header>
 
@@ -328,6 +331,29 @@ export default function ClipToTrack() {
           )}
         </section>
       </main>
+
+      {settingsOpen && (
+        <SettingsDialog
+          clipCount={clips.length}
+          layoutIsDefault={
+            panelW === clampW(window.innerWidth * 0.33) &&
+            [null, '260'].includes(localStorage.getItem(PROFILE_HEIGHT_KEY)) // 260 = ElevationProfile's DEFAULT_H
+          }
+          onClose={() => setSettingsOpen(false)}
+          onResetLayout={() => {
+            setPanelW(clampW(window.innerWidth * 0.33));
+            try {
+              localStorage.removeItem(PROFILE_HEIGHT_KEY); // applied next time the dock opens
+            } catch {
+              /* ignore */
+            }
+          }}
+          onClearClips={() => {
+            handleClear();
+            setSettingsOpen(false);
+          }}
+        />
+      )}
 
       {playbackHelp && <PlaybackHelp onClose={() => setPlaybackHelp(false)} />}
 
