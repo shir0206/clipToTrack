@@ -298,6 +298,8 @@ function fmtRange(from?: number, to?: number) {
 export function projectViews(
   projects: Project[],
   clips: Clip[],
+  /** clip id → place name (reverse-geocoded); a project is named after its first clip's place */
+  clipPlace: Record<string, string> = {},
 ): ProjectView[] {
   const byId = new Map(clips.map((c) => [c.id, c]));
   return (
@@ -312,18 +314,19 @@ export function projectViews(
         const from = starts.length ? Math.min(...starts) : undefined;
         const to = starts.length ? Math.max(...starts) : undefined;
         const range = cs.length ? fmtRange(from, to) : 'No clips yet';
-        // generated names read "Fabulous Times in Valencia" once the place is known
+        // generated names read "[Adjective] [Noun] in [place]" once the place is known
+        const place = (p.clipIds[0] && clipPlace[p.clipIds[0]]) || p.place || '';
         const generated =
           p.id === UNDATED_ID ? 'Undated' : (p.title ?? 'Project');
         return {
           id: p.id,
           name:
             p.name ??
-            (p.place && p.id !== UNDATED_ID
-              ? `${generated} in ${p.place}`
+            (place && p.id !== UNDATED_ID
+              ? `${generated} in ${place}`
               : generated),
           custom: !!p.name,
-          place: p.place || undefined,
+          place: place || undefined,
           range,
           clipIds: p.clipIds,
           from,

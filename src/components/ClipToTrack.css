@@ -199,9 +199,9 @@
   font-weight: 600;
 }
 .ctt-card-head p {
-  margin: 2px 0 0;
+  margin: 4px 0;
   font-size: 12px;
-  color: var(--muted);
+  color: black;
 }
 .ctt-quality {
   grid-column: 1 / -1;
@@ -213,12 +213,12 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--c);
   color: #fff;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 700;
 }
 .ctt-controls {
@@ -1552,6 +1552,7 @@
   flex-wrap: wrap;
   gap: 4px 10px;
   min-width: 0;
+  margin-bottom: 8px;
 }
 
 .ctt-thumb.is-playable {
@@ -1653,9 +1654,14 @@
   flex-wrap: wrap; /* the buttons wrap instead of overflowing when the text column is narrow */
 }
 
-/* ───────── card: file name – place ───────── */
-.ctt-place {
-  font-weight: 500;
+/* ───────── card: place under the file name, date with its icon ───────── */
+.ctt-meta > .ctt-icon {
+  flex: none;
+}
+.ctt-card-head p.ctt-place {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.25;
   color: var(--muted);
 }
 

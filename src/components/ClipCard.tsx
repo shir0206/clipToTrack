@@ -202,11 +202,10 @@ export default function ClipCard({
 
       <div className="ctt-card-body">
         <div className="ctt-card-head">
-          <span className="ctt-badge">{clip.index}</span>
           <div>
             <div className="ctt-title-row">
+              <span className="ctt-badge" />
               <h3>{clip.title}</h3>
-              {place && <h3 className="ctt-place">{place}</h3>}
               {active && (
                 <span className="ctt-playing" role="status">
                   <span className="ctt-eq" aria-hidden="true">
@@ -218,7 +217,16 @@ export default function ClipCard({
                 </span>
               )}
             </div>
-            <p>{clip.date}</p>
+            {place && (
+              <p className="ctt-meta">
+                <SvgIcon name="mapPin" size={14} />
+                {place}
+              </p>
+            )}
+            <p className="ctt-meta">
+              <SvgIcon name="calendar" size={12} />
+              {clip.date}
+            </p>
             <p className="ctt-meta">
               <SvgIcon name="camera" size={12} />
               {clip.camera}

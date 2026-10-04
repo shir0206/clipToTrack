@@ -1,0 +1,85 @@
+/* Altitude cluster: reuses the speed cluster's instrument styling (SpeedCluster.css). */
+.ctt-al-dial {
+  overflow: visible;
+}
+/* hands are turned by the component every frame (eased in JS), so no CSS transition */
+.ctt-al-hand {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+.ctt-al-hand polygon {
+  fill: #f5f5f6;
+}
+.ctt-al-hand.is-short polygon {
+  fill: var(--c, #2878ff);
+  stroke: #f5f5f6;
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+}
+/* the climb-rate needle is already eased in JS too */
+.ctt-al .ctt-gt-needle {
+  transition: none;
+}
+
+/* route profile with a marker riding along it */
+.ctt-al-strip {
+  position: relative;
+  height: clamp(22px, 13cqh, 40px);
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #2e2e31;
+  background: #101011;
+}
+.ctt-al-strip svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ctt-al-area {
+  fill: var(--c, #2878ff);
+  opacity: 0.14;
+}
+.ctt-al-done {
+  fill: var(--c, #2878ff);
+  opacity: 0.4;
+}
+.ctt-al-line {
+  fill: none;
+  stroke: var(--c, #2878ff);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.ctt-al-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--c, #2878ff) 40%,
+    transparent
+  );
+  pointer-events: none;
+}
+.ctt-al-dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 2px var(--c, #2878ff),
+    0 0 10px var(--c, #2878ff);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ctt-al-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--gt-muted, #9a9a9f);
+  font-size: 0.85em;
+  pointer-events: none;
+}

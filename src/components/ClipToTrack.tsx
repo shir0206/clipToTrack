@@ -173,7 +173,8 @@ export default function ClipToTrack() {
       ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
 
-  const handleFiles = async (files: File[]) => {
+  /** `into`: a project chosen explicitly (the Projects dialog); otherwise the open project, if any */
+  const handleFiles = async (files: File[], into?: string) => {
     // in parallel with the import: can this browser draw the picture? If not, explain (once) what to approve
     const video = files.find((f) => !/\.json$/i.test(f.name));
     if (video && !playbackHelpDismissed())
@@ -182,7 +183,7 @@ export default function ClipToTrack() {
       );
     // an upload made while a project is open belongs to that project (not to the automatic grouping)
     const target =
-      projectMode && activeProject !== 'all' ? activeProject : null;
+      into ?? (projectMode && activeProject !== 'all' ? activeProject : null);
     const ids = await addFiles(files);
     if (!ids.length) return;
     if (target) projects.adopt(ids, target);
@@ -449,6 +450,9 @@ export default function ClipToTrack() {
           onMove={projects.moveClip}
           onCreate={projects.createProject}
           onDelete={handleDeleteProject}
+          onUpload={(files, id) => void handleFiles(files, id)}
+          busy={busy}
+          progress={progress}
           onOpen={(id) => {
             setProjectFilter(id);
             setProjectsDialog(null);

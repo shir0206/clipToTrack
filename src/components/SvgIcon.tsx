@@ -37,7 +37,8 @@ export type IconName =
   | 'plus'
   | 'check'
   | 'folder'
-  | 'external';
+  | 'external'
+  | 'mapPin';
 
 const solid = { fill: 'currentColor', stroke: 'none' } as const;
 
@@ -148,6 +149,12 @@ const PATHS: Record<IconName, ReactNode> = {
   check: <path d="M20 6 9 17l-5-5" />,
   folder: (
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+  ),
+  mapPin: (
+    <>
+      <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </>
   ),
   external: (
     <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />

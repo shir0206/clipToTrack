@@ -76,7 +76,7 @@ const arc = (f0: number, f1: number, r: number) => {
 
 type Pill = [caption: string, value: string];
 
-function Dial({
+export function Dial({
   labels,
   frac,
   title,

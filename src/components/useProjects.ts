@@ -123,48 +123,28 @@ export function useProjects(clips: Clip[]) {
     }
   }, [clipPlace]);
 
-  // Place names (Nominatim allows one request per second): projects first, then each clip.
+  // Place names (Nominatim allows one request per second). A project is named after the place of
+  // its first clip, so those clips are looked up first, then the rest (for the card subtitles).
   const asked = useRef(new Set<string>());
   const busy = useRef(false);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (busy.current) return;
-    let key: string | undefined;
-    let clip: Clip | undefined;
-    let save: ((place: string) => void) | undefined;
-
-    const p = projects.find(
-      (x) =>
-        x.place === undefined &&
-        x.clipIds.length > 0 && // an empty manual project has nothing to look up yet
-        x.id !== UNDATED_ID &&
-        !asked.current.has(`p:${x.id}`),
+    const byId = new Map(clips.map((c) => [c.id, c]));
+    const firsts = projects
+      .filter((p) => p.id !== UNDATED_ID)
+      .map((p) => byId.get(p.clipIds[0]))
+      .filter((c): c is Clip => !!c);
+    const clip = [...firsts, ...clips].find(
+      (c) => clipPlace[c.id] === undefined && !asked.current.has(c.id),
     );
-    const first = p && clips.find((c) => c.id === p.clipIds[0]);
-    if (p && first) {
-      key = `p:${p.id}`;
-      clip = first;
-      save = (place) =>
-        setProjects((ps) =>
-          ps.map((x) => (x.id === p.id ? { ...x, place } : x)),
-        );
-    } else {
-      const c = clips.find(
-        (x) => clipPlace[x.id] === undefined && !asked.current.has(`c:${x.id}`),
-      );
-      if (c) {
-        key = `c:${c.id}`;
-        clip = c;
-        save = (place) => setClipPlace((m) => ({ ...m, [c.id]: place }));
-      }
-    }
-    if (!key || !clip || !save) return;
+    if (!clip) return;
 
-    asked.current.add(key);
+    asked.current.add(clip.id);
     busy.current = true;
     const [lon, lat] = clip.coordinates[0];
     reverse(lon, lat)
-      .then(save)
+      .then((place) => setClipPlace((m) => ({ ...m, [clip.id]: place })))
       .catch(() => {
         /* offline: tried once this session; retried on the next visit */
       })
@@ -176,7 +156,10 @@ export function useProjects(clips: Clip[]) {
       );
   }, [projects, clips, clipPlace, tick]);
 
-  const views = useMemo(() => projectViews(projects, clips), [projects, clips]);
+  const views = useMemo(
+    () => projectViews(projects, clips, clipPlace),
+    [projects, clips, clipPlace],
+  );
   const projectOf = useMemo(
     () =>
       new Map(

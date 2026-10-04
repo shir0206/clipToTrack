@@ -5,8 +5,9 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import type { Clip } from './types';
+import type { Clip, UploadProgress } from './types';
 import SvgIcon, { type IconName } from './SvgIcon';
+import UploadZone from './UploadZone';
 import {
   CLIP_MIME,
   fmtKm,
@@ -475,6 +476,9 @@ export function ProjectsDialog({
   onOpen,
   onCreate,
   onDelete,
+  onUpload,
+  busy,
+  progress,
   onClose,
 }: {
   views: ProjectView[];
@@ -486,6 +490,10 @@ export function ProjectsDialog({
   /** creates an empty project and returns its id */
   onCreate: () => string;
   onDelete: (id: string) => void;
+  /** add files from this computer straight into a project */
+  onUpload: (files: File[], projectId: string) => void;
+  busy?: boolean;
+  progress?: UploadProgress | null;
   onClose: () => void;
 }) {
   const [selId, setSelId] = useState(initialId ?? views[0]?.id);
@@ -734,6 +742,14 @@ export function ProjectsDialog({
                 </div>
               )}
 
+              <div className="ctt-pupload">
+                <UploadZone
+                  onFiles={(files) => onUpload(files, sel.id)}
+                  busy={busy}
+                  progress={progress}
+                />
+              </div>
+
               {selClips.length ? (
                 <>
                   <p className="ctt-pd-legend">
@@ -770,8 +786,8 @@ export function ProjectsDialog({
                 </>
               ) : (
                 <p className="ctt-pd-none">
-                  This project is empty. Upload a clip, or use “Add clips” to
-                  bring some in from other projects.
+                  This project is empty. Upload clips above, or use “Add
+                  clips” to bring some in from other projects.
                 </p>
               )}
             </section>
