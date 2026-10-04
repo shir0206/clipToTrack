@@ -266,12 +266,12 @@
   background: var(--bg);
 }
 .ctt-stats dt {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
 }
 .ctt-stats dd {
   margin: 2px 0 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1636,4 +1636,19 @@
   .ctt-eq i {
     transform: scaleY(0.7);
   }
+}
+
+/* ───────── responsive video: grows with the sidebar width ─────────
+   The list is a size container, so `cqw` = 1% of the list width, which changes as the
+   sidebar is dragged. The thumbnail / <video> (16:9) never goes below 168px, then takes
+   ~46% of the list width, up to 640px. Browsers without container units keep the fixed 168px. */
+.ctt-list {
+  container-type: inline-size;
+  container-name: ctt-list;
+}
+.ctt-card {
+  grid-template-columns: clamp(168px, 46cqw, 640px) minmax(0, 1fr);
+}
+.ctt-controls {
+  flex-wrap: wrap; /* the buttons wrap instead of overflowing when the text column is narrow */
 }
