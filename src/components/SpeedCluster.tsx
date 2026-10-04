@@ -290,7 +290,8 @@ export default function SpeedCluster({ clip, probe }: Props) {
   const rpmLabels = Array.from({ length: ENGINE.maxRpm / 1000 + 1 }, (_, i) =>
     String(i),
   );
-  const gearText = v === undefined ? '--' : eng.gear === 0 ? 'N' : `${eng.gear}`;
+  const gearText =
+    v === undefined ? '--' : eng.gear === 0 ? 'N' : `${eng.gear}`;
   const altText = fin(p?.altM) ? `${Math.round(p!.altM!)} m` : '--';
 
   const total = samples[last]?.cumulativeDistM;

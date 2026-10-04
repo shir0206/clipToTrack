@@ -11,6 +11,7 @@ function span(m: ClipMetadata): { start: Anchor; end: Anchor } | undefined {
   const t0 = Date.parse(g.startUtc ?? '');
   const t1 = Date.parse(g.endUtc ?? '');
   if (!Number.isFinite(t0) || !Number.isFinite(t1)) return undefined;
+  if (!g.start || !g.end) return undefined;
   const tr = g.track;
   return {
     start: { lat: g.start.lat, lon: g.start.lon, altM: tr[0]?.altM, utcMs: t0 },

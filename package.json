@@ -23,6 +23,7 @@
     "fix:check": "yarn fix && yarn run check",
     "check": "yarn format:check && yarn lint && yarn test && yarn build",
     "ci": "yarn run check",
+    "perdploy": "yarn predeploy",
     "predeploy": "yarn fix:check",
     "deploy": "gh-pages -d dist"
   },

@@ -14,6 +14,8 @@ import Logo from './Logo';
 import VideoModal from './VideoModal';
 import VideoWindow, { openVideoWindow } from './VideoWindow';
 import SvgIcon, { type IconName } from './SvgIcon';
+import PlaybackHelp, { playbackHelpDismissed } from './PlaybackHelp';
+import { probeDecode } from './videoSupport';
 import { useClips } from './useClips';
 import './ClipToTrack.css';
 
@@ -61,6 +63,7 @@ export default function ClipToTrack() {
   const [videoWin, setVideoWin] = useState<Window | null>(null); // popup window; null => in-page modal fallback
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set()); // hidden on the map only
   const [sort, setSort] = useState(loadSort);
+  const [playbackHelp, setPlaybackHelp] = useState(false); // browser can't draw the video's picture
   const mapApi = useRef<MapApi | null>(null);
 
   useEffect(() => {
@@ -144,6 +147,12 @@ export default function ClipToTrack() {
   };
 
   const handleFiles = async (files: File[]) => {
+    // in parallel with the import: can this browser draw the picture? If not, explain (once) what to approve
+    const video = files.find((f) => !/\.json$/i.test(f.name));
+    if (video && !playbackHelpDismissed())
+      void probeDecode(video).then(
+        (r) => r === 'no-picture' && setPlaybackHelp(true),
+      );
     const firstId = await addFiles(files);
     if (!firstId) return;
     setSelectedClipId(firstId);
@@ -319,6 +328,8 @@ export default function ClipToTrack() {
           )}
         </section>
       </main>
+
+      {playbackHelp && <PlaybackHelp onClose={() => setPlaybackHelp(false)} />}
 
       {maxClip &&
         (videoWin ? (

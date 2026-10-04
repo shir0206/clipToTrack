@@ -136,9 +136,7 @@ export function useClips() {
         thumbnail?: string;
       }[] = [];
       const asVideoUrl = (f: File) =>
-        URL.createObjectURL(
-          f.type ? f : new Blob([f], { type: 'video/mp4' }),
-        );
+        URL.createObjectURL(f.type ? f : new Blob([f], { type: 'video/mp4' }));
 
       for (let n = 0; n < files.length; n++) {
         const file = files[n];
@@ -201,7 +199,7 @@ export function useClips() {
           startMs !== undefined && endMs !== undefined
             ? pickAnchors(metas, startMs, endMs)
             : {};
-        if (!prev && !next) {
+        if (!prev && !next && !u.err.info.canPlaceAlone) {
           errors.push(`${u.file.name}: ${u.err.message}`);
           URL.revokeObjectURL(u.videoUrl);
           continue;

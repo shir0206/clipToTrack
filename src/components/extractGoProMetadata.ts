@@ -478,6 +478,8 @@ export class NoGpsFixError extends Error {
       /** clip time window (GPS clock, falls back to the MP4 creation time) */
       startMs?: number;
       endMs?: number;
+      /** true when the camera still reported (last-known) coordinates, so the clip can be placed with no neighbours */
+      canPlaceAlone: boolean;
       place: (prev?: Anchor, next?: Anchor) => ClipMetadata;
     },
   ) {
@@ -727,8 +729,33 @@ export async function extractGoProMetadata(
       ? t0 + (n > 1 ? ((durationSec ?? 0) * 1000 * i) / (n - 1) : 0)
       : undefined);
 
-  /** Fills the whole clip with positions interpolated (by time) between the neighbouring clips. */
+  const sane = (s: RawSample) =>
+    Number.isFinite(s.lat) &&
+    Number.isFinite(s.lon) &&
+    Math.abs(s.lat) <= 90 &&
+    Math.abs(s.lon) <= 180 &&
+    !(s.lat === 0 && s.lon === 0);
+  const firstSane = raw.find(sane);
+
+  /**
+   * Fills the whole clip with ESTIMATED positions:
+   *  - with neighbours: interpolated (by time) between the clip before and the clip after
+   *  - with one neighbour: held at that clip's end / start
+   *  - with none: the camera's own last-known position (it keeps extrapolating for a moment after
+   *    the fix is lost, i.e. roughly the tunnel entrance), then held
+   */
   const place = (prev?: Anchor, next?: Anchor): ClipMetadata => {
+    if (!prev && !next && firstSane) {
+      let cur = firstSane;
+      const synth = raw.map((s, i): RawSample => {
+        if (sane(s)) cur = s;
+        return { ...cur, utcMs: timeOf(i), fix: 0, dop: 99.99 };
+      });
+      return assemble(
+        synth,
+        synth.map(() => true),
+      );
+    }
     const both = !!prev && !!next && next.utcMs > prev.utcMs;
     const v = both
       ? haversine(prev!, next!) / ((next!.utcMs - prev!.utcMs) / 1000)
@@ -776,6 +803,11 @@ export async function extractGoProMetadata(
     `no GPS lock: ${goodCount} of ${n} GPS samples had a 2D/3D fix` +
       (Number.isFinite(bestDop) ? ` (best DOP ${bestDop.toFixed(2)})` : '') +
       '. Filmed in a tunnel or under cover? Add the clips recorded just before / after it in the same upload and it will be placed between them.',
-    { startMs: timeOf(0), endMs: timeOf(n - 1), place },
+    {
+      startMs: timeOf(0),
+      endMs: timeOf(n - 1),
+      canPlaceAlone: !!firstSane,
+      place,
+    },
   );
 }
