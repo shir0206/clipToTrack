@@ -1,5 +1,7 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useId, useMemo, useState, type CSSProperties } from 'react';
 import type { Clip, GpsPoint } from './types';
+import { ENGINE, estimateEngine } from './engineModel';
+import SvgIcon from './SvgIcon';
 import './SpeedCluster.css';
 
 type Props = {
@@ -16,12 +18,47 @@ const kmh = (p: GpsPoint) =>
     : fin(p.speed3dMs)
       ? p.speed3dMs * 3.6
       : undefined;
-const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+const clamp = (n: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, n));
+const clamp01 = (n: number) => clamp(n, 0, 1);
 
-/** Speed dial has 8 intervals; pick the smallest "nice" step that covers the clip's top speed. */
-const NICE = [1, 2, 5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100];
+/** Speed dial has 6 intervals; pick the smallest "nice" step with a little headroom over the top speed. */
+const SPEED_INTERVALS = 6;
+const NICE = [5, 10, 15, 20, 25, 30, 40, 50];
 const niceStep = (max: number) =>
-  NICE.find((n) => n * 8 >= max) ?? Math.ceil(max / 8 / 100) * 100;
+  NICE.find((n) => n * SPEED_INTERVALS >= max * 1.05) ??
+  Math.ceil(max / SPEED_INTERVALS / 10) * 10;
+
+/** Slope (%) and acceleration (m/s²) around sample i, measured over a short window so GPS noise averages out. */
+function localMotion(samples: GpsPoint[], i: number) {
+  const last = samples.length - 1;
+  const dist = (a: number, b: number) =>
+    (samples[b].cumulativeDistM ?? NaN) - (samples[a].cumulativeDistM ?? NaN);
+  let lo = i;
+  let hi = i;
+  while (
+    (hi - lo < 2 || !(dist(lo, hi) >= 20)) &&
+    hi - lo < 20 &&
+    (lo > 0 || hi < last)
+  ) {
+    if (lo > 0) lo--;
+    if (hi < last) hi++;
+  }
+  const a = samples[lo];
+  const b = samples[hi];
+  const dd = dist(lo, hi);
+  const dz = (b.altM ?? NaN) - (a.altM ?? NaN);
+  const gradePct = dd >= 20 && fin(dz) ? clamp((dz / dd) * 100, -25, 25) : 0;
+
+  const dt = (Date.parse(b.utc ?? '') - Date.parse(a.utc ?? '')) / 1000;
+  const va = kmh(a);
+  const vb = kmh(b);
+  const accelMs2 =
+    dt > 0.3 && va !== undefined && vb !== undefined
+      ? clamp((vb - va) / 3.6 / dt, -6, 6)
+      : 0;
+  return { gradePct, accelMs2 };
+}
 
 // dial geometry (SVG user units, viewBox 0 0 200 200; angles in degrees, 0 = 3 o'clock, clockwise)
 const START = 135;
@@ -30,38 +67,55 @@ const polar = (a: number, r: number) => {
   const t = (a * Math.PI) / 180;
   return [100 + r * Math.cos(t), 100 + r * Math.sin(t)] as const;
 };
-const arc = (f: number, r: number) => {
-  const a = SWEEP * f;
-  const [x0, y0] = polar(START, r);
-  const [x1, y1] = polar(START + a, r);
-  return `M${x0.toFixed(2)},${y0.toFixed(2)}A${r},${r} 0 ${a > 180 ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
+/** arc from fraction f0 to f1 of the sweep */
+const arc = (f0: number, f1: number, r: number) => {
+  const [x0, y0] = polar(START + SWEEP * f0, r);
+  const [x1, y1] = polar(START + SWEEP * f1, r);
+  return `M${x0.toFixed(2)},${y0.toFixed(2)}A${r},${r} 0 ${(f1 - f0) * SWEEP > 180 ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
 };
+
+type Pill = [caption: string, value: string];
 
 function Dial({
   labels,
   frac,
   title,
   unit,
+  redFrom,
+  sub = 5,
+  pills = [],
+  badge = false,
   className = '',
 }: {
   labels: string[];
   frac: number;
   title: string;
   unit: string;
+  /** fraction (0..1) where the red zone starts */
+  redFrom?: number;
+  /** minor ticks per labelled interval */
+  sub?: number;
+  pills?: Pill[];
+  badge?: boolean;
   className?: string;
 }) {
+  const uid = useId().replace(/:/g, '');
   const f = clamp01(frac);
   const n = labels.length - 1;
+  const total = n * sub;
+
   const ticks = [];
-  for (let i = 0; i <= n * 2; i++) {
-    const major = i % 2 === 0;
-    const a = START + (SWEEP * i) / (n * 2);
-    const [x0, y0] = polar(a, major ? 79 : 83);
-    const [x1, y1] = polar(a, 88);
+  for (let i = 0; i <= total; i++) {
+    const t = i / total;
+    const major = i % sub === 0;
+    const red = redFrom !== undefined && t >= redFrom - 1e-6;
+    const a = START + SWEEP * t;
+    const [x0, y0] = polar(a, major ? 75 : 81);
+    const [x1, y1] = polar(a, 86);
     ticks.push(
       <line
         key={i}
-        className={major ? 'maj' : 'min'}
+        className={`${major ? 'maj' : 'min'}${red ? ' red' : ''}`}
         x1={x0}
         y1={y0}
         x2={x1}
@@ -69,6 +123,7 @@ function Dial({
       />,
     );
   }
+
   return (
     <svg
       className={`ctt-gt-dial ${className}`}
@@ -76,34 +131,117 @@ function Dial({
       style={{ '--f': f } as CSSProperties}
       aria-hidden="true"
     >
-      <circle className="ctt-gt-face" cx="100" cy="100" r="97" />
-      <path className="ctt-gt-track" d={arc(1, 92)} />
-      {f > 0.002 && <path className="ctt-gt-fill" d={arc(f, 92)} />}
+      <defs>
+        <radialGradient id={`${uid}-face`} cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stopColor="#1f1f22" />
+          <stop offset="70%" stopColor="#121214" />
+          <stop offset="100%" stopColor="#060607" />
+        </radialGradient>
+        <linearGradient id={`${uid}-bezel`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#9a9a9f" />
+          <stop offset="35%" stopColor="#2c2c2f" />
+          <stop offset="65%" stopColor="#161618" />
+          <stop offset="100%" stopColor="#66666b" />
+        </linearGradient>
+        <linearGradient id={`${uid}-sheen`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.1" />
+          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id={`${uid}-hub`} cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#f5f5f6" />
+          <stop offset="45%" stopColor="#98989d" />
+          <stop offset="100%" stopColor="#2d2d30" />
+        </radialGradient>
+      </defs>
+
+      <circle
+        className="ctt-gt-bezel"
+        cx="100"
+        cy="100"
+        r="97.5"
+        stroke={`url(#${uid}-bezel)`}
+      />
+      <circle
+        className="ctt-gt-face"
+        cx="100"
+        cy="100"
+        r="95.5"
+        fill={`url(#${uid}-face)`}
+      />
+      <ellipse
+        cx="100"
+        cy="54"
+        rx="68"
+        ry="40"
+        fill={`url(#${uid}-sheen)`}
+        pointerEvents="none"
+      />
+
+      <path className="ctt-gt-track" d={arc(0, 1, 91)} />
+      {redFrom !== undefined && (
+        <path className="ctt-gt-red" d={arc(redFrom, 1, 91)} />
+      )}
+      {f > 0.002 && <path className="ctt-gt-fill" d={arc(0, f, 91)} />}
       {ticks}
       {labels.map((l, i) => {
-        const [x, y] = polar(START + (SWEEP * i) / n, 64);
+        const [x, y] = polar(START + (SWEEP * i) / n, 60);
         return (
           <text key={i} className="ctt-gt-lbl" x={x} y={y}>
             {l}
           </text>
         );
       })}
-      <text className="ctt-gt-cap" x="100" y="134">
+
+      <text className="ctt-gt-cap" x="100" y="130">
         {title}
       </text>
-      <text className="ctt-gt-unit" x="100" y="147">
+      <text className="ctt-gt-unit" x="100" y="142">
         {unit}
       </text>
+
+      {pills.map(([cap, val], i) => {
+        const x = i === 0 ? 50 : 106;
+        return (
+          <g key={cap} className="ctt-gt-pill">
+            <rect x={x} y="156" width="44" height="22" rx="8" />
+            <text className="ctt-gt-pill-cap" x={x + 22} y="164">
+              {cap}
+            </text>
+            <text className="ctt-gt-pill-val" x={x + 22} y="173">
+              {val}
+            </text>
+          </g>
+        );
+      })}
+
+      {badge && (
+        <g className="ctt-gt-badge" transform="translate(100 166) skewX(-22)">
+          <rect x="-11" y="-5" width="6" height="10" rx="1" />
+          <rect x="-3" y="-5" width="6" height="10" rx="1" />
+          <rect x="5" y="-5" width="6" height="10" rx="1" />
+        </g>
+      )}
+
       <g className="ctt-gt-needle">
-        <line x1="90" y1="100" x2="160" y2="100" />
+        <polygon points="82,98.2 161,99.5 161,100.5 82,101.8" />
       </g>
-      <circle className="ctt-gt-hub" cx="100" cy="100" r="5" />
+      <circle
+        className="ctt-gt-hub"
+        cx="100"
+        cy="100"
+        r="9"
+        fill={`url(#${uid}-hub)`}
+      />
+      <circle className="ctt-gt-hub-dot" cx="100" cy="100" r="3" />
     </svg>
   );
 }
 
 /**
- * Dark instrument cluster fed by the clip's own GPS samples (speed, altitude, distance).
+ * Dark instrument cluster fed by the clip's own GPS samples.
+ *  - right dial: speedometer (km/h)
+ *  - left dial: tachometer from a virtual engine (see engineModel.ts) that combines speed,
+ *    altitude (air density), slope and acceleration into RPM + gear
  * It has no controls of its own: it shows the sample picked by `probe`, so the route on the map
  * (hover, click, or the video playhead) is the controller.
  */
@@ -113,12 +251,7 @@ export default function SpeedCluster({ clip, probe }: Props) {
 
   const stats = useMemo(() => {
     const speeds = samples.map(kmh).filter(fin);
-    const alts = samples.map((p) => p.altM).filter(fin);
-    return {
-      maxSpeed: speeds.length ? Math.max(...speeds) : undefined,
-      altMin: alts.length ? Math.min(...alts) : undefined,
-      altMax: alts.length ? Math.max(...alts) : undefined,
-    };
+    return { maxSpeed: speeds.length ? Math.max(...speeds) : undefined };
   }, [samples]);
 
   // keep showing the last probed sample when the pointer leaves the route
@@ -134,23 +267,31 @@ export default function SpeedCluster({ clip, probe }: Props) {
     );
 
   const step = niceStep(stats.maxSpeed);
-  const scale = step * 8;
-  const speedLabels = Array.from({ length: 9 }, (_, i) => String(i * step));
+  const scale = step * SPEED_INTERVALS;
+  const speedLabels = Array.from({ length: SPEED_INTERVALS + 1 }, (_, i) =>
+    String(i * step),
+  );
 
   const p = idx !== null ? samples[Math.min(idx, last)] : undefined;
   const v = p ? kmh(p) : undefined;
   const speedFrac = v !== undefined ? v / scale : 0;
 
-  const hasAlt = stats.altMin !== undefined && stats.altMax !== undefined;
-  const altSpan = hasAlt ? stats.altMax! - stats.altMin! || 1 : 1;
-  const altDec = altSpan >= 20 ? 0 : 1;
-  const altLabels = hasAlt
-    ? Array.from({ length: 5 }, (_, i) =>
-        (stats.altMin! + (altSpan * i) / 4).toFixed(altDec),
-      )
-    : [];
-  const altFrac =
-    hasAlt && fin(p?.altM) ? (p!.altM! - stats.altMin!) / altSpan : 0;
+  // tachometer: speed + altitude (+ slope / acceleration) -> RPM
+  const motion =
+    p && idx !== null
+      ? localMotion(samples, Math.min(idx, last))
+      : { gradePct: 0, accelMs2: 0 };
+  const eng = estimateEngine({
+    speedKmh: v ?? 0,
+    altM: p?.altM ?? 0,
+    ...motion,
+  });
+  const rpmFrac = v !== undefined ? eng.rpm / ENGINE.maxRpm : 0;
+  const rpmLabels = Array.from({ length: ENGINE.maxRpm / 1000 + 1 }, (_, i) =>
+    String(i),
+  );
+  const gearText = v === undefined ? '--' : eng.gear === 0 ? 'N' : `${eng.gear}`;
+  const altText = fin(p?.altM) ? `${Math.round(p!.altM!)} m` : '--';
 
   const total = samples[last]?.cumulativeDistM;
   const done = p?.cumulativeDistM;
@@ -160,17 +301,21 @@ export default function SpeedCluster({ clip, probe }: Props) {
     <div
       className="ctt-gt"
       role="img"
-      aria-label={`Speedometer: ${v !== undefined ? Math.round(v) : 'no'} km/h`}
+      aria-label={`Speedometer: ${v !== undefined ? Math.round(v) : 'no'} km/h, ${v !== undefined ? Math.round(eng.rpm) : 'no'} rpm`}
     >
-      {hasAlt && (
-        <Dial
-          className="ctt-gt-alt"
-          labels={altLabels}
-          frac={altFrac}
-          title="ALTITUDE"
-          unit="m"
-        />
-      )}
+      <Dial
+        className="ctt-gt-tach"
+        labels={rpmLabels}
+        frac={rpmFrac}
+        redFrom={ENGINE.redlineRpm / ENGINE.maxRpm}
+        sub={2}
+        title="RPM"
+        unit="x1000"
+        pills={[
+          ['ALT', altText],
+          ['GEAR', gearText],
+        ]}
+      />
 
       <section className="ctt-gt-mid">
         <div className="ctt-gt-seg" aria-hidden="true">
@@ -181,18 +326,31 @@ export default function SpeedCluster({ clip, probe }: Props) {
             />
           ))}
         </div>
-        <div className="ctt-gt-read">
-          <b>{v !== undefined ? Math.round(v) : '--'}</b>
-          <span>km/h</span>
+        <div className="ctt-gt-readout">
+          <span className="ctt-gt-label">SPEED</span>
+          <div className="ctt-gt-read">
+            <b>{v !== undefined ? Math.round(v) : '--'}</b>
+            <span>km/h</span>
+          </div>
         </div>
         <div className="ctt-gt-tiles">
-          <div>
-            <span>Distance</span>
-            <b>{fin(done) ? `${Math.round(done)} m` : '--'}</b>
+          <div className="ctt-gt-tile">
+            <span className="ctt-gt-ico">
+              <SvgIcon name="route" size={20} />
+            </span>
+            <span className="ctt-gt-tx">
+              <em>Distance</em>
+              <b>{fin(done) ? `${Math.round(done)} m` : '--'}</b>
+            </span>
           </div>
-          <div>
-            <span>Max speed</span>
-            <b>{Math.round(stats.maxSpeed)} km/h</b>
+          <div className="ctt-gt-tile">
+            <span className="ctt-gt-ico">
+              <SvgIcon name="gauge" size={20} />
+            </span>
+            <span className="ctt-gt-tx">
+              <em>Max speed</em>
+              <b>{Math.round(stats.maxSpeed)} km/h</b>
+            </span>
           </div>
         </div>
         {idx === null ? (
@@ -208,8 +366,11 @@ export default function SpeedCluster({ clip, probe }: Props) {
         className="ctt-gt-speedo"
         labels={speedLabels}
         frac={speedFrac}
+        redFrom={5 / 6}
+        sub={5}
         title="SPEED"
         unit="km/h"
+        badge
       />
     </div>
   );

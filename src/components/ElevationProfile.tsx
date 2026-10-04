@@ -9,7 +9,7 @@ import {
   type PointerEvent,
 } from 'react';
 import type { Clip } from './types';
-import SvgIcon from './SvgIcon';
+import SvgIcon, { type IconName } from './SvgIcon';
 import SpeedCluster from './SpeedCluster';
 
 type Props = {
@@ -35,6 +35,7 @@ const MIN_STAGE = 200; // the map always keeps at least this much
 
 const LABEL: Record<Metric, string> = { alt: 'Altitude', speed: 'Speed' };
 const UNIT: Record<Metric, string> = { alt: 'm', speed: 'km/h' };
+const ICON: Record<Metric, IconName> = { alt: 'mountain', speed: 'gauge' };
 const otherOf = (m: Metric): Metric => (m === 'alt' ? 'speed' : 'alt');
 
 /** One metric of the selected clip: a chart (or, for speed, optionally the speedometer). */
@@ -44,14 +45,12 @@ function Pane({
   probe,
   onProbe,
   speedMode,
-  onSpeedMode,
 }: {
   clip: Clip;
   metric: Metric;
   probe: number | null;
   onProbe: (i: number | null) => void;
   speedMode: SpeedMode;
-  onSpeedMode: (m: SpeedMode) => void;
 }) {
   const unit = UNIT[metric];
   const dial = metric === 'speed' && speedMode === 'dial';
@@ -105,32 +104,18 @@ function Pane({
 
   return (
     <section className="ctt-prof-pane" aria-label={LABEL[metric]}>
-      <div className="ctt-prof-pane-head">
-        <b>{LABEL[metric]}</b>
-        <span className="ctt-prof-read">
-          {dial
-            ? ''
-            : chart && showProbe
+      {!dial && (
+        <div className="ctt-prof-pane-head">
+          <b>{LABEL[metric]}</b>
+          <span className="ctt-prof-read">
+            {chart && showProbe
               ? `${chart.xs[probe!].toFixed(0)} m · ${pv!.toFixed(1)} ${unit}`
               : chart
-                ? `${chart.min.toFixed(0)}–${chart.max.toFixed(0)} ${unit}`
+                ? `${chart.min.toFixed(0)}-${chart.max.toFixed(0)} ${unit}`
                 : ''}
-        </span>
-        {metric === 'speed' && (
-          <div className="ctt-prof-tabs" role="group" aria-label="Speed view">
-            {(['graph', 'dial'] as const).map((m) => (
-              <button
-                key={m}
-                className={`ctt-chip${speedMode === m ? ' is-on' : ''}`}
-                aria-pressed={speedMode === m}
-                onClick={() => onSpeedMode(m)}
-              >
-                {m === 'graph' ? 'Graph' : 'Speedometer'}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+          </span>
+        </div>
+      )}
 
       {dial ? (
         <SpeedCluster key={clip.id} clip={clip} probe={probe} />
@@ -205,13 +190,17 @@ export default function ElevationProfile({
     }
   }, [height]);
   const clampH = (h: number) => {
-    const room = root.current?.parentElement?.clientHeight ?? window.innerHeight;
-    return Math.round(Math.min(Math.max(h, MIN_H), Math.max(MIN_H, room - MIN_STAGE)));
+    const room =
+      root.current?.parentElement?.clientHeight ?? window.innerHeight;
+    return Math.round(
+      Math.min(Math.max(h, MIN_H), Math.max(MIN_H, room - MIN_STAGE)),
+    );
   };
   const onGripMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
     const parent = root.current?.parentElement;
-    if (parent) setHeight(clampH(parent.getBoundingClientRect().bottom - e.clientY));
+    if (parent)
+      setHeight(clampH(parent.getBoundingClientRect().bottom - e.clientY));
   };
   const onGripKey = (e: KeyboardEvent) => {
     if (e.key === 'ArrowUp') setHeight((h) => clampH(h + 24));
@@ -301,6 +290,7 @@ export default function ElevationProfile({
               onClick={() => pickSingle(k)}
               {...tabDrag(k)}
             >
+              <SvgIcon name={ICON[k]} size={13} />
               {LABEL[k]}
             </button>
           ))}
@@ -314,6 +304,7 @@ export default function ElevationProfile({
                 aria-pressed={tab === 'split'}
                 onClick={() => setTab('split')}
               >
+                <SvgIcon name="columns" size={13} />
                 {LABEL[split[0]]} | {LABEL[split[1]]}
               </button>
               <button
@@ -327,6 +318,26 @@ export default function ElevationProfile({
             </span>
           ) : null}
         </div>
+
+        {metrics.includes('speed') && (
+          <div
+            className="ctt-prof-tabs ctt-prof-view"
+            role="group"
+            aria-label="Speed view"
+          >
+            {(['graph', 'dial'] as const).map((m) => (
+              <button
+                key={m}
+                className={`ctt-chip${speedMode === m ? ' is-on' : ''}`}
+                aria-pressed={speedMode === m}
+                onClick={() => setSpeedMode(m)}
+              >
+                <SvgIcon name={m === 'graph' ? 'chart' : 'dial'} size={13} />
+                {m === 'graph' ? 'Graph' : 'Speedometer'}
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           className="ctt-btn"
@@ -346,7 +357,6 @@ export default function ElevationProfile({
             probe={probe}
             onProbe={onProbe}
             speedMode={speedMode}
-            onSpeedMode={setSpeedMode}
           />
         ))}
 

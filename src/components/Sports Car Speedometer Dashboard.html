@@ -1,180 +1,708 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>GT Instrument Cluster</title>
-<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:ital,wght@0,500;0,700;1,600;1,800&display=swap" rel="stylesheet">
-<style>
-@property --v{syntax:"<integer>";inherits:true;initial-value:0}
-@property --r{syntax:"<integer>";inherits:true;initial-value:800}
-@property --g{syntax:"<integer>";inherits:true;initial-value:1}
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>GT Instrument Cluster</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Saira+Condensed:ital,wght@0,500;0,700;1,600;1,800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      @property --v {
+        syntax: '<integer>';
+        inherits: true;
+        initial-value: 0;
+      }
+      @property --r {
+        syntax: '<integer>';
+        inherits: true;
+        initial-value: 800;
+      }
+      @property --g {
+        syntax: '<integer>';
+        inherits: true;
+        initial-value: 1;
+      }
 
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
-  --red:#ff2a36;--ink:#eaeef3;--dim:#6d747d}
-html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
-*,*::before,*::after{box-sizing:inherit}
-body{margin:0;min-height:100%;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 30%,#1d2025,#050506 75%);
-  font-family:"Saira Condensed","Arial Narrow",sans-serif;color:var(--ink);overflow-x:hidden}
+      :root {
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        --red: #ff2a36;
+        --ink: #eaeef3;
+        --dim: #6d747d;
+      }
+      html {
+        height: 100%;
+        scroll-padding-top: env(safe-area-inset-top, 0px);
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: inherit;
+      }
+      body {
+        margin: 0;
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(ellipse at 50% 30%, #1d2025, #050506 75%);
+        font-family: 'Saira Condensed', 'Arial Narrow', sans-serif;
+        color: var(--ink);
+        overflow-x: hidden;
+      }
 
-/* ---------- binnacle ---------- */
-.dash{font-size:min(.8vw,13px);display:flex;align-items:center;gap:3em;padding:7em 6em 5em;border-radius:14em 14em 5em 5em/12em 12em 5em 5em;
-  background:linear-gradient(180deg,rgba(255,255,255,.07),transparent 25%),conic-gradient(#0d0e10 25%,#17191c 0 50%,#0d0e10 0 75%,#17191c 0) 0 0/.8em .8em;
-  box-shadow:inset 0 .3em .6em rgba(255,255,255,.08),inset 0 -2em 4em #000,0 3em 8em #000;
-  animation:drive 26s infinite}
-@media(max-aspect-ratio:1/1){.dash{font-size:2vw;flex-direction:column;padding:6em 4em 4em;margin:4vw 0}.mid{order:3}}
+      /* ---------- binnacle ---------- */
+      .dash {
+        font-size: min(0.8vw, 13px);
+        display: flex;
+        align-items: center;
+        gap: 3em;
+        padding: 7em 6em 5em;
+        border-radius: 14em 14em 5em 5em/12em 12em 5em 5em;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 25%),
+          conic-gradient(#0d0e10 25%, #17191c 0 50%, #0d0e10 0 75%, #17191c 0) 0
+            0/0.8em 0.8em;
+        box-shadow:
+          inset 0 0.3em 0.6em rgba(255, 255, 255, 0.08),
+          inset 0 -2em 4em #000,
+          0 3em 8em #000;
+        animation: drive 26s infinite;
+      }
+      @media (max-aspect-ratio: 1/1) {
+        .dash {
+          font-size: 2vw;
+          flex-direction: column;
+          padding: 6em 4em 4em;
+          margin: 4vw 0;
+        }
+        .mid {
+          order: 3;
+        }
+      }
 
-/* ---------- dial ---------- */
-.dial{width:34em;height:34em;border-radius:50%;padding:.9em;flex:none;position:relative;
-  background:conic-gradient(#3a3d42,#a5aab1,#3a3d42,#d2d6db,#3a3d42,#8b9096,#3a3d42);
-  box-shadow:0 1.5em 3em #000,0 0 0 .4em #07080a}
-.face{position:relative;width:100%;height:100%;border-radius:50%;
-  background:radial-gradient(circle at 50% 38%,#20242a,#0a0b0d 62%,#030304);box-shadow:inset 0 0 3em #000,inset 0 0 0 .3em #000}
-.face::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;
-  background:linear-gradient(155deg,rgba(255,255,255,.13),transparent 36%,transparent 70%,rgba(255,255,255,.04))}
+      /* ---------- dial ---------- */
+      .dial {
+        width: 34em;
+        height: 34em;
+        border-radius: 50%;
+        padding: 0.9em;
+        flex: none;
+        position: relative;
+        background: conic-gradient(
+          #3a3d42,
+          #a5aab1,
+          #3a3d42,
+          #d2d6db,
+          #3a3d42,
+          #8b9096,
+          #3a3d42
+        );
+        box-shadow:
+          0 1.5em 3em #000,
+          0 0 0 0.4em #07080a;
+      }
+      .face {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 50% 38%,
+          #20242a,
+          #0a0b0d 62%,
+          #030304
+        );
+        box-shadow:
+          inset 0 0 3em #000,
+          inset 0 0 0 0.3em #000;
+      }
+      .face::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        pointer-events: none;
+        background: linear-gradient(
+          155deg,
+          rgba(255, 255, 255, 0.13),
+          transparent 36%,
+          transparent 70%,
+          rgba(255, 255, 255, 0.04)
+        );
+      }
 
-.ticks{position:absolute;inset:0;border-radius:50%;
-  -webkit-mask-composite:source-in;mask-composite:intersect}
-.ticks.minor{background:repeating-conic-gradient(from 224.8deg,#9aa1aa 0 .4deg,transparent .4deg var(--m));
-  -webkit-mask-image:radial-gradient(circle closest-side,transparent 86%,#000 86.4% 92%,transparent 92.4%),conic-gradient(from 224deg,#000 0 272deg,transparent 0);
-  mask-image:radial-gradient(circle closest-side,transparent 86%,#000 86.4% 92%,transparent 92.4%),conic-gradient(from 224deg,#000 0 272deg,transparent 0)}
-.ticks.major{background:repeating-conic-gradient(from 224.6deg,#fff 0 .8deg,transparent .8deg var(--M));
-  -webkit-mask-image:radial-gradient(circle closest-side,transparent 80%,#000 80.4% 92%,transparent 92.4%),conic-gradient(from 224deg,#000 0 272deg,transparent 0);
-  mask-image:radial-gradient(circle closest-side,transparent 80%,#000 80.4% 92%,transparent 92.4%),conic-gradient(from 224deg,#000 0 272deg,transparent 0)}
-.speedo{--m:8.4375deg;--M:16.875deg}
-.tacho{--m:15deg;--M:30deg}
+      .ticks {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        -webkit-mask-composite: source-in;
+        mask-composite: intersect;
+      }
+      .ticks.minor {
+        background: repeating-conic-gradient(
+          from 224.8deg,
+          #9aa1aa 0 0.4deg,
+          transparent 0.4deg var(--m)
+        );
+        -webkit-mask-image:
+          radial-gradient(
+            circle closest-side,
+            transparent 86%,
+            #000 86.4% 92%,
+            transparent 92.4%
+          ),
+          conic-gradient(from 224deg, #000 0 272deg, transparent 0);
+        mask-image:
+          radial-gradient(
+            circle closest-side,
+            transparent 86%,
+            #000 86.4% 92%,
+            transparent 92.4%
+          ),
+          conic-gradient(from 224deg, #000 0 272deg, transparent 0);
+      }
+      .ticks.major {
+        background: repeating-conic-gradient(
+          from 224.6deg,
+          #fff 0 0.8deg,
+          transparent 0.8deg var(--M)
+        );
+        -webkit-mask-image:
+          radial-gradient(
+            circle closest-side,
+            transparent 80%,
+            #000 80.4% 92%,
+            transparent 92.4%
+          ),
+          conic-gradient(from 224deg, #000 0 272deg, transparent 0);
+        mask-image:
+          radial-gradient(
+            circle closest-side,
+            transparent 80%,
+            #000 80.4% 92%,
+            transparent 92.4%
+          ),
+          conic-gradient(from 224deg, #000 0 272deg, transparent 0);
+      }
+      .speedo {
+        --m: 8.4375deg;
+        --M: 16.875deg;
+      }
+      .tacho {
+        --m: 15deg;
+        --M: 30deg;
+      }
 
-.redzone{position:absolute;inset:0;border-radius:50%;
-  background:conic-gradient(from 225deg,transparent 0 225deg,var(--red) 225deg 270deg,transparent 0);
-  -webkit-mask:radial-gradient(circle closest-side,transparent 93.5%,#000 94% 96.5%,transparent 97%);
-  mask:radial-gradient(circle closest-side,transparent 93.5%,#000 94% 96.5%,transparent 97%);
-  filter:drop-shadow(0 0 .5em var(--red))}
-.arc{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 225deg,var(--red) 0 1deg,transparent 0);
-  -webkit-mask:radial-gradient(circle closest-side,transparent 93.5%,#000 94% 96.5%,transparent 97%);
-  mask:radial-gradient(circle closest-side,transparent 93.5%,#000 94% 96.5%,transparent 97%);opacity:.0}
+      .redzone {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(
+          from 225deg,
+          transparent 0 225deg,
+          var(--red) 225deg 270deg,
+          transparent 0
+        );
+        -webkit-mask: radial-gradient(
+          circle closest-side,
+          transparent 93.5%,
+          #000 94% 96.5%,
+          transparent 97%
+        );
+        mask: radial-gradient(
+          circle closest-side,
+          transparent 93.5%,
+          #000 94% 96.5%,
+          transparent 97%
+        );
+        filter: drop-shadow(0 0 0.5em var(--red));
+      }
+      .arc {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(
+          from 225deg,
+          var(--red) 0 1deg,
+          transparent 0
+        );
+        -webkit-mask: radial-gradient(
+          circle closest-side,
+          transparent 93.5%,
+          #000 94% 96.5%,
+          transparent 97%
+        );
+        mask: radial-gradient(
+          circle closest-side,
+          transparent 93.5%,
+          #000 94% 96.5%,
+          transparent 97%
+        );
+        opacity: 0;
+      }
 
-.n{position:absolute;left:50%;top:50%;font-size:2.3em;font-weight:700;font-style:italic;line-height:1;
-  --a:calc(-135deg + var(--i) * var(--step));
-  transform:translate(-50%,-50%) rotate(var(--a)) translateY(-4.7em) rotate(calc(-1 * var(--a)));
-  text-shadow:0 0 .5em rgba(255,255,255,.35)}
-.speedo .n{--step:33.75deg;font-size:2em}
-.tacho .n{--step:30deg}
-.tacho .n:nth-of-type(n+9){color:var(--red);text-shadow:0 0 .5em var(--red)}
+      .n {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        font-size: 2.3em;
+        font-weight: 700;
+        font-style: italic;
+        line-height: 1;
+        --a: calc(-135deg + var(--i) * var(--step));
+        transform: translate(-50%, -50%) rotate(var(--a)) translateY(-4.7em)
+          rotate(calc(-1 * var(--a)));
+        text-shadow: 0 0 0.5em rgba(255, 255, 255, 0.35);
+      }
+      .speedo .n {
+        --step: 33.75deg;
+        font-size: 2em;
+      }
+      .tacho .n {
+        --step: 30deg;
+      }
+      .tacho .n:nth-of-type(n + 9) {
+        color: var(--red);
+        text-shadow: 0 0 0.5em var(--red);
+      }
 
-.cap{position:absolute;left:0;right:0;text-align:center;color:var(--dim);font-style:italic;font-weight:500;font-size:1.7em;letter-spacing:.12em}
-.cap.top{top:27%;color:#b9c0c8;font-weight:700;font-size:2.1em;letter-spacing:.35em}
-.cap.bot{top:66%}
+      .cap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        text-align: center;
+        color: var(--dim);
+        font-style: italic;
+        font-weight: 500;
+        font-size: 1.7em;
+        letter-spacing: 0.12em;
+      }
+      .cap.top {
+        top: 27%;
+        color: #b9c0c8;
+        font-weight: 700;
+        font-size: 2.1em;
+        letter-spacing: 0.35em;
+      }
+      .cap.bot {
+        top: 66%;
+      }
 
-.needle{position:absolute;left:50%;bottom:50%;width:1.1em;height:44%;margin-left:-.55em;transform-origin:50% 100%;z-index:3;
-  filter:drop-shadow(0 0 .5em rgba(255,40,50,.8)) drop-shadow(0 .3em .3em rgba(0,0,0,.7))}
-.needle::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#ff5a5a,#d3121f 55%,#8d0a14);clip-path:polygon(50% 0,100% 100%,0 100%)}
-.needle::after{content:"";position:absolute;left:25%;right:25%;top:100%;height:9em;background:#2a2d32;border-radius:0 0 .5em .5em}
-.speedo .needle{transform:rotate(calc(-135deg + var(--v) * .84375deg))}
-.tacho .needle{transform:rotate(calc(-135deg + var(--r) * .03deg))}
-.hub{position:absolute;left:50%;top:50%;width:6em;height:6em;margin:-3em;border-radius:50%;z-index:4;
-  background:radial-gradient(circle at 35% 30%,#9ba0a7,#2b2e33 55%,#0a0b0c);box-shadow:0 .4em 1em #000,inset 0 0 0 .25em #0c0d0f}
+      .needle {
+        position: absolute;
+        left: 50%;
+        bottom: 50%;
+        width: 1.1em;
+        height: 44%;
+        margin-left: -0.55em;
+        transform-origin: 50% 100%;
+        z-index: 3;
+        filter: drop-shadow(0 0 0.5em rgba(255, 40, 50, 0.8))
+          drop-shadow(0 0.3em 0.3em rgba(0, 0, 0, 0.7));
+      }
+      .needle::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, #ff5a5a, #d3121f 55%, #8d0a14);
+        clip-path: polygon(50% 0, 100% 100%, 0 100%);
+      }
+      .needle::after {
+        content: '';
+        position: absolute;
+        left: 25%;
+        right: 25%;
+        top: 100%;
+        height: 9em;
+        background: #2a2d32;
+        border-radius: 0 0 0.5em 0.5em;
+      }
+      .speedo .needle {
+        transform: rotate(calc(-135deg + var(--v) * 0.84375deg));
+      }
+      .tacho .needle {
+        transform: rotate(calc(-135deg + var(--r) * 0.03deg));
+      }
+      .hub {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 6em;
+        height: 6em;
+        margin: -3em;
+        border-radius: 50%;
+        z-index: 4;
+        background: radial-gradient(
+          circle at 35% 30%,
+          #9ba0a7,
+          #2b2e33 55%,
+          #0a0b0c
+        );
+        box-shadow:
+          0 0.4em 1em #000,
+          inset 0 0 0 0.25em #0c0d0f;
+      }
 
-/* ---------- center console ---------- */
-.mid{width:24em;display:flex;flex-direction:column;align-items:center;gap:1.6em;flex:none}
-.leds{display:flex;gap:.7em}
-.leds i{width:2.1em;height:1em;border-radius:.3em;background:#1b1d21;position:relative;box-shadow:inset 0 .1em .2em #000}
-.leds i::after{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--c);box-shadow:0 0 1em var(--c);
-  opacity:clamp(0,calc((var(--r) - var(--t)) / 120),1)}
-.lcd{width:100%;padding:1.6em 1.4em 1.2em;border-radius:1.6em;text-align:center;
-  background:linear-gradient(180deg,#0a0b0d,#15171b);box-shadow:inset 0 0 0 .2em #2a2d33,inset 0 .5em 2em #000,0 .2em 0 rgba(255,255,255,.06)}
-.spd{font-size:10em;font-weight:800;font-style:italic;line-height:.85;letter-spacing:-.02em;
-  text-shadow:0 0 .25em rgba(255,255,255,.3)}
-.spd::before{counter-reset:s var(--v);content:counter(s)}
-.unit{color:var(--dim);font-style:italic;font-weight:500;font-size:2em;letter-spacing:.2em;margin-top:.3em}
-.row{display:flex;gap:1.2em;width:100%;align-items:stretch}
-.gear{flex:1;border-radius:1.2em;padding:.7em 0;text-align:center;background:#0e0f12;box-shadow:inset 0 0 0 .2em #2a2d33}
-.gear b{display:block;font-size:5.2em;line-height:1;font-style:italic;font-weight:800;color:var(--red);text-shadow:0 0 .4em var(--red)}
-.gear b::before{counter-reset:g var(--g);content:counter(g)}
-.gear span,.mode span{font-size:1.5em;color:var(--dim);letter-spacing:.2em}
-.mode{flex:1.2;display:flex;flex-direction:column;justify-content:center;gap:.3em;font-size:1.7em;font-style:italic;font-weight:700;letter-spacing:.15em;padding-left:.2em}
-.mode em{color:#444a52;font-style:inherit}
-.mode em.on{color:var(--red);text-shadow:0 0 .6em var(--red)}
-.bars{width:100%;display:grid;grid-template-columns:auto 1fr;gap:.8em 1em;align-items:center;font-size:1.6em;color:var(--dim);font-weight:500;letter-spacing:.1em}
-.bar{height:.6em;border-radius:1em;background:#1a1c20;overflow:hidden;box-shadow:inset 0 .1em .2em #000}
-.bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#c9ccd1,#fff)}
-.bar.hot i{background:linear-gradient(90deg,#9aa1aa,#ff9a3c)}
+      /* ---------- center console ---------- */
+      .mid {
+        width: 24em;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.6em;
+        flex: none;
+      }
+      .leds {
+        display: flex;
+        gap: 0.7em;
+      }
+      .leds i {
+        width: 2.1em;
+        height: 1em;
+        border-radius: 0.3em;
+        background: #1b1d21;
+        position: relative;
+        box-shadow: inset 0 0.1em 0.2em #000;
+      }
+      .leds i::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--c);
+        box-shadow: 0 0 1em var(--c);
+        opacity: clamp(0, calc((var(--r) - var(--t)) / 120), 1);
+      }
+      .lcd {
+        width: 100%;
+        padding: 1.6em 1.4em 1.2em;
+        border-radius: 1.6em;
+        text-align: center;
+        background: linear-gradient(180deg, #0a0b0d, #15171b);
+        box-shadow:
+          inset 0 0 0 0.2em #2a2d33,
+          inset 0 0.5em 2em #000,
+          0 0.2em 0 rgba(255, 255, 255, 0.06);
+      }
+      .spd {
+        font-size: 10em;
+        font-weight: 800;
+        font-style: italic;
+        line-height: 0.85;
+        letter-spacing: -0.02em;
+        text-shadow: 0 0 0.25em rgba(255, 255, 255, 0.3);
+      }
+      .spd::before {
+        counter-reset: s var(--v);
+        content: counter(s);
+      }
+      .unit {
+        color: var(--dim);
+        font-style: italic;
+        font-weight: 500;
+        font-size: 2em;
+        letter-spacing: 0.2em;
+        margin-top: 0.3em;
+      }
+      .row {
+        display: flex;
+        gap: 1.2em;
+        width: 100%;
+        align-items: stretch;
+      }
+      .gear {
+        flex: 1;
+        border-radius: 1.2em;
+        padding: 0.7em 0;
+        text-align: center;
+        background: #0e0f12;
+        box-shadow: inset 0 0 0 0.2em #2a2d33;
+      }
+      .gear b {
+        display: block;
+        font-size: 5.2em;
+        line-height: 1;
+        font-style: italic;
+        font-weight: 800;
+        color: var(--red);
+        text-shadow: 0 0 0.4em var(--red);
+      }
+      .gear b::before {
+        counter-reset: g var(--g);
+        content: counter(g);
+      }
+      .gear span,
+      .mode span {
+        font-size: 1.5em;
+        color: var(--dim);
+        letter-spacing: 0.2em;
+      }
+      .mode {
+        flex: 1.2;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.3em;
+        font-size: 1.7em;
+        font-style: italic;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        padding-left: 0.2em;
+      }
+      .mode em {
+        color: #444a52;
+        font-style: inherit;
+      }
+      .mode em.on {
+        color: var(--red);
+        text-shadow: 0 0 0.6em var(--red);
+      }
+      .bars {
+        width: 100%;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.8em 1em;
+        align-items: center;
+        font-size: 1.6em;
+        color: var(--dim);
+        font-weight: 500;
+        letter-spacing: 0.1em;
+      }
+      .bar {
+        height: 0.6em;
+        border-radius: 1em;
+        background: #1a1c20;
+        overflow: hidden;
+        box-shadow: inset 0 0.1em 0.2em #000;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #c9ccd1, #fff);
+      }
+      .bar.hot i {
+        background: linear-gradient(90deg, #9aa1aa, #ff9a3c);
+      }
 
-/* ---------- animation: one drive cycle drives every gauge ---------- */
-@keyframes drive{
-  0%{--v:0;--r:800;--g:1}
-  3%{--v:320;--r:9000;--g:1}
-  7%{--v:0;--r:800;--g:1}
-  10%{--v:0;--r:800;--g:1}
-  11%{--v:0;--r:4400;--g:1}
-  12%{--v:0;--r:3900;--g:1}
-  17%{--v:62;--r:8200;--g:1}
-  17.1%{--v:62;--r:4300;--g:2}
-  24%{--v:118;--r:8200;--g:2}
-  24.1%{--v:118;--r:5500;--g:3}
-  32%{--v:176;--r:8200;--g:3}
-  32.1%{--v:176;--r:6100;--g:4}
-  42%{--v:236;--r:8200;--g:4}
-  42.1%{--v:236;--r:6600;--g:5}
-  54%{--v:292;--r:8100;--g:5}
-  54.1%{--v:292;--r:6400;--g:6}
-  68%{--v:318;--r:7000;--g:6}
-  74%{--v:150;--r:3300;--g:6}
-  74.1%{--v:150;--r:5200;--g:4}
-  80%{--v:80;--r:2800;--g:4}
-  80.1%{--v:80;--r:5600;--g:2}
-  86%{--v:30;--r:2100;--g:2}
-  86.1%{--v:30;--r:4000;--g:1}
-  92%{--v:0;--r:800;--g:1}
-  100%{--v:0;--r:800;--g:1}
-}
-@media(prefers-reduced-motion:reduce){.dash{animation:none;--v:142;--r:5600;--g:4}}
-</style>
-</head>
-<body>
-<main class="dash" aria-label="Animated sports car instrument cluster">
+      /* ---------- animation: one drive cycle drives every gauge ---------- */
+      @keyframes drive {
+        0% {
+          --v: 0;
+          --r: 800;
+          --g: 1;
+        }
+        3% {
+          --v: 320;
+          --r: 9000;
+          --g: 1;
+        }
+        7% {
+          --v: 0;
+          --r: 800;
+          --g: 1;
+        }
+        10% {
+          --v: 0;
+          --r: 800;
+          --g: 1;
+        }
+        11% {
+          --v: 0;
+          --r: 4400;
+          --g: 1;
+        }
+        12% {
+          --v: 0;
+          --r: 3900;
+          --g: 1;
+        }
+        17% {
+          --v: 62;
+          --r: 8200;
+          --g: 1;
+        }
+        17.1% {
+          --v: 62;
+          --r: 4300;
+          --g: 2;
+        }
+        24% {
+          --v: 118;
+          --r: 8200;
+          --g: 2;
+        }
+        24.1% {
+          --v: 118;
+          --r: 5500;
+          --g: 3;
+        }
+        32% {
+          --v: 176;
+          --r: 8200;
+          --g: 3;
+        }
+        32.1% {
+          --v: 176;
+          --r: 6100;
+          --g: 4;
+        }
+        42% {
+          --v: 236;
+          --r: 8200;
+          --g: 4;
+        }
+        42.1% {
+          --v: 236;
+          --r: 6600;
+          --g: 5;
+        }
+        54% {
+          --v: 292;
+          --r: 8100;
+          --g: 5;
+        }
+        54.1% {
+          --v: 292;
+          --r: 6400;
+          --g: 6;
+        }
+        68% {
+          --v: 318;
+          --r: 7000;
+          --g: 6;
+        }
+        74% {
+          --v: 150;
+          --r: 3300;
+          --g: 6;
+        }
+        74.1% {
+          --v: 150;
+          --r: 5200;
+          --g: 4;
+        }
+        80% {
+          --v: 80;
+          --r: 2800;
+          --g: 4;
+        }
+        80.1% {
+          --v: 80;
+          --r: 5600;
+          --g: 2;
+        }
+        86% {
+          --v: 30;
+          --r: 2100;
+          --g: 2;
+        }
+        86.1% {
+          --v: 30;
+          --r: 4000;
+          --g: 1;
+        }
+        92% {
+          --v: 0;
+          --r: 800;
+          --g: 1;
+        }
+        100% {
+          --v: 0;
+          --r: 800;
+          --g: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .dash {
+          animation: none;
+          --v: 142;
+          --r: 5600;
+          --g: 4;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="dash" aria-label="Animated sports car instrument cluster">
+      <!-- Tachometer -->
+      <section class="dial tacho">
+        <div class="face">
+          <i class="redzone"></i>
+          <i class="ticks minor"></i><i class="ticks major"></i>
+          <span class="n" style="--i: 0">0</span
+          ><span class="n" style="--i: 1">1</span
+          ><span class="n" style="--i: 2">2</span>
+          <span class="n" style="--i: 3">3</span
+          ><span class="n" style="--i: 4">4</span
+          ><span class="n" style="--i: 5">5</span>
+          <span class="n" style="--i: 6">6</span
+          ><span class="n" style="--i: 7">7</span
+          ><span class="n" style="--i: 8">8</span>
+          <span class="n" style="--i: 9">9</span>
+          <div class="cap top">AVANTI</div>
+          <div class="cap bot">x1000 rpm</div>
+          <div class="needle"></div>
+          <div class="hub"></div>
+        </div>
+      </section>
 
-  <!-- Tachometer -->
-  <section class="dial tacho"><div class="face">
-    <i class="redzone"></i>
-    <i class="ticks minor"></i><i class="ticks major"></i>
-    <span class="n" style="--i:0">0</span><span class="n" style="--i:1">1</span><span class="n" style="--i:2">2</span>
-    <span class="n" style="--i:3">3</span><span class="n" style="--i:4">4</span><span class="n" style="--i:5">5</span>
-    <span class="n" style="--i:6">6</span><span class="n" style="--i:7">7</span><span class="n" style="--i:8">8</span>
-    <span class="n" style="--i:9">9</span>
-    <div class="cap top">AVANTI</div>
-    <div class="cap bot">x1000 rpm</div>
-    <div class="needle"></div><div class="hub"></div>
-  </div></section>
+      <!-- Center console -->
+      <section class="mid">
+        <div class="leds" aria-hidden="true">
+          <i style="--c: #38e08a; --t: 5600"></i
+          ><i style="--c: #38e08a; --t: 5950"></i
+          ><i style="--c: #38e08a; --t: 6300"></i>
+          <i style="--c: #ffb21f; --t: 6650"></i
+          ><i style="--c: #ffb21f; --t: 7000"></i
+          ><i style="--c: #ffb21f; --t: 7350"></i>
+          <i style="--c: #ff2a36; --t: 7700"></i
+          ><i style="--c: #ff2a36; --t: 7950"></i
+          ><i style="--c: #ff2a36; --t: 8150"></i>
+        </div>
+        <div class="lcd">
+          <div class="spd"></div>
+          <div class="unit">KM/H</div>
+        </div>
+        <div class="row">
+          <div class="gear"><b></b><span>GEAR</span></div>
+          <div class="mode">
+            <em>ECO</em><em>COMFORT</em><em class="on">SPORT+</em>
+          </div>
+        </div>
+        <div class="bars">
+          <span>FUEL</span>
+          <div class="bar"><i style="width: 68%"></i></div>
+          <span>OIL</span>
+          <div class="bar hot"><i style="width: 54%"></i></div>
+        </div>
+      </section>
 
-  <!-- Center console -->
-  <section class="mid">
-    <div class="leds" aria-hidden="true">
-      <i style="--c:#38e08a;--t:5600"></i><i style="--c:#38e08a;--t:5950"></i><i style="--c:#38e08a;--t:6300"></i>
-      <i style="--c:#ffb21f;--t:6650"></i><i style="--c:#ffb21f;--t:7000"></i><i style="--c:#ffb21f;--t:7350"></i>
-      <i style="--c:#ff2a36;--t:7700"></i><i style="--c:#ff2a36;--t:7950"></i><i style="--c:#ff2a36;--t:8150"></i>
-    </div>
-    <div class="lcd"><div class="spd"></div><div class="unit">KM/H</div></div>
-    <div class="row">
-      <div class="gear"><b></b><span>GEAR</span></div>
-      <div class="mode"><em>ECO</em><em>COMFORT</em><em class="on">SPORT+</em></div>
-    </div>
-    <div class="bars">
-      <span>FUEL</span><div class="bar"><i style="width:68%"></i></div>
-      <span>OIL</span><div class="bar hot"><i style="width:54%"></i></div>
-    </div>
-  </section>
-
-  <!-- Speedometer -->
-  <section class="dial speedo"><div class="face">
-    <i class="ticks minor"></i><i class="ticks major"></i>
-    <span class="n" style="--i:0">0</span><span class="n" style="--i:1">40</span><span class="n" style="--i:2">80</span>
-    <span class="n" style="--i:3">120</span><span class="n" style="--i:4">160</span><span class="n" style="--i:5">200</span>
-    <span class="n" style="--i:6">240</span><span class="n" style="--i:7">280</span><span class="n" style="--i:8">320</span>
-    <div class="cap top">GT</div>
-    <div class="cap bot">km/h</div>
-    <div class="needle"></div><div class="hub"></div>
-  </div></section>
-
-</main>
-</body>
+      <!-- Speedometer -->
+      <section class="dial speedo">
+        <div class="face">
+          <i class="ticks minor"></i><i class="ticks major"></i>
+          <span class="n" style="--i: 0">0</span
+          ><span class="n" style="--i: 1">40</span
+          ><span class="n" style="--i: 2">80</span>
+          <span class="n" style="--i: 3">120</span
+          ><span class="n" style="--i: 4">160</span
+          ><span class="n" style="--i: 5">200</span>
+          <span class="n" style="--i: 6">240</span
+          ><span class="n" style="--i: 7">280</span
+          ><span class="n" style="--i: 8">320</span>
+          <div class="cap top">GT</div>
+          <div class="cap bot">km/h</div>
+          <div class="needle"></div>
+          <div class="hub"></div>
+        </div>
+      </section>
+    </main>
+  </body>
 </html>

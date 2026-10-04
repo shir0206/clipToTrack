@@ -957,19 +957,18 @@
   height: 26px;
   margin-left: auto;
 }
+/* Graph / Speedometer sit in the header row, right-aligned, same chip size as the tabs */
+.ctt-prof-view {
+  margin-left: auto;
+}
+.ctt-prof-view + .ctt-btn {
+  margin-left: 0;
+}
 
 /* draggable tabs */
 .ctt-tab {
   cursor: grab;
   user-select: none;
-}
-.ctt-tab::before {
-  content: '';
-  width: 6px;
-  height: 10px;
-  opacity: 0.45;
-  background: radial-gradient(circle, currentColor 1px, transparent 1.5px) 0 0 /
-    3px 3.4px;
 }
 .ctt-tab:active {
   cursor: grabbing;
@@ -987,6 +986,11 @@
   all: unset;
   cursor: pointer;
   padding: 4px 9px;
+}
+.ctt-tab-split .ctt-tab-split-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .ctt-tab-split-x {
   display: inline-flex;

@@ -28,7 +28,9 @@ export type IconName =
   | 'chart'
   | 'sliders'
   | 'calendar'
-  | 'type';
+  | 'type'
+  | 'dial'
+  | 'columns';
 
 const solid = { fill: 'currentColor', stroke: 'none' } as const;
 
@@ -116,6 +118,18 @@ const PATHS: Record<IconName, ReactNode> = {
     <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
   ),
   type: <path d="M4 7V4h16v3M9 20h6M12 4v16" />,
+  dial: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m12 12 4-4M12 3.5V5M3.5 12H5M19 12h1.5" />
+    </>
+  ),
+  columns: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M12 4v16" />
+    </>
+  ),
   sliders: (
     <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
   ),

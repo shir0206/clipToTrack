@@ -16,11 +16,14 @@
     "test:watch": "vitest",
     "test:browser": "playwright test",
     "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "fix": "yarn format && yarn lint:fix",
+    "fix:check": "yarn fix && yarn run check",
     "check": "yarn format:check && yarn lint && yarn test && yarn build",
     "ci": "yarn run check",
-    "predeploy": "npm run build",
+    "predeploy": "yarn fix:check",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
