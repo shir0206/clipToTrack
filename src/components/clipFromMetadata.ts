@@ -71,9 +71,7 @@ const fmtSpeed = (kmh?: number) =>
   isNum(kmh) ? `${Math.round(kmh)} km/h` : '—';
 const fmtAltitude = (a?: { min: number; max: number }) => {
   if (!a || !isNum(a.min) || !isNum(a.max)) return '—';
-  const lo = Math.round(a.min),
-    hi = Math.round(a.max);
-  return lo === hi ? `${hi} m` : `${lo}–${hi} m`;
+  return `${Math.round(a.max)} m`;
 };
 const fmtDate = (iso?: string) => {
   const d = iso ? new Date(iso) : null;

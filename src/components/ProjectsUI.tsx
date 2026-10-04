@@ -233,8 +233,13 @@ function ProjectHead({
           </button>
         </div>
       )}
-      <p className="ctt-phead-sub">{where(v)}</p>
-      <StatChips v={v} />
+      <div className="ctt-phead-sub-container">
+        <div className="ctt-phead-sub-header">
+          <SvgIcon name="calendar" size={13} />
+          <p className="ctt-phead-sub">{where(v)}</p>
+        </div>
+        <StatChips v={v} />
+      </div>
       {asking && (
         <DeleteConfirm
           v={v}
@@ -687,8 +692,14 @@ export function ProjectsDialog({
                     )}
                   </div>
                 )}
-                <p className="ctt-phead-sub">{where(sel)}</p>
-                <StatChips v={sel} />
+
+                <div className="ctt-phead-sub-container">
+                  <div className="ctt-phead-sub-header">
+                    <SvgIcon name="calendar" size={13} />
+                    <p className="ctt-phead-sub">{where(sel)}</p>
+                  </div>
+                  <StatChips v={sel} />
+                </div>
                 {asking && (
                   <DeleteConfirm
                     v={sel}
@@ -786,8 +797,8 @@ export function ProjectsDialog({
                 </>
               ) : (
                 <p className="ctt-pd-none">
-                  This project is empty. Upload clips above, or use “Add
-                  clips” to bring some in from other projects.
+                  This project is empty. Upload clips above, or use “Add clips”
+                  to bring some in from other projects.
                 </p>
               )}
             </section>
