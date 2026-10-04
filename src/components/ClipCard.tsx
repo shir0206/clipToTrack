@@ -202,20 +202,30 @@ export default function ClipCard({
 
       <div className="ctt-card-body">
         <div className="ctt-card-head">
-          <div>
-            <div className="ctt-title-row">
-              <span className="ctt-badge" />
-              <h3>{clip.title}</h3>
-              {active && (
-                <span className="ctt-playing" role="status">
-                  <span className="ctt-eq" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  Playing
-                </span>
-              )}
+          <div className="ctt-card-head-container">
+            <div className="ctt-phead-title">
+              <div className="ctt-title-row">
+                <span className="ctt-badge" />
+                <h3>{clip.title}</h3>
+              </div>
+              <button
+                className="ctt-btn ctt-btn-spacer"
+                aria-label={`${hidden ? 'Show' : 'Hide'} ${clip.title} on map`}
+                aria-pressed={hidden}
+                title={hidden ? 'Show on map' : 'Hide on map'}
+                onClick={stop(onToggleHidden)}
+              >
+                <SvgIcon name={hidden ? 'eyeOff' : 'eye'} size={15} />
+              </button>
+              <button
+                className="ctt-btn"
+                aria-label={`Delete ${clip.title}`}
+                title="Delete clip"
+                aria-expanded={confirming}
+                onClick={stop(() => setConfirming((c) => !c))}
+              >
+                <SvgIcon name="trash" size={14} />
+              </button>
             </div>
             {place && (
               <p className="ctt-meta">
@@ -235,52 +245,46 @@ export default function ClipCard({
         </div>
 
         <div className="ctt-controls">
-          <button
-            className="ctt-btn ctt-btn-primary"
-            aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`}
-            disabled={!canPlay}
-            onClick={stop(handleToggle)}
-          >
-            <SvgIcon name={playing ? 'pause' : 'play'} size={14} />
-          </button>
-          <button
-            className="ctt-btn"
-            aria-label={`Stop ${clip.title}`}
-            disabled={!canPlay}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleStop();
-            }}
-          >
-            <SvgIcon name="stop" size={13} />
-          </button>
-          <button
-            className="ctt-btn"
-            aria-label={`Maximize ${clip.title}`}
-            title="Open larger"
-            disabled={!canPlay}
-            onClick={stop(onMaximize)}
-          >
-            <SvgIcon name="maximize" size={14} />
-          </button>
-          <button
-            className="ctt-btn ctt-btn-spacer"
-            aria-label={`${hidden ? 'Show' : 'Hide'} ${clip.title} on map`}
-            aria-pressed={hidden}
-            title={hidden ? 'Show on map' : 'Hide on map'}
-            onClick={stop(onToggleHidden)}
-          >
-            <SvgIcon name={hidden ? 'eyeOff' : 'eye'} size={15} />
-          </button>
-          <button
-            className="ctt-btn"
-            aria-label={`Delete ${clip.title}`}
-            title="Delete clip"
-            aria-expanded={confirming}
-            onClick={stop(() => setConfirming((c) => !c))}
-          >
-            <SvgIcon name="trash" size={14} />
-          </button>
+          <div className="ctt-controls-btns">
+            <button
+              className="ctt-btn ctt-btn-primary"
+              aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`}
+              disabled={!canPlay}
+              onClick={stop(handleToggle)}
+            >
+              <SvgIcon name={playing ? 'pause' : 'play'} size={14} />
+            </button>
+            <button
+              className="ctt-btn"
+              aria-label={`Stop ${clip.title}`}
+              disabled={!canPlay}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStop();
+              }}
+            >
+              <SvgIcon name="stop" size={13} />
+            </button>
+            <button
+              className="ctt-btn"
+              aria-label={`Maximize ${clip.title}`}
+              title="Open larger"
+              disabled={!canPlay}
+              onClick={stop(onMaximize)}
+            >
+              <SvgIcon name="maximize" size={14} />
+            </button>
+          </div>
+          {active && (
+            <span className="ctt-playing" role="status">
+              <span className="ctt-eq" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              Playing
+            </span>
+          )}
         </div>
         {confirming && (
           <div

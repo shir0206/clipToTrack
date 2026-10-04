@@ -203,6 +203,9 @@
   font-size: 12px;
   color: black;
 }
+.ctt-card-head-container {
+  width: 100%;
+}
 .ctt-quality {
   grid-column: 1 / -1;
   margin: -4px 0 0;
@@ -222,6 +225,11 @@
   font-weight: 700;
 }
 .ctt-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ctt-controls-btns {
   display: flex;
   align-items: center;
   gap: 8px;
