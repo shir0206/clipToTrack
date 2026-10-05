@@ -203,7 +203,6 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgb(40 120 255 / 0.3);
   transition: background 0.15s;
 }
 .ctt-pbar-new:hover {
