@@ -9,6 +9,11 @@ type Props = {
   onPlayingChange?: (playing: boolean) => void;
 };
 
+const toggle = (v: HTMLVideoElement) => {
+  if (v.paused) v.play().catch(() => {});
+  else v.pause();
+};
+
 /** Large player for one clip. Esc / backdrop click / ✕ closes it. */
 export default function VideoModal({
   clip,
@@ -16,12 +21,26 @@ export default function VideoModal({
   onProgress,
   onPlayingChange,
 }: Props) {
-  const closeBtn = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // no native toolbar: click / Space = play-pause, ← → = seek 5 s, Esc = close
+    const onKey = (e: KeyboardEvent) => {
+      const v = videoRef.current;
+      if (e.key === 'Escape') onClose();
+      else if (!v) return;
+      else if (e.key === ' ' || e.key === 'k') {
+        e.preventDefault();
+        toggle(v);
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const to = v.currentTime + (e.key === 'ArrowRight' ? 5 : -5);
+        v.currentTime = Math.max(0, Math.min(to, v.duration || to));
+      }
+    };
     window.addEventListener('keydown', onKey);
-    closeBtn.current?.focus();
+    box.current?.focus(); // not the ✕ button, so Space doesn't "press" it
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
@@ -34,6 +53,8 @@ export default function VideoModal({
       onClick={onClose}
     >
       <div
+        ref={box}
+        tabIndex={-1}
         className="ctt-modal-box"
         style={{ '--c': clip.color } as CSSProperties}
         onClick={(e) => e.stopPropagation()}
@@ -45,7 +66,6 @@ export default function VideoModal({
             {clip.date} · {clip.camera}
           </small>
           <button
-            ref={closeBtn}
             className="ctt-btn"
             aria-label="Close video"
             onClick={onClose}
@@ -54,11 +74,12 @@ export default function VideoModal({
           </button>
         </div>
         <video
+          ref={videoRef}
           className="ctt-modal-video"
           src={clip.videoUrl}
           poster={clip.thumbnail}
-          controls
           autoPlay
+          onClick={(e) => toggle(e.currentTarget)}
           playsInline
           onPlay={() => onPlayingChange?.(true)}
           onPause={() => onPlayingChange?.(false)}

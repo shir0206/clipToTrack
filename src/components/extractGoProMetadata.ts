@@ -666,6 +666,23 @@ export async function extractGoProMetadata(
     const first = ref[0];
     const last = ref[ref.length - 1];
 
+    // Ascent / descent: GPS altitude jitters by a few cm even when standing still, so a
+    // 5-sample moving average is applied before summing the up / down steps.
+    const smooth = ref.map((_, i) => {
+      const a = Math.max(0, i - 2);
+      const b = Math.min(ref.length - 1, i + 2);
+      let sum = 0;
+      for (let k = a; k <= b; k++) sum += ref[k].alt;
+      return sum / (b - a + 1);
+    });
+    let ascent = 0;
+    let descent = 0;
+    for (let i = 1; i < smooth.length; i++) {
+      const d = smooth[i] - smooth[i - 1];
+      if (d > 0) ascent += d;
+      else descent -= d;
+    }
+
     return {
       schemaVersion: 1,
       source: {
@@ -705,6 +722,9 @@ export async function extractGoProMetadata(
           min: round(Math.min(...alts), 3),
           max: round(Math.max(...alts), 3),
           mean: round(mean(alts), 3),
+          changeStartToEnd: round(last.alt - first.alt, 3),
+          ascentM: round(ascent, 3),
+          descentM: round(descent, 3),
         },
         speed3dKmh: {
           max: round(Math.max(...spd), 3),

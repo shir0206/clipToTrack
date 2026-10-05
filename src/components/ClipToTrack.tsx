@@ -14,25 +14,38 @@ import Logo from './Logo';
 import VideoModal from './VideoModal';
 import VideoWindow, { openVideoWindow } from './VideoWindow';
 import SvgIcon, { type IconName } from './SvgIcon';
+import SettingsDialog from './SettingsDialog';
 import PlaybackHelp, { playbackHelpDismissed } from './PlaybackHelp';
 import { probeDecode } from './videoSupport';
 import { useClips } from './useClips';
+import { useProjectMode, useProjects } from './useProjects';
+import { ProjectBar, ProjectNotice, ProjectsDialog } from './ProjectsUI';
 import './ClipToTrack.css';
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
+const PROFILE_HEIGHT_KEY = 'clip-to-track:profile-height'; // owned by ElevationProfile
 const SORT_KEY = 'clip-to-track:sort';
 
-type SortKey = 'added' | 'name' | 'date' | 'duration' | 'distance' | 'speed';
+type SortKey = 'added' | 'name' | 'date' | 'location' | 'speed';
 const SORTS: [SortKey, string, IconName][] = [
   ['added', 'Uploaded', 'upload'],
   ['name', 'Name', 'type'],
   ['date', 'Date', 'calendar'],
-  ['duration', 'Duration', 'clock'],
-  ['distance', 'Distance', 'route'],
+  ['location', 'Location', 'gps'],
   ['speed', 'Max speed', 'gauge'],
 ];
-const value = (c: Clip, k: SortKey): number | string | undefined =>
-  k === 'added' ? c.addedAt : k === 'name' ? c.title : c.sort[k];
+const value = (
+  c: Clip,
+  k: SortKey,
+  place?: string,
+): number | string | undefined =>
+  k === 'added'
+    ? c.addedAt
+    : k === 'name'
+      ? c.title
+      : k === 'location'
+        ? place || undefined // not looked up yet / nothing found: sorts last
+        : c.sort[k];
 const loadSort = (): { key: SortKey; dir: 1 | -1 } => {
   try {
     const s = JSON.parse(localStorage.getItem(SORT_KEY) ?? '');
@@ -53,6 +66,28 @@ const clampW = (w: number) =>
 
 export default function ClipToTrack() {
   const { clips, error, busy, progress, addFiles, remove, clear } = useClips(); // clips persist in localStorage
+  const projects = useProjects(clips); // every clip is placed in a project automatically
+  const projectMode = useProjectMode(); // Settings → "Group clips into projects"; off = plain clip list
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [projectsDialog, setProjectsDialog] = useState<{ id?: string } | null>(
+    null,
+  );
+  const [dragClipId, setDragClipId] = useState<string | null>(null); // a card is being dragged
+  const activeProject =
+    projectMode && projects.views.some((v) => v.id === projectFilter)
+      ? projectFilter
+      : 'all';
+  // clips not placed yet (a render-phase transient) stay visible
+  const visible = useMemo(
+    () =>
+      activeProject === 'all'
+        ? clips
+        : clips.filter((c) => {
+            const p = projects.projectOf.get(c.id);
+            return !p || p === activeProject;
+          }),
+    [clips, activeProject, projects.projectOf],
+  );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(
     clips[0]?.id ?? null,
   ); // single source of truth
@@ -64,6 +99,7 @@ export default function ClipToTrack() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set()); // hidden on the map only
   const [sort, setSort] = useState(loadSort);
   const [playbackHelp, setPlaybackHelp] = useState(false); // browser can't draw the video's picture
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const mapApi = useRef<MapApi | null>(null);
 
   useEffect(() => {
@@ -77,9 +113,9 @@ export default function ClipToTrack() {
   // Sorting only changes the list order. Clip.index / colour stay tied to upload order, so the map never recolours.
   const sorted = useMemo(
     () =>
-      [...clips].sort((a, b) => {
-        const x = value(a, sort.key);
-        const y = value(b, sort.key);
+      [...visible].sort((a, b) => {
+        const x = value(a, sort.key, projects.clipPlace[a.id]);
+        const y = value(b, sort.key, projects.clipPlace[b.id]);
         if (x === undefined) return y === undefined ? 0 : 1; // missing values always last
         if (y === undefined) return -1;
         const r =
@@ -92,11 +128,11 @@ export default function ClipToTrack() {
         // ties fall back to upload order, and flip with the direction so the toggle always visibly does something
         return (r || a.index - b.index) * sort.dir;
       }),
-    [clips, sort],
+    [visible, sort, projects.clipPlace],
   );
   const mapClips = useMemo(
-    () => clips.filter((c) => !hiddenIds.has(c.id)),
-    [clips, hiddenIds],
+    () => visible.filter((c) => !hiddenIds.has(c.id)),
+    [visible, hiddenIds],
   );
   const toggleHidden = (id: string) =>
     setHiddenIds((s) => {
@@ -146,15 +182,21 @@ export default function ClipToTrack() {
       ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
 
-  const handleFiles = async (files: File[]) => {
+  /** `into`: a project chosen explicitly (the Projects dialog); otherwise the open project, if any */
+  const handleFiles = async (files: File[], into?: string) => {
     // in parallel with the import: can this browser draw the picture? If not, explain (once) what to approve
     const video = files.find((f) => !/\.json$/i.test(f.name));
     if (video && !playbackHelpDismissed())
       void probeDecode(video).then(
         (r) => r === 'no-picture' && setPlaybackHelp(true),
       );
-    const firstId = await addFiles(files);
-    if (!firstId) return;
+    // an upload made while a project is open belongs to that project (not to the automatic grouping)
+    const target =
+      into ?? (projectMode && activeProject !== 'all' ? activeProject : null);
+    const ids = await addFiles(files);
+    if (!ids.length) return;
+    if (target) projects.adopt(ids, target);
+    const firstId = ids[0];
     setSelectedClipId(firstId);
     setTimeout(() => select(firstId), 0); // scroll the new card into view after render
   };
@@ -188,6 +230,14 @@ export default function ClipToTrack() {
     remove(id); // -> map layers, pinned bubble and localStorage all follow from `clips`
   };
 
+  // a project owns its clips: deleting it removes them too (the UI asks for confirmation first)
+  const handleDeleteProject = (id: string) => {
+    const ids = projects.views.find((v) => v.id === id)?.clipIds ?? [];
+    ids.forEach(handleDelete);
+    projects.removeProject(id);
+    if (projectFilter === id) setProjectFilter('all');
+  };
+
   const handleClear = () => {
     setPlayingClipId(null);
     closeMax();
@@ -198,13 +248,117 @@ export default function ClipToTrack() {
 
   const maxClip = clips.find((c) => c.id === maxClipId && c.videoUrl);
 
+  const emptyProject =
+    projectMode && activeProject !== 'all' && visible.length === 0;
+  const upload = (
+    <UploadZone onFiles={handleFiles} busy={busy} progress={progress} />
+  );
+  // sort bar + cards: inside the project container when a project is open, plain otherwise
+  const panelBody = (
+    <>
+      {!emptyProject && (
+        <div className="ctt-sort" role="group" aria-label="Sort clips">
+          <span className="ctt-sort-label">Sort</span>
+          <div className="ctt-sort-chips">
+            {SORTS.map(([k, label, icon]) => {
+              const on = sort.key === k;
+              const asc = sort.dir === 1;
+              return (
+                <button
+                  key={k}
+                  className={`ctt-sort-chip${on ? ' is-on' : ''}`}
+                  disabled={visible.length < 2}
+                  aria-pressed={on}
+                  title={
+                    on
+                      ? `${label}: ${asc ? 'ascending' : 'descending'} — click to reverse`
+                      : `Sort by ${label.toLowerCase()}`
+                  }
+                  onClick={() =>
+                    setSort(
+                      on
+                        ? { key: k, dir: asc ? -1 : 1 }
+                        : {
+                            key: k,
+                            dir:
+                              k === 'name' || k === 'added' || k === 'location'
+                                ? 1
+                                : -1,
+                          },
+                    )
+                  }
+                >
+                  <SvgIcon name={icon} size={13} />
+                  {label}
+                  {on && (
+                    <SvgIcon
+                      name={asc ? 'arrowUp' : 'arrowDown'}
+                      size={12}
+                      className="ctt-sort-dir"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {emptyProject ? (
+        <div className="ctt-pempty">
+          <p>
+            This project is empty. Drop GoPro clips here and they’ll be added to
+            it.
+          </p>
+          {upload}
+        </div>
+      ) : (
+        <ul className="ctt-list" role="listbox" aria-label="Clips">
+          {sorted.map((clip) => (
+            <ClipCard
+              key={clip.id}
+              clip={clip}
+              place={projects.clipPlace[clip.id]}
+              selected={clip.id === selectedClipId}
+              playing={clip.id === playingClipId}
+              nowPlaying={clip.id === maxClipId && maxPlaying}
+              onSelect={() => select(clip.id)}
+              onHover={(h) => setHoveredClipId(h ? clip.id : null)}
+              onTogglePlay={() => {
+                setSelectedClipId(clip.id);
+                setPlayingClipId((p) => (p === clip.id ? null : clip.id));
+              }}
+              onStop={() => setPlayingClipId(null)}
+              hidden={hiddenIds.has(clip.id)}
+              onToggleHidden={() => toggleHidden(clip.id)}
+              onProgress={(f) => mapApi.current?.setPlayhead(clip.id, f)}
+              onDelete={() => handleDelete(clip.id)}
+              onDragStart={() => setDragClipId(clip.id)}
+              onDragEnd={() => setDragClipId(null)}
+              onMaximize={() => openMax(clip)}
+            />
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
   return (
     <div className={`ctt-app${dragging ? ' is-resizing' : ''}`}>
       <header className="ctt-header">
         <Logo tagline="GoPro clips. Mapped to your adventures." />
         <div className="ctt-header-actions">
-          <button>Projects</button>
-          <button>Settings</button>
+          {projectMode && (
+            <button
+              onClick={() =>
+                setProjectsDialog({
+                  id: activeProject === 'all' ? undefined : activeProject,
+                })
+              }
+            >
+              Projects
+            </button>
+          )}
+          <button onClick={() => setSettingsOpen(true)}>Settings</button>
         </div>
       </header>
 
@@ -219,80 +373,39 @@ export default function ClipToTrack() {
                   Clear all
                 </button>
               )}
-              {clips.length}
+              {visible.length}
             </span>
           </div>
-          <div className="ctt-sort" role="group" aria-label="Sort clips">
-            <span className="ctt-sort-label">Sort</span>
-            <div className="ctt-sort-chips">
-              {SORTS.map(([k, label, icon]) => {
-                const on = sort.key === k;
-                const asc = sort.dir === 1;
-                return (
-                  <button
-                    key={k}
-                    className={`ctt-sort-chip${on ? ' is-on' : ''}`}
-                    disabled={clips.length < 2}
-                    aria-pressed={on}
-                    title={
-                      on
-                        ? `${label}: ${asc ? 'ascending' : 'descending'} — click to reverse`
-                        : `Sort by ${label.toLowerCase()}`
-                    }
-                    onClick={() =>
-                      setSort(
-                        on
-                          ? { key: k, dir: asc ? -1 : 1 }
-                          : {
-                              key: k,
-                              dir: k === 'name' || k === 'added' ? 1 : -1,
-                            },
-                      )
-                    }
-                  >
-                    <SvgIcon name={icon} size={13} />
-                    {label}
-                    {on && (
-                      <SvgIcon
-                        name={asc ? 'arrowUp' : 'arrowDown'}
-                        size={12}
-                        className="ctt-sort-dir"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <ul className="ctt-list" role="listbox" aria-label="Clips">
-            {sorted.map((clip) => (
-              <ClipCard
-                key={clip.id}
-                clip={clip}
-                selected={clip.id === selectedClipId}
-                playing={clip.id === playingClipId}
-                nowPlaying={clip.id === maxClipId && maxPlaying}
-                onSelect={() => select(clip.id)}
-                onHover={(h) => setHoveredClipId(h ? clip.id : null)}
-                onTogglePlay={() => {
-                  setSelectedClipId(clip.id);
-                  setPlayingClipId((p) => (p === clip.id ? null : clip.id));
-                }}
-                onStop={() => setPlayingClipId(null)}
-                hidden={hiddenIds.has(clip.id)}
-                onToggleHidden={() => toggleHidden(clip.id)}
-                onProgress={(f) => mapApi.current?.setPlayhead(clip.id, f)}
-                onDelete={() => handleDelete(clip.id)}
-                onMaximize={() => openMax(clip)}
-              />
-            ))}
-          </ul>
+          {projectMode ? (
+            <ProjectBar
+              views={projects.views}
+              activeId={activeProject}
+              dragging={dragClipId !== null}
+              onChange={setProjectFilter}
+              onRename={projects.rename}
+              onManage={(id) => setProjectsDialog({ id })}
+              onCreate={() => {
+                const id = projects.createProject();
+                setProjectFilter(id);
+                return id;
+              }}
+              onDelete={handleDeleteProject}
+              onDropClip={(clipId, target) => {
+                projects.moveClip(clipId, target);
+                setDragClipId(null);
+              }}
+            >
+              {panelBody}
+            </ProjectBar>
+          ) : (
+            panelBody
+          )}
           {error && (
             <p className="ctt-error" role="alert">
               Couldn’t load {error}
             </p>
           )}
-          <UploadZone onFiles={handleFiles} busy={busy} progress={progress} />
+          {!emptyProject && upload}
         </aside>
 
         <div
@@ -328,6 +441,60 @@ export default function ClipToTrack() {
           )}
         </section>
       </main>
+
+      {projectMode && projects.notice && (
+        <ProjectNotice
+          items={projects.notice}
+          views={projects.views}
+          clips={clips}
+          activeId={activeProject}
+          onOpen={setProjectFilter}
+          onDismiss={projects.dismissNotice}
+        />
+      )}
+
+      {projectMode && projectsDialog && (
+        <ProjectsDialog
+          views={projects.views}
+          clips={clips}
+          initialId={projectsDialog.id}
+          onRename={projects.rename}
+          onMove={projects.moveClip}
+          onCreate={projects.createProject}
+          onDelete={handleDeleteProject}
+          onUpload={(files, id) => void handleFiles(files, id)}
+          busy={busy}
+          progress={progress}
+          onOpen={(id) => {
+            setProjectFilter(id);
+            setProjectsDialog(null);
+          }}
+          onClose={() => setProjectsDialog(null)}
+        />
+      )}
+
+      {settingsOpen && (
+        <SettingsDialog
+          clipCount={clips.length}
+          layoutIsDefault={
+            panelW === clampW(window.innerWidth * 0.33) &&
+            [null, '260'].includes(localStorage.getItem(PROFILE_HEIGHT_KEY)) // 260 = ElevationProfile's DEFAULT_H
+          }
+          onClose={() => setSettingsOpen(false)}
+          onResetLayout={() => {
+            setPanelW(clampW(window.innerWidth * 0.33));
+            try {
+              localStorage.removeItem(PROFILE_HEIGHT_KEY); // applied next time the dock opens
+            } catch {
+              /* ignore */
+            }
+          }}
+          onClearClips={() => {
+            handleClear();
+            setSettingsOpen(false);
+          }}
+        />
+      )}
 
       {playbackHelp && <PlaybackHelp onClose={() => setPlaybackHelp(false)} />}
 

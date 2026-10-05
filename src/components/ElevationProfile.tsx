@@ -8,9 +8,11 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import type { Clip } from './types';
 import SvgIcon, { type IconName } from './SvgIcon';
 import SpeedCluster from './SpeedCluster';
+import AltitudeCluster from './AltitudeCluster';
 
 type Props = {
   clip: Clip;
@@ -22,7 +24,7 @@ type Props = {
 type Metric = 'alt' | 'speed';
 type Tab = Metric | 'split';
 type Side = 'left' | 'right';
-type SpeedMode = 'graph' | 'dial';
+type ViewMode = 'graph' | 'dial';
 
 const W = 1000;
 const H = 100;
@@ -36,24 +38,32 @@ const MIN_STAGE = 200; // the map always keeps at least this much
 const LABEL: Record<Metric, string> = { alt: 'Altitude', speed: 'Speed' };
 const UNIT: Record<Metric, string> = { alt: 'm', speed: 'km/h' };
 const ICON: Record<Metric, IconName> = { alt: 'mountain', speed: 'gauge' };
+/** label of the instrument-cluster view of each metric */
+const DIAL_LABEL: Record<Metric, string> = {
+  alt: 'Altimeter',
+  speed: 'Speedometer',
+};
 const otherOf = (m: Metric): Metric => (m === 'alt' ? 'speed' : 'alt');
 
-/** One metric of the selected clip: a chart (or, for speed, optionally the speedometer). */
+/** One metric of the selected clip: a chart or its instrument cluster (altimeter / speedometer). */
 function Pane({
   clip,
   metric,
   probe,
   onProbe,
-  speedMode,
+  mode,
+  onPop,
 }: {
   clip: Clip;
   metric: Metric;
   probe: number | null;
   onProbe: (i: number | null) => void;
-  speedMode: SpeedMode;
+  mode: ViewMode;
+  /** open this metric in its own window (absent inside the popup itself) */
+  onPop?: () => void;
 }) {
   const unit = UNIT[metric];
-  const dial = metric === 'speed' && speedMode === 'dial';
+  const dial = mode === 'dial';
 
   const chart = useMemo(() => {
     const vals = clip.samples.map((p) =>
@@ -99,11 +109,26 @@ function Pane({
     onProbe(best);
   };
 
+  const popBtn = onPop && (
+    <button
+      className="ctt-btn ctt-pane-pop"
+      aria-label={`Open ${LABEL[metric]} in a new window`}
+      title="Open in a new window"
+      onClick={onPop}
+    >
+      <SvgIcon name="external" size={13} />
+    </button>
+  );
+
   const pv = chart && probe !== null ? chart.vals[probe] : undefined;
   const showProbe = chart && probe !== null && typeof pv === 'number';
 
   return (
-    <section className="ctt-prof-pane" aria-label={LABEL[metric]}>
+    <section
+      className={`ctt-prof-pane${dial ? ' is-dial' : ''}`}
+      aria-label={LABEL[metric]}
+    >
+      {dial && popBtn}
       {!dial && (
         <div className="ctt-prof-pane-head">
           <b>{LABEL[metric]}</b>
@@ -114,11 +139,16 @@ function Pane({
                 ? `${chart.min.toFixed(0)}-${chart.max.toFixed(0)} ${unit}`
                 : ''}
           </span>
+          {popBtn}
         </div>
       )}
 
       {dial ? (
-        <SpeedCluster key={clip.id} clip={clip} probe={probe} />
+        metric === 'alt' ? (
+          <AltitudeCluster key={clip.id} clip={clip} probe={probe} />
+        ) : (
+          <SpeedCluster key={clip.id} clip={clip} probe={probe} />
+        )
       ) : chart ? (
         <div
           className="ctt-prof-plot"
@@ -160,11 +190,126 @@ function Pane({
   );
 }
 
+const PLOT_ROOT = 'ctt-plot-root';
+
+/**
+ * Opens an empty popup (no toolbar / address bar) that looks like the app: the page's stylesheets are
+ * copied in. Must be called synchronously from a click handler, otherwise the popup blocker refuses it.
+ */
+function openPlotWindow(title: string): Window | null {
+  const w = Math.min(900, window.screen.availWidth - 80);
+  const h = Math.min(380, window.screen.availHeight - 80);
+  const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+  const top = Math.round(window.screenY + (window.outerHeight - h) / 2);
+  const win = window.open(
+    '',
+    '_blank',
+    `popup=yes,resizable=yes,width=${w},height=${h},left=${left},top=${top}`,
+  );
+  if (!win) return null;
+
+  const doc = win.document;
+  doc.title = title;
+  doc.head.innerHTML =
+    '<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />';
+  document
+    .querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
+      'link[rel="stylesheet"], style',
+    )
+    .forEach((n) => {
+      if (n instanceof HTMLLinkElement) {
+        const l = doc.createElement('link');
+        l.rel = 'stylesheet';
+        l.href = n.href; // absolute, so it resolves inside the popup
+        doc.head.appendChild(l);
+      } else doc.head.appendChild(doc.importNode(n, true));
+    });
+  doc.body.style.margin = '0';
+  doc.body.innerHTML = `<div id="${PLOT_ROOT}"></div>`;
+  return win;
+}
+
+function setPlotWindowTitle(win: Window, title: string) {
+  win.document.title = title;
+}
+
+/** One metric (chart or instrument cluster) of the selected clip in its own window. Hovering it drives the map too. */
+function PlotWindow({
+  win,
+  clip,
+  metric,
+  probe,
+  onProbe,
+  mode,
+  onClose,
+}: {
+  win: Window;
+  clip: Clip;
+  metric: Metric;
+  probe: number | null;
+  onProbe: (i: number | null) => void;
+  mode: ViewMode;
+  onClose: () => void;
+}) {
+  const [root] = useState(() => win.document.getElementById(PLOT_ROOT));
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  useEffect(() => {
+    setPlotWindowTitle(win, `${LABEL[metric]} · ${clip.title}`);
+  }, [win, metric, clip.title]);
+
+  useEffect(() => {
+    let notified = false;
+    const notify = () => {
+      if (notified) return;
+      notified = true;
+      onCloseRef.current();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) =>
+      e.key === 'Escape' && win.close();
+    win.addEventListener('pagehide', notify); // user closed the window
+    win.addEventListener('keydown', onKey);
+    const poll = window.setInterval(() => win.closed && notify(), 500);
+    const closeWithParent = () => win.close(); // reloading the app takes its popups with it
+    window.addEventListener('pagehide', closeWithParent);
+    return () => {
+      notified = true; // unmount must not report a user close
+      window.clearInterval(poll);
+      window.removeEventListener('pagehide', closeWithParent);
+      win.removeEventListener('pagehide', notify);
+      win.removeEventListener('keydown', onKey);
+      // the dock closes its popups itself; closing here would break StrictMode re-runs
+    };
+  }, [win]);
+
+  if (!root) return null;
+  return createPortal(
+    <div className="ctt-app ctt-pop">
+      <div className="ctt-prof" style={{ '--c': clip.color } as CSSProperties}>
+        <div className="ctt-prof-body">
+          <Pane
+            clip={clip}
+            metric={metric}
+            probe={probe}
+            onProbe={onProbe}
+            mode={mode}
+          />
+        </div>
+      </div>
+    </div>,
+    root,
+  );
+}
+
 /**
  * Altitude / speed dock of the selected clip. Hovering a chart moves a marker on the map.
  * - Drag a tab onto the other tab (or onto the left / right half of the dock) to open them side by side in a new tab.
  * - The side-by-side tab has an × to cancel it.
- * - Speed can be shown as a graph or as the GT speedometer.
+ * - Altitude and speed can each be shown as a graph or as an instrument cluster (altimeter / GT speedometer).
+ * - Each metric has a button to open it in its own window (no toolbar); both can be open at once.
  */
 export default function ElevationProfile({
   clip,
@@ -175,7 +320,45 @@ export default function ElevationProfile({
   const [tab, setTab] = useState<Tab>('alt');
   const [single, setSingle] = useState<Metric>('alt'); // where "cancel" returns to
   const [split, setSplit] = useState<[Metric, Metric] | null>(null); // [left, right]
-  const [speedMode, setSpeedMode] = useState<SpeedMode>('graph');
+  const [modes, setModes] = useState<Record<Metric, ViewMode>>({
+    alt: 'graph',
+    speed: 'graph',
+  });
+
+  // pop-out windows, one per metric
+  const [wins, setWins] = useState<Partial<Record<Metric, Window>>>({});
+  const winsRef = useRef(wins);
+  useEffect(() => {
+    winsRef.current = wins;
+  });
+  useEffect(
+    () => () =>
+      Object.values(winsRef.current).forEach(
+        (w) => w && !w.closed && w.close(),
+      ),
+    [],
+  ); // closing the dock closes its windows
+  const pop = (m: Metric) => {
+    const old = wins[m];
+    if (old && !old.closed) {
+      old.focus();
+      return;
+    }
+    const w = openPlotWindow(`${LABEL[m]} · ${clip.title}`); // synchronous: inside the click
+    if (!w) {
+      window.alert(
+        'Your browser blocked the pop-up window. Allow pop-ups for this site and try again.',
+      );
+      return;
+    }
+    setWins((s) => ({ ...s, [m]: w }));
+  };
+  const popClosed = (m: Metric) =>
+    setWins((s) => {
+      const n = { ...s };
+      delete n[m];
+      return n;
+    });
 
   // dock height: drag the grip on its top edge (or use ↑ / ↓); remembered between visits
   const root = useRef<HTMLDivElement>(null);
@@ -319,25 +502,27 @@ export default function ElevationProfile({
           ) : null}
         </div>
 
-        {metrics.includes('speed') && (
+        {metrics.map((m) => (
           <div
+            key={m}
             className="ctt-prof-tabs ctt-prof-view"
             role="group"
-            aria-label="Speed view"
+            aria-label={`${LABEL[m]} view`}
           >
-            {(['graph', 'dial'] as const).map((m) => (
+            {metrics.length > 1 && <SvgIcon name={ICON[m]} size={13} />}
+            {(['graph', 'dial'] as const).map((v) => (
               <button
-                key={m}
-                className={`ctt-chip${speedMode === m ? ' is-on' : ''}`}
-                aria-pressed={speedMode === m}
-                onClick={() => setSpeedMode(m)}
+                key={v}
+                className={`ctt-chip${modes[m] === v ? ' is-on' : ''}`}
+                aria-pressed={modes[m] === v}
+                onClick={() => setModes((s) => ({ ...s, [m]: v }))}
               >
-                <SvgIcon name={m === 'graph' ? 'chart' : 'dial'} size={13} />
-                {m === 'graph' ? 'Graph' : 'Speedometer'}
+                <SvgIcon name={v === 'graph' ? 'chart' : 'dial'} size={13} />
+                {v === 'graph' ? 'Graph' : DIAL_LABEL[m]}
               </button>
             ))}
           </div>
-        )}
+        ))}
 
         <button
           className="ctt-btn"
@@ -356,7 +541,8 @@ export default function ElevationProfile({
             metric={m}
             probe={probe}
             onProbe={onProbe}
-            speedMode={speedMode}
+            mode={modes[m]}
+            onPop={() => pop(m)}
           />
         ))}
 
@@ -383,6 +569,22 @@ export default function ElevationProfile({
           </div>
         )}
       </div>
+
+      {(['alt', 'speed'] as const).map((m) => {
+        const win = wins[m];
+        return win ? (
+          <PlotWindow
+            key={m}
+            win={win}
+            clip={clip}
+            metric={m}
+            probe={probe}
+            onProbe={onProbe}
+            mode={modes[m]}
+            onClose={() => popClosed(m)}
+          />
+        ) : null;
+      })}
     </div>
   );
 }

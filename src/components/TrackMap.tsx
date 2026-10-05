@@ -20,6 +20,7 @@ import MapPanel, {
 } from './MapPanel';
 import ElevationProfile from './ElevationProfile';
 import SvgIcon from './SvgIcon';
+import { useSettings } from './settings';
 import { clipToGeoJson, clipToGpx, download } from './exportTrack';
 
 // Let Vite fingerprint and serve MapLibre's worker as a real JS asset.
@@ -88,7 +89,11 @@ const STYLE = {
     layout: { visibility: k === 'streets' ? 'visible' : 'none' },
     paint:
       k === 'streets'
-        ? { 'raster-saturation': -0.6, 'raster-opacity': 0.9 }
+        ? {
+            'raster-saturation': -0.6,
+            'raster-contrast': 0.1,
+            'raster-opacity': 0.95,
+          }
         : {},
   })),
 } as maplibregl.StyleSpecification;
@@ -273,6 +278,7 @@ export default function TrackMap({
   const playheadClip = useRef<string | null>(null);
   const prevIds = useRef(new Set<string>());
 
+  const { view } = useSettings();
   const [opts, setOpts] = useState<MapOpts>(loadOpts);
   const set = (p: Partial<MapOpts>) => setOpts((o) => ({ ...o, ...p }));
   const followRef = useRef(opts.follow);
@@ -948,7 +954,9 @@ export default function TrackMap({
   const unit = opts.color === 'speed' ? 'km/h' : 'm';
 
   return (
-    <div className="ctt-mapcol">
+    <div
+      className={`ctt-mapcol${view.zoom ? '' : ' hide-zoom'}${view.gps ? '' : ' hide-gps'}${view.terrain ? '' : ' hide-terrain'}${view.scale ? '' : ' hide-scale'}`}
+    >
       <div className="ctt-mapstage">
         <div ref={el} className="ctt-map" />
         <MapPanel
@@ -971,7 +979,7 @@ export default function TrackMap({
           }
         />
 
-        {range && (
+        {range && view.legend && (
           <div
             className="ctt-legend"
             aria-label={`Colour scale: ${opts.color}`}
@@ -1016,17 +1024,19 @@ export default function TrackMap({
           </div>
         )}
 
-        <button
-          ref={coordEl}
-          className="ctt-coords"
-          title="Click to copy coordinates"
-          onClick={() =>
-            lastCoord.current &&
-            void navigator.clipboard?.writeText(lastCoord.current)
-          }
-        >
-          lat, lon
-        </button>
+        {view.coords && (
+          <button
+            ref={coordEl}
+            className="ctt-coords"
+            title="Click to copy coordinates"
+            onClick={() =>
+              lastCoord.current &&
+              void navigator.clipboard?.writeText(lastCoord.current)
+            }
+          >
+            lat, lon
+          </button>
+        )}
       </div>
 
       {opts.profile && sel && (
