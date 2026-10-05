@@ -1459,7 +1459,6 @@
   background: #2878ff;
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgb(40 120 255 / 0.35);
 }
 .ctt-sort-chip:disabled {
   opacity: 0.45;
