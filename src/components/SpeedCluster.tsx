@@ -85,6 +85,8 @@ export function Dial({
   sub = 5,
   pills = [],
   badge = false,
+  from = 0,
+  tone,
   className = '',
 }: {
   labels: string[];
@@ -97,6 +99,10 @@ export function Dial({
   sub?: number;
   pills?: Pill[];
   badge?: boolean;
+  /** fraction (0..1) the value arc starts from; 0.5 gives a centre-zero dial (e.g. climb rate) */
+  from?: number;
+  /** colours the value arc (used by centre-zero dials: up / down) */
+  tone?: 'up' | 'down';
   className?: string;
 }) {
   const uid = useId().replace(/:/g, '');
@@ -181,7 +187,12 @@ export function Dial({
       {redFrom !== undefined && (
         <path className="ctt-gt-red" d={arc(redFrom, 1, 91)} />
       )}
-      {f > 0.002 && <path className="ctt-gt-fill" d={arc(0, f, 91)} />}
+      {Math.abs(f - from) > 0.002 && (
+        <path
+          className={`ctt-gt-fill${tone ? ` ${tone}` : ''}`}
+          d={arc(Math.min(from, f), Math.max(from, f), 91)}
+        />
+      )}
       {ticks}
       {labels.map((l, i) => {
         const [x, y] = polar(START + (SWEEP * i) / n, 60);
@@ -200,7 +211,7 @@ export function Dial({
       </text>
 
       {pills.map(([cap, val], i) => {
-        const x = i === 0 ? 50 : 106;
+        const x = pills.length === 1 ? 78 : i === 0 ? 50 : 106;
         return (
           <g key={cap} className="ctt-gt-pill">
             <rect x={x} y="156" width="44" height="22" rx="8" />

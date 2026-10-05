@@ -1,85 +1,394 @@
-/* Altitude cluster: reuses the speed cluster's instrument styling (SpeedCluster.css). */
-.ctt-al-dial {
-  overflow: visible;
-}
-/* hands are turned by the component every frame (eased in JS), so no CSS transition */
-.ctt-al-hand {
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
-}
-.ctt-al-hand polygon {
-  fill: #f5f5f6;
-}
-.ctt-al-hand.is-short polygon {
-  fill: var(--c, #2878ff);
-  stroke: #f5f5f6;
-  stroke-width: 0.8;
-  stroke-linejoin: round;
-}
-/* the climb-rate needle is already eased in JS too */
-.ctt-al .ctt-gt-needle {
-  transition: none;
+@import url('https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700;800&family=Saira+Condensed:wght@500;600&display=swap');
+
+/*
+ * Altitude cluster. Rendered with the `ctt-gt ctt-alt` classes, so it inherits the panel, side wings,
+ * dial chrome (bezel, ticks, needle, pills) and trip-progress bar from SpeedCluster.css; everything
+ * below only adds or overrides what is specific to the altitude view.
+ */
+.ctt-alt {
+  /* climb = the clip's own colour (--c, same as the speedometer glow); drop = the speedometer red */
+  --alt-climb: var(--c, #2878ff);
+  --alt-drop: var(--gt-red, #ff3b30);
+  --alt-font-cap: 'Saira Condensed', 'Saira', system-ui, sans-serif;
+  font-family:
+    'Saira',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  padding: 12px 16px;
 }
 
-/* route profile with a marker riding along it */
-.ctt-al-strip {
+/* dials: same chrome as the speed cluster, slower needle, orange when the value arc goes down */
+.ctt-alt .ctt-gt-needle {
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ctt-alt .ctt-gt-fill.down {
+  stroke: var(--alt-drop);
+  filter: drop-shadow(0 0 3px var(--alt-drop));
+}
+.ctt-alt .ctt-gt-lbl {
+  font-size: 11px;
+}
+.ctt-alt .ctt-gt-bar i {
+  background: linear-gradient(90deg, var(--alt-climb), #fff);
+  box-shadow: 0 0 8px var(--alt-climb);
+}
+
+/* not enough width: drop both dials, keep the centre console */
+@container (max-width: 560px) {
+  .ctt-alt .ctt-alt-dial {
+    display: none;
+  }
+}
+
+/* dials are secondary: small side gauges so the numbers and the graph get the room */
+.ctt-alt .ctt-alt-dial {
+  flex: none;
+  height: auto;
+  width: clamp(84px, 13cqw, 118px);
+  opacity: 0.9;
+}
+
+/* centre console */
+.ctt-alt-mid {
   position: relative;
-  height: clamp(22px, 13cqh, 40px);
-  overflow: hidden;
-  border-radius: 8px;
-  border: 1px solid #2e2e31;
-  background: #101011;
+  z-index: 1;
+  flex: 1 1 0;
+  max-width: 860px;
+  min-width: 0;
+  max-height: 100%;
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(6px, 3cqh, 12px);
 }
-.ctt-al-strip svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.ctt-al-area {
-  fill: var(--c, #2878ff);
-  opacity: 0.14;
-}
-.ctt-al-done {
-  fill: var(--c, #2878ff);
-  opacity: 0.4;
-}
-.ctt-al-line {
-  fill: none;
-  stroke: var(--c, #2878ff);
-  stroke-width: 1.6;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-.ctt-al-cursor {
+.ctt-alt-mid::before {
+  content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
+  z-index: -1;
+  inset: 18% -3% 0;
+  clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%);
   background: linear-gradient(
     180deg,
-    transparent,
-    var(--c, #2878ff) 40%,
-    transparent
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0) 85%
   );
-  pointer-events: none;
 }
-.ctt-al-dot {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow:
-    0 0 0 2px var(--c, #2878ff),
-    0 0 10px var(--c, #2878ff);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
+
+/* skewed LED segments */
+.ctt-alt-seg {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 5px;
+  padding: 0 6%;
 }
-.ctt-al-hint {
+.ctt-alt-seg i {
+  position: relative;
+  height: 8px;
+  border-radius: 3px;
+  transform: skewX(-22deg);
+  background: linear-gradient(180deg, #2b2b2e, #161617);
+  border: 1px solid #36363a;
+}
+.ctt-alt-seg i::after {
+  content: '';
   position: absolute;
-  inset: 0;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--alt-climb) 40%, #fff),
+    var(--alt-climb)
+  );
+  box-shadow: 0 0 8px var(--alt-climb);
+  opacity: var(--on, 0);
+  transition: opacity 0.2s linear;
+}
+
+/* readout */
+.ctt-alt-readout {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--alt-climb),
+      transparent
+    )
+    1;
+}
+.ctt-alt-label {
+  padding-left: 0.32em;
+  color: var(--alt-climb);
+  font:
+    600 14px/1 var(--alt-font-cap);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  filter: brightness(1.15);
+}
+.ctt-alt-big {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+}
+.ctt-alt-digits {
+  display: flex;
+  font-size: clamp(44px, 24cqh, 150px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 18px rgba(255, 255, 255, 0.14);
+  transition: opacity 0.2s linear;
+}
+.ctt-alt-digits.idle {
+  opacity: 0.3;
+}
+.ctt-alt-col {
+  display: block;
+  width: 0.64em;
+  height: 1em;
+  overflow: hidden;
+}
+.ctt-alt-strip {
+  display: block;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+.ctt-alt-strip span {
+  display: block;
+  height: 1em;
+  line-height: 1;
+  text-align: center;
+}
+.ctt-alt-unit {
+  color: var(--gt-muted);
+  font-size: clamp(20px, 9cqh, 56px);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+/* climb / drop chip */
+.ctt-alt-trend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ctt-alt-trend .arrow {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 11px solid var(--alt-climb);
+}
+.ctt-alt-trend.down .arrow {
+  border-bottom: 0;
+  border-top: 11px solid var(--alt-drop);
+}
+.ctt-alt-trend .v {
+  color: var(--alt-climb);
+  font-size: 22px;
+}
+.ctt-alt-trend.down .v {
+  color: var(--alt-drop);
+}
+.ctt-alt-trend .w {
+  color: var(--gt-muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.ctt-alt-asl {
+  color: var(--gt-muted);
+  font:
+    500 11px/1 var(--alt-font-cap);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+/* altitude profile: fills whatever height is left in the console */
+.ctt-alt-graph {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 72px;
+  border: 1px solid #2c2c30;
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(40, 40, 44, 0.45),
+    rgba(10, 10, 11, 0.9)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.ctt-alt-plot {
+  position: absolute;
+  inset: 8px 6px 4px 8px;
+}
+.ctt-alt-plot svg {
+  display: block;
+  overflow: visible;
+}
+.ctt-alt-grid {
+  stroke: #fff;
+  stroke-opacity: 0.07;
+  stroke-width: 1;
+}
+.ctt-alt-tick {
+  fill: var(--gt-muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.ctt-alt-ghost {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: 0.16;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.ctt-alt-line {
+  fill: none;
+  stroke: var(--alt-climb);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px var(--alt-climb));
+}
+.ctt-alt-dot {
+  fill: var(--alt-climb);
+  stroke: #fff;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px var(--alt-climb));
+}
+.ctt-alt-pulse {
+  fill: none;
+  stroke: var(--alt-climb);
+  stroke-width: 1.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ctt-alt-pulse 1.8s ease-out infinite;
+}
+@keyframes ctt-alt-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+.ctt-alt-start {
+  stroke: var(--alt-drop);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.7;
+}
+
+/* tiles: alt. change / air pressure / air temperature */
+.ctt-alt-tiles {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.ctt-alt-tile {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid #333336;
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(50, 50, 54, 0.55),
+    rgba(16, 16, 18, 0.9)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.ctt-alt-ico {
   display: grid;
   place-items: center;
-  color: var(--gt-muted, #9a9a9f);
-  font-size: 0.85em;
-  pointer-events: none;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--alt-climb);
+  background: linear-gradient(180deg, #242427, #141415);
+  border: 1px solid #39393d;
+}
+.ctt-alt-ico svg {
+  width: 18px;
+  height: 18px;
+}
+.ctt-alt-tx {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ctt-alt-tx em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gt-muted);
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+.ctt-alt-tx b {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ctt-alt-tx b small {
+  color: var(--gt-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* short panes: shed the least important rows first */
+@container (max-height: 340px) {
+  .ctt-alt-tiles,
+  .ctt-alt-asl {
+    display: none;
+  }
+}
+@container (max-height: 190px) {
+  .ctt-alt-graph {
+    display: none;
+  }
+}
+@container (max-width: 480px) {
+  .ctt-alt-tiles {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ctt-alt-tiles .ctt-alt-tile:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctt-alt .ctt-gt-needle,
+  .ctt-alt-strip,
+  .ctt-alt-seg i::after,
+  .ctt-alt-digits {
+    transition: none;
+  }
+  .ctt-alt-pulse {
+    animation: none;
+  }
 }

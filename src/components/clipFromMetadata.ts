@@ -46,6 +46,10 @@ export type ClipMetadata = {
       max: number;
       mean?: number;
       changeStartToEnd?: number;
+      /** total climbed, from the smoothed altitude track */
+      ascentM?: number;
+      /** total descended, from the smoothed altitude track */
+      descentM?: number;
     };
     speed3dKmh?: { max: number; mean?: number };
     track: GpsPoint[];
@@ -120,6 +124,18 @@ function buildDetails(m: ClipMetadata): DetailGroup[] {
           'Altitude change',
           isNum(delta)
             ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)} m`
+            : undefined,
+        ],
+        [
+          'Ascent',
+          isNum(g.altitudeM?.ascentM)
+            ? `${g.altitudeM!.ascentM.toFixed(1)} m`
+            : undefined,
+        ],
+        [
+          'Descent',
+          isNum(g.altitudeM?.descentM)
+            ? `${g.altitudeM!.descentM.toFixed(1)} m`
             : undefined,
         ],
       ],

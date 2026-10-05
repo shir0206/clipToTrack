@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import type { Clip } from './types';
 import SvgIcon, { type IconName } from './SvgIcon';
 import SpeedCluster from './SpeedCluster';
+import AltitudeCluster from './AltitudeCluster';
 
 type Props = {
   clip: Clip;
@@ -23,7 +24,7 @@ type Props = {
 type Metric = 'alt' | 'speed';
 type Tab = Metric | 'split';
 type Side = 'left' | 'right';
-type SpeedMode = 'graph' | 'dial';
+type ViewMode = 'graph' | 'dial';
 
 const W = 1000;
 const H = 100;
@@ -37,27 +38,32 @@ const MIN_STAGE = 200; // the map always keeps at least this much
 const LABEL: Record<Metric, string> = { alt: 'Altitude', speed: 'Speed' };
 const UNIT: Record<Metric, string> = { alt: 'm', speed: 'km/h' };
 const ICON: Record<Metric, IconName> = { alt: 'mountain', speed: 'gauge' };
+/** label of the instrument-cluster view of each metric */
+const DIAL_LABEL: Record<Metric, string> = {
+  alt: 'Altimeter',
+  speed: 'Speedometer',
+};
 const otherOf = (m: Metric): Metric => (m === 'alt' ? 'speed' : 'alt');
 
-/** One metric of the selected clip: a chart (or, for speed, optionally the speedometer). */
+/** One metric of the selected clip: a chart or its instrument cluster (altimeter / speedometer). */
 function Pane({
   clip,
   metric,
   probe,
   onProbe,
-  speedMode,
+  mode,
   onPop,
 }: {
   clip: Clip;
   metric: Metric;
   probe: number | null;
   onProbe: (i: number | null) => void;
-  speedMode: SpeedMode;
+  mode: ViewMode;
   /** open this metric in its own window (absent inside the popup itself) */
   onPop?: () => void;
 }) {
   const unit = UNIT[metric];
-  const dial = metric === 'speed' && speedMode === 'dial';
+  const dial = mode === 'dial';
 
   const chart = useMemo(() => {
     const vals = clip.samples.map((p) =>
@@ -138,7 +144,11 @@ function Pane({
       )}
 
       {dial ? (
-        <SpeedCluster key={clip.id} clip={clip} probe={probe} />
+        metric === 'alt' ? (
+          <AltitudeCluster key={clip.id} clip={clip} probe={probe} />
+        ) : (
+          <SpeedCluster key={clip.id} clip={clip} probe={probe} />
+        )
       ) : chart ? (
         <div
           className="ctt-prof-plot"
@@ -219,14 +229,14 @@ function openPlotWindow(title: string): Window | null {
   return win;
 }
 
-/** One metric (chart or speedometer) of the selected clip in its own window. Hovering it drives the map too. */
+/** One metric (chart or instrument cluster) of the selected clip in its own window. Hovering it drives the map too. */
 function PlotWindow({
   win,
   clip,
   metric,
   probe,
   onProbe,
-  speedMode,
+  mode,
   onClose,
 }: {
   win: Window;
@@ -234,7 +244,7 @@ function PlotWindow({
   metric: Metric;
   probe: number | null;
   onProbe: (i: number | null) => void;
-  speedMode: SpeedMode;
+  mode: ViewMode;
   onClose: () => void;
 }) {
   const [root] = useState(() => win.document.getElementById(PLOT_ROOT));
@@ -281,7 +291,7 @@ function PlotWindow({
             metric={metric}
             probe={probe}
             onProbe={onProbe}
-            speedMode={speedMode}
+            mode={mode}
           />
         </div>
       </div>
@@ -294,7 +304,7 @@ function PlotWindow({
  * Altitude / speed dock of the selected clip. Hovering a chart moves a marker on the map.
  * - Drag a tab onto the other tab (or onto the left / right half of the dock) to open them side by side in a new tab.
  * - The side-by-side tab has an × to cancel it.
- * - Speed can be shown as a graph or as the GT speedometer.
+ * - Altitude and speed can each be shown as a graph or as an instrument cluster (altimeter / GT speedometer).
  * - Each metric has a button to open it in its own window (no toolbar); both can be open at once.
  */
 export default function ElevationProfile({
@@ -306,7 +316,10 @@ export default function ElevationProfile({
   const [tab, setTab] = useState<Tab>('alt');
   const [single, setSingle] = useState<Metric>('alt'); // where "cancel" returns to
   const [split, setSplit] = useState<[Metric, Metric] | null>(null); // [left, right]
-  const [speedMode, setSpeedMode] = useState<SpeedMode>('graph');
+  const [modes, setModes] = useState<Record<Metric, ViewMode>>({
+    alt: 'graph',
+    speed: 'graph',
+  });
 
   // pop-out windows, one per metric
   const [wins, setWins] = useState<Partial<Record<Metric, Window>>>({});
@@ -485,25 +498,27 @@ export default function ElevationProfile({
           ) : null}
         </div>
 
-        {metrics.includes('speed') && (
+        {metrics.map((m) => (
           <div
+            key={m}
             className="ctt-prof-tabs ctt-prof-view"
             role="group"
-            aria-label="Speed view"
+            aria-label={`${LABEL[m]} view`}
           >
-            {(['graph', 'dial'] as const).map((m) => (
+            {metrics.length > 1 && <SvgIcon name={ICON[m]} size={13} />}
+            {(['graph', 'dial'] as const).map((v) => (
               <button
-                key={m}
-                className={`ctt-chip${speedMode === m ? ' is-on' : ''}`}
-                aria-pressed={speedMode === m}
-                onClick={() => setSpeedMode(m)}
+                key={v}
+                className={`ctt-chip${modes[m] === v ? ' is-on' : ''}`}
+                aria-pressed={modes[m] === v}
+                onClick={() => setModes((s) => ({ ...s, [m]: v }))}
               >
-                <SvgIcon name={m === 'graph' ? 'chart' : 'dial'} size={13} />
-                {m === 'graph' ? 'Graph' : 'Speedometer'}
+                <SvgIcon name={v === 'graph' ? 'chart' : 'dial'} size={13} />
+                {v === 'graph' ? 'Graph' : DIAL_LABEL[m]}
               </button>
             ))}
           </div>
-        )}
+        ))}
 
         <button
           className="ctt-btn"
@@ -522,7 +537,7 @@ export default function ElevationProfile({
             metric={m}
             probe={probe}
             onProbe={onProbe}
-            speedMode={speedMode}
+            mode={modes[m]}
             onPop={() => pop(m)}
           />
         ))}
@@ -561,7 +576,7 @@ export default function ElevationProfile({
             metric={m}
             probe={probe}
             onProbe={onProbe}
-            speedMode={speedMode}
+            mode={modes[m]}
             onClose={() => popClosed(m)}
           />
         ) : null;
