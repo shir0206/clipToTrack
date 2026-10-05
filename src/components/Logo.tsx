@@ -14,73 +14,109 @@ export default function Logo({ size = 36, wordmark = true, tagline }: Props) {
       <svg
         width={size}
         height={size}
-        viewBox="0 0 512 512"
+        viewBox="0 0 383.92859 372.18396"
         fill="none"
         version="1.1"
         id="svg9"
       >
-        <defs id="defs1">
+        <defs>
           <clipPath id="playClip">
             <path
-              d="           M106 82           C106 55 136 38 160 52           L407 193           C433 208 433 246 407 261           L160 402           C136 416 106 399 106 372           Z         "
+              d="m 106,82 c 0,-27 30,-44 54,-30 l 247,141 c 26,15 26,53 0,68 L 160,402 c -24,14 -54,-3 -54,-30 z"
               id="path1"
             />
           </clipPath>
         </defs>
-        <g clip-path="url(#playClip)" id="g2">
-          <rect width="512" height="512" fill="#2468F2" id="rect1" />
+        <g
+          clipPath="url(#playClip)"
+          id="g2"
+          transform="translate(-87.173325,-34.832696)"
+        >
+          <rect
+            width="512"
+            height="512"
+            fill="#2468f2"
+            id="rect1"
+            x="0"
+            y="0"
+          />
           <path
-            d="         M80 355         C132 294 161 226 208 227         C260 228 284 261 337 241         C375 227 406 192 455 200         L512 512         L0 512         Z       "
-            fill="#F5388A"
+            d="m 80,355 c 52,-61 81,-129 128,-128 52,1 76,34 129,14 38,-14 69,-49 118,-41 l 57,312 H 0 Z"
+            fill="#f5388a"
             id="path2"
           />
         </g>
         <path
-          d="m 134.61099,315.11577 c 9.48146,-32.42532 26.33736,-61.3452 53.72821,-93.77052 38.97929,11.39268 79.01207,22.78536 120.09835,17.52721 41.08627,-5.25817 74.7981,-22.78536 100.08196,-47.32344"
+          d="m 47.437665,280.28308 c 9.48146,-32.42532 26.33736,-61.3452 53.728215,-93.77052 38.97929,11.39268 79.01207,22.78536 120.09835,17.52721 41.08627,-5.25817 74.7981,-22.78536 100.08196,-47.32344"
           stroke="#ffffff"
-          stroke-width="23.0605"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+          strokeWidth="23.0605"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           id="path3"
         />
-        <circle cx="134" cy="306" r="34" fill="white" id="circle3" />
-        <circle cx="134" cy="306" r="17" fill="#2468F2" id="circle4" />
-        <circle
-          cx="190.94412"
-          cy="217.37276"
-          r="28"
+        <ellipse
+          cx="46.826675"
+          cy="271.1673"
+          fill="#ffffff"
+          id="circle3"
+          rx="46.826675"
+          ry="45.401489"
+          style={{ strokeWidth: 1.35613 }}
+        />
+        <ellipse
+          cx="46.826675"
+          cy="271.1673"
+          fill="#2468f2"
+          id="circle4"
+          rx="23.413338"
+          ry="22.700745"
+          style={{ strokeWidth: 1.35613 }}
+        />
+        <ellipse
+          cx="99.210205"
+          cy="175.98419"
           fill="#ffffff"
           id="circle5"
+          rx="36.266079"
+          ry="37.121189"
+          style={{ strokeWidth: 1.3104 }}
         />
-        <circle
-          cx="190.94412"
-          cy="217.37276"
-          r="13"
+        <ellipse
+          cx="99.210205"
+          cy="175.98419"
           fill="#2468f2"
           id="circle6"
+          rx="16.837822"
+          ry="17.234838"
+          style={{ strokeWidth: 1.3104 }}
         />
-        <circle
-          cx="405.02487"
-          cy="199.58403"
-          r="24"
+        <ellipse
+          cx="318.4754"
+          cy="161.94391"
           fill="#ffffff"
           id="circle7"
+          rx="45.668476"
+          ry="45.491039"
+          style={{ strokeWidth: 1.89915 }}
         />
-        <circle
-          cx="405.02487"
-          cy="199.58403"
-          r="10"
+        <ellipse
+          cx="318.4754"
+          cy="162.79555"
           fill="#2468f2"
           id="circle8"
+          rx="19.028534"
+          ry="19.806234"
+          style={{ strokeWidth: 1.94134 }}
         />
         <path
-          d="m 406.80751,23.298123 c -37,0 -66,29 -66,66 0,47.999997 66,99.999997 66,99.999997 0,0 66,-52 66,-99.999997 0,-37 -29,-66 -66,-66 z"
+          d="m 319.28162,0 c -36.24148,0 -64.64697,27.58176 -64.64697,62.772281 0,45.652569 64.64697,95.109519 64.64697,95.109519 0,0 64.64697,-49.45695 64.64697,-95.109519 C 383.92859,27.58176 355.5231,0 319.28162,0 Z"
           fill="#ff7a1a"
           id="path8"
+          style={{ strokeWidth: 0.965193 }}
         />
         <circle
-          cx="406.80753"
-          cy="89.298119"
+          cx="320.18365"
+          cy="61.940891"
           r="22"
           fill="#ffffff"
           id="circle9"
@@ -90,9 +126,9 @@ export default function Logo({ size = 36, wordmark = true, tagline }: Props) {
       {wordmark && (
         <div className="ctt-brand-text">
           <span className="ctt-logo">
-            <b>clip</b>
+            <b>Clip</b>
             <i>to</i>
-            <b style={{ color: ROUTE_COLORS[0] }}>track</b>
+            <b style={{ color: ROUTE_COLORS[0] }}>Track</b>
           </span>
           {tagline && <span className="ctt-tagline">{tagline}</span>}
         </div>
