@@ -2,9 +2,12 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Clip } from './types';
 import SvgIcon, { type IconName } from './SvgIcon';
 import { watchPicture } from './videoSupport';
+import { CLIP_MIME } from './projects';
 
 type Props = {
   clip: Clip;
+  /** town / city of the clip's start, shown after the file name once looked up */
+  place?: string;
   selected: boolean;
   playing: boolean;
   /** true while this clip plays in the large player (popup / modal); only drives the visuals */
@@ -20,6 +23,9 @@ type Props = {
   onProgress: (frac: number | null) => void;
   /** removes the clip from the map and from localStorage */
   onDelete: () => void;
+  /** the card can be dragged onto a project (see ProjectBar) */
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 };
 
 const UNPLAYABLE =
@@ -27,6 +33,7 @@ const UNPLAYABLE =
 
 export default function ClipCard({
   clip,
+  place,
   selected,
   playing,
   nowPlaying = false,
@@ -39,6 +46,8 @@ export default function ClipCard({
   onToggleHidden,
   onProgress,
   onDelete,
+  onDragStart,
+  onDragEnd,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
   const stop = (fn: () => void) => (e: React.MouseEvent) => {
@@ -124,10 +133,18 @@ export default function ClipCard({
       role="option"
       aria-selected={selected}
       tabIndex={0}
-      aria-label={`Select track ${clip.index} ${clip.title}`}
+      aria-label={`Select track ${clip.index} ${clip.title}${place ? ` - ${place}` : ''}`}
       className={`ctt-card${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
       style={{ '--c': clip.color } as CSSProperties}
       onClick={onSelect}
+      draggable={!!onDragStart}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(CLIP_MIME, clip.id);
+        e.dataTransfer.setData('text/plain', clip.title);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.();
+      }}
+      onDragEnd={() => onDragEnd?.()}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return; // let the inner buttons handle their own keys
         if (e.key === 'Enter' || e.key === ' ') {
@@ -185,22 +202,41 @@ export default function ClipCard({
 
       <div className="ctt-card-body">
         <div className="ctt-card-head">
-          <span className="ctt-badge">{clip.index}</span>
-          <div>
-            <div className="ctt-title-row">
-              <h3>{clip.title}</h3>
-              {active && (
-                <span className="ctt-playing" role="status">
-                  <span className="ctt-eq" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  Playing
-                </span>
-              )}
+          <div className="ctt-card-head-container">
+            <div className="ctt-phead-title">
+              <div className="ctt-title-row">
+                <span className="ctt-badge" />
+                <h3>{clip.title}</h3>
+              </div>
+              <button
+                className="ctt-btn ctt-btn-spacer"
+                aria-label={`${hidden ? 'Show' : 'Hide'} ${clip.title} on map`}
+                aria-pressed={hidden}
+                title={hidden ? 'Show on map' : 'Hide on map'}
+                onClick={stop(onToggleHidden)}
+              >
+                <SvgIcon name={hidden ? 'eyeOff' : 'eye'} size={15} />
+              </button>
+              <button
+                className="ctt-btn"
+                aria-label={`Delete ${clip.title}`}
+                title="Delete clip"
+                aria-expanded={confirming}
+                onClick={stop(() => setConfirming((c) => !c))}
+              >
+                <SvgIcon name="trash" size={14} />
+              </button>
             </div>
-            <p>{clip.date}</p>
+            {place && (
+              <p className="ctt-meta">
+                <SvgIcon name="mapPin" size={14} />
+                {place}
+              </p>
+            )}
+            <p className="ctt-meta">
+              <SvgIcon name="calendar" size={12} />
+              {clip.date}
+            </p>
             <p className="ctt-meta">
               <SvgIcon name="camera" size={12} />
               {clip.camera}
@@ -209,52 +245,46 @@ export default function ClipCard({
         </div>
 
         <div className="ctt-controls">
-          <button
-            className="ctt-btn ctt-btn-primary"
-            aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`}
-            disabled={!canPlay}
-            onClick={stop(handleToggle)}
-          >
-            <SvgIcon name={playing ? 'pause' : 'play'} size={14} />
-          </button>
-          <button
-            className="ctt-btn"
-            aria-label={`Stop ${clip.title}`}
-            disabled={!canPlay}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleStop();
-            }}
-          >
-            <SvgIcon name="stop" size={13} />
-          </button>
-          <button
-            className="ctt-btn"
-            aria-label={`Maximize ${clip.title}`}
-            title="Open larger"
-            disabled={!canPlay}
-            onClick={stop(onMaximize)}
-          >
-            <SvgIcon name="maximize" size={14} />
-          </button>
-          <button
-            className="ctt-btn ctt-btn-spacer"
-            aria-label={`${hidden ? 'Show' : 'Hide'} ${clip.title} on map`}
-            aria-pressed={hidden}
-            title={hidden ? 'Show on map' : 'Hide on map'}
-            onClick={stop(onToggleHidden)}
-          >
-            <SvgIcon name={hidden ? 'eyeOff' : 'eye'} size={15} />
-          </button>
-          <button
-            className="ctt-btn"
-            aria-label={`Delete ${clip.title}`}
-            title="Delete clip"
-            aria-expanded={confirming}
-            onClick={stop(() => setConfirming((c) => !c))}
-          >
-            <SvgIcon name="trash" size={14} />
-          </button>
+          <div className="ctt-controls-btns">
+            <button
+              className="ctt-btn ctt-btn-primary"
+              aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`}
+              disabled={!canPlay}
+              onClick={stop(handleToggle)}
+            >
+              <SvgIcon name={playing ? 'pause' : 'play'} size={14} />
+            </button>
+            <button
+              className="ctt-btn"
+              aria-label={`Stop ${clip.title}`}
+              disabled={!canPlay}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStop();
+              }}
+            >
+              <SvgIcon name="stop" size={13} />
+            </button>
+            <button
+              className="ctt-btn"
+              aria-label={`Maximize ${clip.title}`}
+              title="Open larger"
+              disabled={!canPlay}
+              onClick={stop(onMaximize)}
+            >
+              <SvgIcon name="maximize" size={14} />
+            </button>
+          </div>
+          {active && (
+            <span className="ctt-playing" role="status">
+              <span className="ctt-eq" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              Playing
+            </span>
+          )}
         </div>
         {confirming && (
           <div

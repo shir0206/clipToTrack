@@ -199,9 +199,12 @@
   font-weight: 600;
 }
 .ctt-card-head p {
-  margin: 2px 0 0;
+  margin: 4px 0;
   font-size: 12px;
-  color: var(--muted);
+  color: black;
+}
+.ctt-card-head-container {
+  width: 100%;
 }
 .ctt-quality {
   grid-column: 1 / -1;
@@ -213,12 +216,12 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--c);
   color: #fff;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 700;
 }
 .ctt-controls {
@@ -1456,7 +1459,6 @@
   background: #2878ff;
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgb(40 120 255 / 0.35);
 }
 .ctt-sort-chip:disabled {
   opacity: 0.45;
@@ -1552,6 +1554,7 @@
   flex-wrap: wrap;
   gap: 4px 10px;
   min-width: 0;
+  margin-bottom: 8px;
 }
 
 .ctt-thumb.is-playable {
@@ -1651,4 +1654,64 @@
 }
 .ctt-controls {
   flex-wrap: wrap; /* the buttons wrap instead of overflowing when the text column is narrow */
+}
+
+/* ───────── card: place under the file name, date with its icon ───────── */
+.ctt-meta > .ctt-icon {
+  flex: none;
+}
+.ctt-card-head p.ctt-place {
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+/* ───────── altitude / speed pop-out windows ───────── */
+.ctt-prof-pane {
+  position: relative;
+}
+.ctt-pane-pop {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+/* the speedometer has no pane header, so its button floats in the corner */
+.ctt-prof-pane.is-dial .ctt-pane-pop {
+  position: absolute;
+  top: 4px;
+  right: 16px;
+  z-index: 2;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+/* inside the popup the dock fills the whole window and has no toolbar */
+.ctt-pop {
+  background: var(--card);
+}
+.ctt-pop .ctt-prof {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  border-top: 0;
+}
+.ctt-pop .ctt-prof-pane {
+  padding-top: 12px;
+}
+
+/* Settings → hide individual MapLibre controls (each control sits in its own .maplibregl-ctrl-group) */
+.ctt-mapcol.hide-zoom .maplibregl-ctrl-group:has(.maplibregl-ctrl-zoom-in),
+.ctt-mapcol.hide-gps .maplibregl-ctrl-group:has(.maplibregl-ctrl-geolocate),
+.ctt-mapcol.hide-terrain .maplibregl-ctrl-group:has(.maplibregl-ctrl-terrain),
+.ctt-mapcol.hide-scale .maplibregl-ctrl-scale {
+  display: none;
+}
+
+/* large player without the native toolbar: click toggles play / pause */
+.ctt-modal-box {
+  outline: none;
+}
+.ctt-modal-video {
+  cursor: pointer;
 }

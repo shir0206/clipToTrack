@@ -122,131 +122,126 @@ export function useClips() {
     [],
   );
 
-  /** Accepts GoPro .mp4 files (telemetry is extracted) or metadata .json. Resolves to the first added clip id. */
-  const addFiles = useCallback(
-    async (files: File[]): Promise<string | undefined> => {
-      setBusy(true);
-      const added: (Omit<Entry, 'slot'> & { id: string })[] = [];
-      const errors: string[] = [];
-      // clips without any GPS fix (tunnel…): placed afterwards, between the clips that do have one
-      const unlocated: {
-        file: File;
-        err: NoGpsFixError;
-        videoUrl: string;
-        thumbnail?: string;
-      }[] = [];
-      const asVideoUrl = (f: File) =>
-        URL.createObjectURL(f.type ? f : new Blob([f], { type: 'video/mp4' }));
+  /** Accepts GoPro .mp4 files (telemetry is extracted) or metadata .json. Resolves to the ids of every clip added (upload order). */
+  const addFiles = useCallback(async (files: File[]): Promise<string[]> => {
+    setBusy(true);
+    const added: (Omit<Entry, 'slot'> & { id: string })[] = [];
+    const errors: string[] = [];
+    // clips without any GPS fix (tunnel…): placed afterwards, between the clips that do have one
+    const unlocated: {
+      file: File;
+      err: NoGpsFixError;
+      videoUrl: string;
+      thumbnail?: string;
+    }[] = [];
+    const asVideoUrl = (f: File) =>
+      URL.createObjectURL(f.type ? f : new Blob([f], { type: 'video/mp4' }));
 
-      for (let n = 0; n < files.length; n++) {
-        const file = files[n];
-        const base = { name: file.name, n: n + 1, of: files.length };
-        setProgress({ ...base, phase: 'index', frac: null });
-        try {
-          if (/\.json$/i.test(file.name)) {
-            const metadata = compact(JSON.parse(await file.text()));
-            added.push({
-              metadata,
-              id: clipFromMetadata(metadata).id,
-              addedAt: Date.now(),
-            });
-          } else {
-            const metadata = compact(
-              await extractGoProMetadata(file, (p) =>
-                setProgress({
-                  ...base,
-                  phase: p.phase,
-                  frac:
-                    p.phase === 'telemetry' && p.total
-                      ? p.done / p.total
-                      : null,
-                }),
-              ),
-            );
-            const id = clipFromMetadata(metadata).id; // validates too
-            // .lrv has no MIME type; label it so <video> doesn't have to guess (wrapping a File in a Blob copies nothing)
-            const videoUrl = asVideoUrl(file);
-            setProgress({ ...base, phase: 'thumbnail', frac: null });
-            const thumbnail = await captureThumbnail(videoUrl);
-            added.push({
-              metadata,
-              thumbnail,
-              videoUrl,
-              id,
-              addedAt: Date.now(),
-            });
-          }
-        } catch (e) {
-          if (e instanceof NoGpsFixError) {
-            const videoUrl = asVideoUrl(file);
-            setProgress({ ...base, phase: 'thumbnail', frac: null });
-            const thumbnail = await captureThumbnail(videoUrl).catch(
-              () => undefined,
-            );
-            unlocated.push({ file, err: e, videoUrl, thumbnail });
-          } else errors.push(`${file.name}: ${message(e)}`);
-        }
-      }
-
-      // tunnel clips: interpolate between the real-fix clips just before / after them
-      for (const u of unlocated) {
-        const { startMs, endMs, place } = u.err.info;
-        const metas = [
-          ...entriesRef.current.map((e) => e.metadata),
-          ...added.map((a) => a.metadata),
-        ];
-        const { prev, next } =
-          startMs !== undefined && endMs !== undefined
-            ? pickAnchors(metas, startMs, endMs)
-            : {};
-        if (!prev && !next && !u.err.info.canPlaceAlone) {
-          errors.push(`${u.file.name}: ${u.err.message}`);
-          URL.revokeObjectURL(u.videoUrl);
-          continue;
-        }
-        const metadata = compact(place(prev, next));
-        added.push({
-          metadata,
-          thumbnail: u.thumbnail,
-          videoUrl: u.videoUrl,
-          id: clipFromMetadata(metadata).id,
-          addedAt: Date.now(),
-        });
-      }
-
-      setError(errors.length ? errors.join(' · ') : null);
-      if (added.length)
-        setEntries((prev) => {
-          // same id (file name + GPS start) replaces in place; keep an existing video/thumbnail if the new one has none
-          const byId = new Map(
-            prev.map((e) => [clipFromMetadata(e.metadata).id, e]),
+    for (let n = 0; n < files.length; n++) {
+      const file = files[n];
+      const base = { name: file.name, n: n + 1, of: files.length };
+      setProgress({ ...base, phase: 'index', frac: null });
+      try {
+        if (/\.json$/i.test(file.name)) {
+          const metadata = compact(JSON.parse(await file.text()));
+          added.push({
+            metadata,
+            id: clipFromMetadata(metadata).id,
+            addedAt: Date.now(),
+          });
+        } else {
+          const metadata = compact(
+            await extractGoProMetadata(file, (p) =>
+              setProgress({
+                ...base,
+                phase: p.phase,
+                frac:
+                  p.phase === 'telemetry' && p.total ? p.done / p.total : null,
+              }),
+            ),
           );
-          // a new clip takes the lowest colour slot nobody is using; a re-added clip keeps its own
-          const used = new Set(prev.map((e) => e.slot));
-          const freeSlot = () => {
-            let n = 1;
-            while (used.has(n)) n++;
-            used.add(n);
-            return n;
-          };
-          for (const { id, ...next } of added) {
-            const old = byId.get(id);
-            byId.set(id, {
-              metadata: next.metadata,
-              thumbnail: next.thumbnail ?? old?.thumbnail,
-              videoUrl: next.videoUrl ?? old?.videoUrl,
-              addedAt: next.addedAt,
-              slot: old?.slot ?? freeSlot(),
-            });
-          }
-          return [...byId.values()];
-        });
-      setProgress(null);
-      setBusy(false);
-      return added[0]?.id;
-    },
-    [],
-  );
+          const id = clipFromMetadata(metadata).id; // validates too
+          // .lrv has no MIME type; label it so <video> doesn't have to guess (wrapping a File in a Blob copies nothing)
+          const videoUrl = asVideoUrl(file);
+          setProgress({ ...base, phase: 'thumbnail', frac: null });
+          const thumbnail = await captureThumbnail(videoUrl);
+          added.push({
+            metadata,
+            thumbnail,
+            videoUrl,
+            id,
+            addedAt: Date.now(),
+          });
+        }
+      } catch (e) {
+        if (e instanceof NoGpsFixError) {
+          const videoUrl = asVideoUrl(file);
+          setProgress({ ...base, phase: 'thumbnail', frac: null });
+          const thumbnail = await captureThumbnail(videoUrl).catch(
+            () => undefined,
+          );
+          unlocated.push({ file, err: e, videoUrl, thumbnail });
+        } else errors.push(`${file.name}: ${message(e)}`);
+      }
+    }
+
+    // tunnel clips: interpolate between the real-fix clips just before / after them
+    for (const u of unlocated) {
+      const { startMs, endMs, place } = u.err.info;
+      const metas = [
+        ...entriesRef.current.map((e) => e.metadata),
+        ...added.map((a) => a.metadata),
+      ];
+      const { prev, next } =
+        startMs !== undefined && endMs !== undefined
+          ? pickAnchors(metas, startMs, endMs)
+          : {};
+      if (!prev && !next && !u.err.info.canPlaceAlone) {
+        errors.push(`${u.file.name}: ${u.err.message}`);
+        URL.revokeObjectURL(u.videoUrl);
+        continue;
+      }
+      const metadata = compact(place(prev, next));
+      added.push({
+        metadata,
+        thumbnail: u.thumbnail,
+        videoUrl: u.videoUrl,
+        id: clipFromMetadata(metadata).id,
+        addedAt: Date.now(),
+      });
+    }
+
+    setError(errors.length ? errors.join(' · ') : null);
+    if (added.length)
+      setEntries((prev) => {
+        // same id (file name + GPS start) replaces in place; keep an existing video/thumbnail if the new one has none
+        const byId = new Map(
+          prev.map((e) => [clipFromMetadata(e.metadata).id, e]),
+        );
+        // a new clip takes the lowest colour slot nobody is using; a re-added clip keeps its own
+        const used = new Set(prev.map((e) => e.slot));
+        const freeSlot = () => {
+          let n = 1;
+          while (used.has(n)) n++;
+          used.add(n);
+          return n;
+        };
+        for (const { id, ...next } of added) {
+          const old = byId.get(id);
+          byId.set(id, {
+            metadata: next.metadata,
+            thumbnail: next.thumbnail ?? old?.thumbnail,
+            videoUrl: next.videoUrl ?? old?.videoUrl,
+            addedAt: next.addedAt,
+            slot: old?.slot ?? freeSlot(),
+          });
+        }
+        return [...byId.values()];
+      });
+    setProgress(null);
+    setBusy(false);
+    return added.map((a) => a.id);
+  }, []);
 
   /** Removes one clip from state and (via the persist effect) from localStorage; its object URL is revoked too. */
   const remove = useCallback((id: string) => {

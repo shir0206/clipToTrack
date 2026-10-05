@@ -1,0 +1,1431 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      html {
+        scroll-padding-top: env(safe-area-inset-top, 0px);
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font:
+          14px -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        background: #faf9f5;
+        color: #141413;
+      }
+      img {
+        max-width: 100%;
+      }
+      [hidden]:not([hidden='until-found' i]) {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <title>Altitude Cluster</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700;800&family=Saira+Condensed:wght@500;600&display=swap"
+    />
+    <style>
+      /* Layout: one dark instrument cluster. Climb-rate dial left, big rolling altitude + profile graph in the centre, elevation dial right. Dials drop away on narrow widths. */
+      :root {
+        --bg: #050506;
+        --panel: #141415;
+        --edge: #2a2a2d;
+        --track: #232326;
+        --ink: #f2f2f3;
+        --muted: #9a9a9f;
+        --climb: #4ade9a;
+        --drop: #ff7a3d;
+        --warn: #ff3b30;
+        --font-ui: 'Saira', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        --font-cap: 'Saira Condensed', 'Saira', system-ui, sans-serif;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-ui);
+        padding-inline: 16px;
+        padding-block: 20px 28px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      .wrap {
+        width: 100%;
+        max-width: 1040px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px 18px;
+      }
+      .head h1 {
+        margin: 0;
+        font: 600 13px/1 var(--font-cap);
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .head p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .head p b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      /* ---------- cluster ---------- */
+      .alt {
+        position: relative;
+        container-type: inline-size;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(8px, 2cqw, 28px);
+        padding: 22px 18px 20px;
+        overflow: hidden;
+        border-radius: 18px;
+        border: 1px solid #1c1c1e;
+        background:
+          radial-gradient(
+            70% 90% at 50% 0%,
+            rgba(255, 255, 255, 0.06),
+            transparent 70%
+          ),
+          linear-gradient(180deg, #101011, #050506);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 24px 60px rgba(0, 0, 0, 0.5);
+      }
+      .alt > * {
+        position: relative;
+        z-index: 1;
+      }
+      .alt::before,
+      .alt::after {
+        content: '';
+        position: absolute;
+        top: 10%;
+        bottom: 10%;
+        width: 32%;
+        z-index: 0;
+        pointer-events: none;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: linear-gradient(
+          180deg,
+          rgba(30, 30, 32, 0.7),
+          rgba(8, 8, 9, 0.2)
+        );
+      }
+      .alt::before {
+        left: -6%;
+        border-left: 0;
+        border-radius: 0 60% 60% 0 / 0 50% 50% 0;
+      }
+      .alt::after {
+        right: -6%;
+        border-right: 0;
+        border-radius: 60% 0 0 60% / 50% 0 0 50%;
+      }
+
+      @container (max-width: 700px) {
+        .dial {
+          display: none;
+        }
+      }
+
+      /* dials */
+      .dial {
+        flex: 0 1 190px;
+        width: 190px;
+        min-width: 0;
+        aspect-ratio: 1;
+        filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.65));
+      }
+      .dial .bezel {
+        fill: none;
+        stroke-width: 2.5;
+      }
+      .dial .face {
+        stroke: #050506;
+        stroke-width: 1;
+      }
+      .dial .track,
+      .dial .fill {
+        fill: none;
+        stroke-width: 4;
+        stroke-linecap: round;
+      }
+      .dial .track {
+        stroke: var(--track);
+      }
+      .dial .fill {
+        stroke: var(--climb);
+        filter: drop-shadow(0 0 3px var(--climb));
+      }
+      .dial .fill.neg {
+        stroke: var(--drop);
+        filter: drop-shadow(0 0 3px var(--drop));
+      }
+      .dial line.maj {
+        stroke: var(--ink);
+        stroke-width: 1.5;
+      }
+      .dial line.min {
+        stroke: #bdbdc2;
+        stroke-width: 0.8;
+        opacity: 0.65;
+      }
+      .dial .lbl {
+        fill: var(--ink);
+        font: 600 11px var(--font-ui);
+        text-anchor: middle;
+        dominant-baseline: central;
+        font-variant-numeric: tabular-nums;
+      }
+      .dial .cap,
+      .dial .unit {
+        fill: var(--muted);
+        text-anchor: middle;
+        font-weight: 500;
+      }
+      .dial .cap {
+        font-size: 7px;
+        letter-spacing: 0.14em;
+      }
+      .dial .unit {
+        font-size: 8px;
+      }
+      .dial .pill rect {
+        fill: rgba(14, 14, 15, 0.92);
+        stroke: #343437;
+        stroke-width: 0.8;
+      }
+      .dial .pill .pc {
+        fill: var(--muted);
+        font-size: 5px;
+        letter-spacing: 0.12em;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }
+      .dial .pill .pv {
+        fill: var(--ink);
+        font: 600 9px var(--font-ui);
+        text-anchor: middle;
+        dominant-baseline: central;
+        font-variant-numeric: tabular-nums;
+      }
+      .needle {
+        transform-box: view-box;
+        transform-origin: 50% 50%;
+        transform: rotate(calc(135deg + var(--f, 0) * 270deg));
+        transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+      }
+      .needle polygon {
+        fill: #f5f5f6;
+      }
+      .hub {
+        stroke: #d0d0d4;
+        stroke-width: 1;
+      }
+      .hub-dot {
+        fill: #242426;
+      }
+
+      /* centre console */
+      .mid {
+        flex: 1 1 380px;
+        max-width: 520px;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .mid::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        inset: 18% -3% 0;
+        clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.055),
+          rgba(255, 255, 255, 0) 85%
+        );
+      }
+      .seg {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 5px;
+        padding: 0 6%;
+      }
+      .seg i {
+        position: relative;
+        height: 8px;
+        border-radius: 3px;
+        transform: skewX(-22deg);
+        background: linear-gradient(180deg, #2b2b2e, #161617);
+        border: 1px solid #36363a;
+      }
+      .seg i::after {
+        content: '';
+        position: absolute;
+        inset: -1px;
+        border-radius: inherit;
+        background: linear-gradient(180deg, #b9ffe0, var(--climb));
+        box-shadow: 0 0 8px var(--climb);
+        opacity: var(--on, 0);
+        transition: opacity 0.2s linear;
+      }
+
+      .readout {
+        display: grid;
+        justify-items: center;
+        gap: 4px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid transparent;
+        border-image: linear-gradient(
+            90deg,
+            transparent,
+            var(--climb),
+            transparent
+          )
+          1;
+      }
+      .label {
+        font: 600 14px/1 var(--font-cap);
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: var(--climb);
+        filter: brightness(1.15);
+        padding-left: 0.32em;
+      }
+      .big {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 10px;
+      }
+      .digits {
+        display: flex;
+        font-size: clamp(64px, 20cqw, 112px);
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 2px 18px rgba(255, 255, 255, 0.14);
+      }
+      .col {
+        display: block;
+        width: 0.64em;
+        height: 1em;
+        overflow: hidden;
+      }
+      .strip {
+        display: block;
+        transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+        will-change: transform;
+      }
+      .strip span {
+        display: block;
+        height: 1em;
+        line-height: 1;
+        text-align: center;
+      }
+      .unit-m {
+        font-size: clamp(26px, 8cqw, 44px);
+        font-weight: 600;
+        color: var(--muted);
+        line-height: 1.15;
+      }
+      .trend {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        min-height: 22px;
+      }
+      .trend .arrow {
+        width: 0;
+        height: 0;
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
+        border-bottom: 11px solid var(--climb);
+      }
+      .trend.down .arrow {
+        border-bottom: 0;
+        border-top: 11px solid var(--drop);
+      }
+      .trend .v {
+        color: var(--climb);
+        font-size: 18px;
+      }
+      .trend.down .v {
+        color: var(--drop);
+      }
+      .trend .w {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+      }
+      .asl {
+        font: 500 11px/1 var(--font-cap);
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      /* graph */
+      .graph {
+        border: 1px solid #2c2c30;
+        border-radius: 12px;
+        background: linear-gradient(
+          180deg,
+          rgba(40, 40, 44, 0.45),
+          rgba(10, 10, 11, 0.9)
+        );
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        padding: 8px 6px 4px 8px;
+      }
+      .graph svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .g-grid {
+        stroke: #ffffff;
+        stroke-opacity: 0.07;
+        stroke-width: 1;
+      }
+      .g-tick {
+        fill: var(--muted);
+        font: 500 12px var(--font-ui);
+        font-variant-numeric: tabular-nums;
+      }
+      .g-ghost {
+        fill: none;
+        stroke: #ffffff;
+        stroke-opacity: 0.16;
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+      }
+      .g-line {
+        fill: none;
+        stroke: var(--climb);
+        stroke-width: 2.2;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+        filter: drop-shadow(0 0 4px rgba(74, 222, 154, 0.6));
+      }
+      .g-dot {
+        fill: var(--climb);
+        stroke: #eafff5;
+        stroke-width: 2;
+        filter: drop-shadow(0 0 6px var(--climb));
+      }
+      .g-pulse {
+        fill: none;
+        stroke: var(--climb);
+        stroke-width: 1.5;
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: pulse 1.8s ease-out infinite;
+      }
+      @keyframes pulse {
+        from {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        to {
+          transform: scale(3.4);
+          opacity: 0;
+        }
+      }
+      .g-start {
+        stroke: var(--drop);
+        stroke-width: 1;
+        stroke-dasharray: 3 4;
+        opacity: 0.7;
+      }
+      .g-start-t {
+        fill: var(--drop);
+        font: 600 10px var(--font-ui);
+        letter-spacing: 0.1em;
+      }
+
+      /* tiles */
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .tile {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 10px 6px 6px;
+        border: 1px solid #333336;
+        border-radius: 12px;
+        background: linear-gradient(
+          180deg,
+          rgba(50, 50, 54, 0.55),
+          rgba(16, 16, 18, 0.9)
+        );
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+        min-width: 0;
+      }
+      .ico {
+        display: grid;
+        place-items: center;
+        flex: none;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        color: var(--climb);
+        background: linear-gradient(180deg, #242427, #141415);
+        border: 1px solid #39393d;
+      }
+      .ico svg {
+        width: 18px;
+        height: 18px;
+      }
+      .tx {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .tx em {
+        font-style: normal;
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      .tx b {
+        font-size: 15px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .tx b small {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--muted);
+      }
+
+      .bar {
+        height: 6px;
+        border-radius: 3px;
+        background: #1a1a1c;
+        border: 1px solid #2e2e31;
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--climb), #fff);
+        box-shadow: 0 0 8px var(--climb);
+      }
+
+      /* controls */
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+      }
+      .tabs {
+        display: inline-flex;
+        padding: 3px;
+        gap: 2px;
+        border: 1px solid var(--edge);
+        border-radius: 10px;
+        background: var(--panel);
+      }
+      .tabs button,
+      .play {
+        font: 600 12px/1 var(--font-ui);
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        background: transparent;
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 13px;
+        cursor: pointer;
+      }
+      .tabs button[aria-pressed='true'] {
+        color: var(--ink);
+        background: #2a2a2e;
+        box-shadow: inset 0 0 0 1px #3c3c41;
+      }
+      .tabs button:hover,
+      .play:hover {
+        color: var(--ink);
+      }
+      .play {
+        border: 1px solid var(--edge);
+        background: var(--panel);
+        color: var(--ink);
+        min-width: 74px;
+      }
+      .tabs button:focus-visible,
+      .play:focus-visible,
+      .scrub:focus-visible {
+        outline: 2px solid var(--climb);
+        outline-offset: 2px;
+      }
+      .scrub {
+        flex: 1 1 200px;
+        min-width: 0;
+        accent-color: var(--climb);
+        height: 24px;
+      }
+      .clock {
+        font-size: 12px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+        min-width: 96px;
+        text-align: right;
+      }
+
+      .note {
+        margin: 0;
+        max-width: 78ch;
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+      .note b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .tag {
+        display: inline-block;
+        padding: 2px 6px;
+        border: 1px solid #3a3a3f;
+        border-radius: 5px;
+        font: 600 10px/1.2 var(--font-cap);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--drop);
+        vertical-align: 1px;
+      }
+
+      @container (max-width: 480px) {
+        .tiles {
+          grid-template-columns: 1fr 1fr;
+        }
+        .tiles .tile:last-child {
+          grid-column: 1 / -1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .needle,
+        .strip,
+        .seg i::after {
+          transition: none;
+        }
+        .g-pulse {
+          animation: none;
+        }
+      }
+    </style>
+
+    <div class="wrap">
+      <header class="head">
+        <h1>Altitude</h1>
+        <p id="src">
+          <b>GoPro HERO13 Black</b> · GL010753.LRV · 47.290°N 12.698°E · 21 Sep
+          2026 08:36 UTC
+        </p>
+      </header>
+
+      <section
+        class="alt"
+        id="cluster"
+        role="img"
+        aria-label="Altitude cluster"
+        aria-live="off"
+      >
+        <svg
+          class="dial"
+          id="dialL"
+          viewBox="0 0 200 200"
+          aria-hidden="true"
+        ></svg>
+
+        <div class="mid">
+          <div class="seg" id="seg" aria-hidden="true"></div>
+          <div class="readout">
+            <span class="label">Altitude</span>
+            <div class="big">
+              <div class="digits" id="digits" aria-hidden="true"></div>
+              <span class="unit-m">m</span>
+            </div>
+            <div class="trend" id="trend">
+              <span class="arrow"></span><span class="v" id="tv">+0 m</span
+              ><span class="w" id="tw"></span>
+            </div>
+            <span class="asl">Meters above sea level</span>
+          </div>
+
+          <div class="graph">
+            <svg
+              id="chart"
+              viewBox="0 0 640 210"
+              role="img"
+              aria-label="Altitude profile"
+            ></svg>
+          </div>
+
+          <div class="tiles">
+            <div class="tile">
+              <span class="ico"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 20l6-9 4 5 3-4 5 8z" />
+                  <path d="M12 3v5M9.5 5.5L12 3l2.5 2.5" /></svg
+              ></span>
+              <span class="tx"><em>Gain</em><b id="tGain">—</b></span>
+            </div>
+            <div class="tile">
+              <span class="ico"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 12l4-4" />
+                  <path d="M7 15h2M15 15h2M12 6v1" /></svg
+              ></span>
+              <span class="tx"
+                ><em id="tPLabel">Air pressure</em><b id="tPress">—</b></span
+              >
+            </div>
+            <div class="tile">
+              <span class="ico"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M14 14.8V5a2 2 0 10-4 0v9.8a4 4 0 104 0z" /></svg
+              ></span>
+              <span class="tx"
+                ><em id="tTLabel">Air temp</em><b id="tTemp">—</b></span
+              >
+            </div>
+          </div>
+          <div class="bar" aria-hidden="true"><i id="prog"></i></div>
+        </div>
+
+        <svg
+          class="dial"
+          id="dialR"
+          viewBox="0 0 200 200"
+          aria-hidden="true"
+        ></svg>
+      </section>
+
+      <div class="controls">
+        <div class="tabs" role="group" aria-label="Data source">
+          <button type="button" id="mClip" aria-pressed="true">
+            Your clip
+          </button>
+          <button type="button" id="mHike" aria-pressed="false">
+            Climb example
+          </button>
+        </div>
+        <button type="button" class="play" id="play">Pause</button>
+        <input
+          class="scrub"
+          id="scrub"
+          type="range"
+          min="0"
+          max="1000"
+          value="0"
+          aria-label="Playhead"
+        />
+        <span class="clock" id="clock">0.0 s</span>
+      </div>
+
+      <p class="note" id="note"></p>
+    </div>
+
+    <script>
+      (function () {
+        var CLIP = {
+          t: [
+            0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2,
+            1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5,
+            2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8,
+            3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0, 5.1,
+            5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4,
+          ],
+          alt: [
+            793.36, 793.34, 793.31, 793.28, 793.26, 793.22, 793.19, 793.15,
+            793.13, 793.1, 793.08, 793.05, 793.02, 793.0, 792.97, 792.93,
+            792.91, 792.89, 792.85, 792.83, 792.81, 792.79, 792.76, 792.74,
+            792.72, 792.7, 792.67, 792.66, 792.63, 792.61, 792.59, 792.57,
+            792.53, 792.52, 792.49, 792.47, 792.45, 792.42, 792.41, 792.39,
+            792.36, 792.35, 792.32, 792.3, 792.28, 792.27, 792.24, 792.22,
+            792.2, 792.19, 792.16, 792.14, 792.12, 792.09, 792.08, 792.05,
+            792.02, 792.0, 791.98, 791.95, 791.94, 791.91, 791.89, 791.86,
+            791.85,
+          ],
+          spd: [
+            38.4, 38.3, 37.3, 37.0, 36.8, 36.4, 36.0, 35.6, 34.8, 33.9, 34.1,
+            34.0, 33.2, 32.7, 32.4, 31.9, 31.5, 31.3, 31.0, 30.5, 30.3, 30.1,
+            30.0, 29.8, 29.3, 29.0, 28.8, 28.4, 28.5, 27.9, 27.8, 27.4, 27.1,
+            26.6, 26.4, 26.0, 25.6, 25.4, 24.9, 24.3, 24.2, 23.7, 23.5, 23.0,
+            22.4, 22.2, 21.7, 21.4, 21.2, 20.9, 20.7, 20.4, 20.1, 20.1, 19.7,
+            19.5, 19.3, 19.0, 18.8, 18.6, 18.5, 18.0, 18.0, 17.6, 17.4,
+          ],
+        };
+
+        /* Optional measured weather. Fill this in (temp °C, wind km/h, pressure hPa) to replace the standard-atmosphere tiles. */
+        var WEATHER = null;
+
+        var reduce =
+          window.matchMedia &&
+          matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var $ = function (id) {
+          return document.getElementById(id);
+        };
+        var clamp = function (n, a, b) {
+          return Math.min(b, Math.max(a, n));
+        };
+
+        /* ---------- datasets ---------- */
+        function seeded(seed) {
+          return function () {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return seed / 4294967296;
+          };
+        }
+        function buildHike() {
+          // example ascent: 3 h, one sample per minute, 1890 m to 2485 m, with switchbacks and two rests
+          var rnd = seeded(7),
+            n = 181,
+            alt = [],
+            t = [],
+            a0 = 1890,
+            a1 = 2485;
+          var raw = [];
+          for (var i = 0; i < n; i++) {
+            var p = i / (n - 1);
+            var rest =
+              p > 0.31 && p < 0.37
+                ? 0.31 + (p - 0.31) * 0.1
+                : p > 0.66 && p < 0.71
+                  ? 0.66 + (p - 0.66) * 0.1
+                  : p;
+            var shaped =
+              rest + 0.035 * Math.sin(p * 21) + (rnd() - 0.5) * 0.006;
+            raw.push(shaped);
+          }
+          var lo = raw[0],
+            hi = raw[n - 1];
+          for (var j = 0; j < n; j++) {
+            var q = (raw[j] - lo) / (hi - lo);
+            alt.push(Math.round((a0 + (a1 - a0) * q) * 10) / 10);
+            t.push(j * 60);
+          }
+          alt[n - 1] = a1;
+          return { t: t, alt: alt };
+        }
+        var HIKE = buildHike();
+
+        var modes = {
+          clip: {
+            t: CLIP.t,
+            alt: CLIP.alt,
+            dur: CLIP.t[CLIP.t.length - 1],
+            rateWin: 1.2,
+            trendWin: null,
+            scale: 30,
+            real: true,
+          },
+          hike: {
+            t: HIKE.t,
+            alt: HIKE.alt,
+            dur: HIKE.t[HIKE.t.length - 1],
+            rateWin: 300,
+            trendWin: 3600,
+            scale: 10,
+            real: false,
+          },
+        };
+        modes.clip.loopSec = 7.5;
+        modes.hike.loopSec = 16;
+
+        function altAt(m, sec) {
+          var t = m.t,
+            a = m.alt;
+          if (sec <= 0) return a[0];
+          if (sec >= m.dur) return a[a.length - 1];
+          var lo = 0,
+            hi = t.length - 1;
+          while (hi - lo > 1) {
+            var mid = (lo + hi) >> 1;
+            if (t[mid] <= sec) lo = mid;
+            else hi = mid;
+          }
+          var f = (sec - t[lo]) / (t[hi] - t[lo]);
+          return a[lo] + (a[hi] - a[lo]) * f;
+        }
+
+        /* ---------- dials ---------- */
+        var START = 135,
+          SWEEP = 270;
+        function polar(a, r) {
+          var t = (a * Math.PI) / 180;
+          return [100 + r * Math.cos(t), 100 + r * Math.sin(t)];
+        }
+        function arc(f0, f1, r) {
+          var lo = Math.min(f0, f1),
+            hi = Math.max(f0, f1);
+          var p0 = polar(START + SWEEP * lo, r),
+            p1 = polar(START + SWEEP * hi, r);
+          return (
+            'M' +
+            p0[0].toFixed(2) +
+            ',' +
+            p0[1].toFixed(2) +
+            'A' +
+            r +
+            ',' +
+            r +
+            ' 0 ' +
+            ((hi - lo) * SWEEP > 180 ? 1 : 0) +
+            ' 1 ' +
+            p1[0].toFixed(2) +
+            ',' +
+            p1[1].toFixed(2)
+          );
+        }
+        function dialStatic(uid, labels, sub, title, unit, pill, redFrom) {
+          var n = labels.length - 1,
+            total = n * sub,
+            s = '';
+          s +=
+            '<defs>' +
+            '<radialGradient id="' +
+            uid +
+            'f" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#1f1f22"/><stop offset=".7" stop-color="#121214"/><stop offset="1" stop-color="#060607"/></radialGradient>' +
+            '<linearGradient id="' +
+            uid +
+            'b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9a9f"/><stop offset=".35" stop-color="#2c2c2f"/><stop offset=".65" stop-color="#161618"/><stop offset="1" stop-color="#66666b"/></linearGradient>' +
+            '<linearGradient id="' +
+            uid +
+            's" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+            '<radialGradient id="' +
+            uid +
+            'h" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#f5f5f6"/><stop offset=".45" stop-color="#98989d"/><stop offset="1" stop-color="#2d2d30"/></radialGradient></defs>';
+          s +=
+            '<circle class="bezel" cx="100" cy="100" r="97.5" stroke="url(#' +
+            uid +
+            'b)"/>';
+          s +=
+            '<circle class="face" cx="100" cy="100" r="95.5" fill="url(#' +
+            uid +
+            'f)"/>';
+          s +=
+            '<ellipse cx="100" cy="54" rx="68" ry="40" fill="url(#' +
+            uid +
+            's)"/>';
+          s += '<path class="track" d="' + arc(0, 1, 91) + '"/>';
+          s += '<path class="fill" id="' + uid + 'fill" d=""/>';
+          for (var i = 0; i <= total; i++) {
+            var major = i % sub === 0,
+              a = START + (SWEEP * i) / total;
+            var p0 = polar(a, major ? 75 : 81),
+              p1 = polar(a, 86);
+            s +=
+              '<line class="' +
+              (major ? 'maj' : 'min') +
+              '" x1="' +
+              p0[0].toFixed(2) +
+              '" y1="' +
+              p0[1].toFixed(2) +
+              '" x2="' +
+              p1[0].toFixed(2) +
+              '" y2="' +
+              p1[1].toFixed(2) +
+              '"/>';
+          }
+          labels.forEach(function (l, i) {
+            var p = polar(START + (SWEEP * i) / n, 60);
+            s +=
+              '<text class="lbl" x="' +
+              p[0].toFixed(2) +
+              '" y="' +
+              p[1].toFixed(2) +
+              '">' +
+              l +
+              '</text>';
+          });
+          s +=
+            '<text class="cap" x="100" y="130">' +
+            title +
+            '</text><text class="unit" x="100" y="142">' +
+            unit +
+            '</text>';
+          s +=
+            '<g class="pill"><rect x="72" y="154" width="56" height="24" rx="8"/><text class="pc" x="100" y="162">' +
+            pill +
+            '</text><text class="pv" id="' +
+            uid +
+            'pv" x="100" y="171">—</text></g>';
+          s +=
+            '<g class="needle" id="' +
+            uid +
+            'n"><polygon points="82,98.2 161,99.5 161,100.5 82,101.8"/></g>';
+          s +=
+            '<circle class="hub" cx="100" cy="100" r="9" fill="url(#' +
+            uid +
+            'h)"/><circle class="hub-dot" cx="100" cy="100" r="3"/>';
+          return s;
+        }
+        function setDial(uid, f, from) {
+          f = clamp(f, 0, 1);
+          $(uid + 'n').style.setProperty('--f', f);
+          var fill = $(uid + 'fill');
+          if (Math.abs(f - from) < 0.004) fill.setAttribute('d', '');
+          else fill.setAttribute('d', arc(from, f, 91));
+          fill.setAttribute('class', 'fill' + (f < from ? ' neg' : ''));
+        }
+        function buildDials(m) {
+          var s = m.scale;
+          $('dialL').innerHTML = dialStatic(
+            'dl',
+            ['−' + s, '−' + s / 2, '0', '+' + s / 2, '+' + s],
+            5,
+            'CLIMB RATE',
+            'm / min',
+            'VERTICAL',
+            null,
+          );
+          var lab = [];
+          for (var k = 0; k <= 3000; k += 500)
+            lab.push(k === 0 ? '0' : (k / 1000).toFixed(1).replace('.0', ''));
+          $('dialR').innerHTML = dialStatic(
+            'dr',
+            lab,
+            5,
+            'ELEVATION',
+            'km',
+            'SEA LEVEL',
+            null,
+          );
+        }
+
+        /* ---------- big rolling number ---------- */
+        var digitCount = 0;
+        function buildDigits(n) {
+          var h = '';
+          for (var i = 0; i < n; i++) {
+            var col = '';
+            for (var d = 0; d < 10; d++) col += '<span>' + d + '</span>';
+            h +=
+              '<span class="col"><span class="strip">' + col + '</span></span>';
+          }
+          $('digits').innerHTML = h;
+          digitCount = n;
+        }
+        function setBig(v) {
+          var s = String(Math.max(0, Math.round(v)));
+          var width = Math.max(s.length, 3);
+          if (width !== digitCount) buildDigits(width);
+          while (s.length < width) s = '0' + s;
+          var strips = $('digits').querySelectorAll('.strip');
+          var lead = true;
+          for (var i = 0; i < strips.length; i++) {
+            var d = +s[i];
+            strips[i].style.transform = 'translateY(' + -d + 'em)';
+            var hide = lead && d === 0 && i < strips.length - 3;
+            if (d !== 0) lead = false;
+            strips[i].parentNode.style.opacity = hide ? '0' : '1';
+          }
+          $('cluster').setAttribute(
+            'aria-label',
+            'Altitude ' + Math.round(v) + ' meters above sea level',
+          );
+        }
+
+        /* ---------- LED segments ---------- */
+        var segHtml = '';
+        for (var q = 0; q < 12; q++) segHtml += '<i></i>';
+        $('seg').innerHTML = segHtml;
+        var segs = $('seg').children;
+
+        /* ---------- chart ---------- */
+        var W = 640,
+          H = 210,
+          PL = 8,
+          PR = 52,
+          PT = 14,
+          PB = 28;
+        var NS = 'http://www.w3.org/2000/svg';
+        var chartCache = null;
+        function niceStep(span, target) {
+          var raw = span / target,
+            mag = Math.pow(10, Math.floor(Math.log10(raw))),
+            r = raw / mag;
+          return (r < 1.5 ? 1 : r < 3 ? 2 : r < 7 ? 5 : 10) * mag;
+        }
+        function fmtTick(v, step) {
+          return step < 1 ? v.toFixed(1) : String(Math.round(v));
+        }
+        function buildChart(m) {
+          var lo = Math.min.apply(null, m.alt),
+            hi = Math.max.apply(null, m.alt);
+          var span = Math.max(hi - lo, m.real ? 3 : 100);
+          var mid = (hi + lo) / 2;
+          lo = mid - span * 0.62;
+          hi = mid + span * 0.62;
+          var step = niceStep(hi - lo, 4);
+          var y0 = Math.floor(lo / step) * step,
+            y1 = Math.ceil(hi / step) * step;
+          var X = function (t) {
+            return PL + ((W - PL - PR) * t) / m.dur;
+          };
+          var Y = function (a) {
+            return PT + (H - PT - PB) * (1 - (a - y0) / (y1 - y0));
+          };
+          var g = '';
+          for (var v = y0; v <= y1 + 1e-9; v += step) {
+            g +=
+              '<line class="g-grid" x1="' +
+              PL +
+              '" x2="' +
+              (W - PR) +
+              '" y1="' +
+              Y(v).toFixed(1) +
+              '" y2="' +
+              Y(v).toFixed(1) +
+              '"/>';
+            g +=
+              '<text class="g-tick" x="' +
+              (W - PR + 8) +
+              '" y="' +
+              (Y(v) + 4).toFixed(1) +
+              '">' +
+              fmtTick(v, step) +
+              '</text>';
+          }
+          var xt = m.real ? [0, 1, 2, 3, 4, 5, 6] : [0, 3600, 7200, 10800];
+          xt.forEach(function (t) {
+            if (t > m.dur + 1e-6) return;
+            var lab = m.real ? t + ' s' : t / 3600 + ' h';
+            g +=
+              '<line class="g-grid" x1="' +
+              X(t).toFixed(1) +
+              '" x2="' +
+              X(t).toFixed(1) +
+              '" y1="' +
+              PT +
+              '" y2="' +
+              (H - PB) +
+              '"/>';
+            g +=
+              '<text class="g-tick" x="' +
+              X(t).toFixed(1) +
+              '" y="' +
+              (H - 8) +
+              '" text-anchor="' +
+              (t === 0 ? 'start' : 'middle') +
+              '">' +
+              lab +
+              '</text>';
+          });
+          var pts = m.t.map(function (t, i) {
+            return X(t).toFixed(1) + ',' + Y(m.alt[i]).toFixed(1);
+          });
+          var line = 'M' + pts.join('L');
+          var area =
+            line +
+            'L' +
+            X(m.dur).toFixed(1) +
+            ',' +
+            (H - PB) +
+            'L' +
+            X(0).toFixed(1) +
+            ',' +
+            (H - PB) +
+            'Z';
+          var sy = Y(m.alt[0]).toFixed(1);
+          var html =
+            '<defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4ade9a" stop-opacity=".42"/><stop offset="1" stop-color="#4ade9a" stop-opacity="0"/></linearGradient>' +
+            '<clipPath id="cp"><rect id="cpr" x="0" y="0" width="0" height="' +
+            H +
+            '"/></clipPath></defs>' +
+            g +
+            '<line class="g-start" x1="' +
+            PL +
+            '" x2="' +
+            (W - PR) +
+            '" y1="' +
+            sy +
+            '" y2="' +
+            sy +
+            '"/>' +
+            '<path class="g-ghost" d="' +
+            line +
+            '"/>' +
+            '<g clip-path="url(#cp)"><path d="' +
+            area +
+            '" fill="url(#ar)"/><path class="g-line" d="' +
+            line +
+            '"/></g>' +
+            '<circle class="g-pulse" id="gp" r="5" cx="0" cy="0"/><circle class="g-dot" id="gd" r="5" cx="0" cy="0"/>';
+          $('chart').innerHTML = html;
+          chartCache = { X: X, Y: Y, m: m };
+        }
+        function updateChart(sec, alt) {
+          var c = chartCache;
+          if (!c) return;
+          var x = c.X(sec),
+            y = c.Y(alt);
+          $('cpr').setAttribute('width', x.toFixed(1));
+          ['gd', 'gp'].forEach(function (id) {
+            $(id).setAttribute('cx', x.toFixed(1));
+            $(id).setAttribute('cy', y.toFixed(1));
+          });
+        }
+
+        /* ---------- derived values ---------- */
+        function isaPressure(h) {
+          return 1013.25 * Math.pow(1 - 2.25577e-5 * h, 5.25588);
+        }
+        function isaTemp(h) {
+          return 15 - 0.0065 * h;
+        }
+        function sign(v, d) {
+          return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+        }
+        function fmtClock(m, sec) {
+          if (m.real) return sec.toFixed(1) + ' s / ' + m.dur.toFixed(1) + ' s';
+          var mm = Math.floor(sec / 60),
+            h = Math.floor(mm / 60);
+          return h + ':' + String(mm % 60).padStart(2, '0') + ' / 3:00 h';
+        }
+
+        /* ---------- state + render ---------- */
+        var key = 'clip',
+          M = modes.clip;
+        var sec = 0,
+          playing = !reduce,
+          introT0 = 0,
+          intro = false,
+          holdUntil = 0,
+          last = 0;
+
+        function render(displayAlt, s) {
+          var m = M;
+          setBig(displayAlt);
+          var alt = altAt(m, s);
+          var w = m.rateWin / 2;
+          var rate =
+            ((altAt(m, Math.min(m.dur, s + w)) - altAt(m, Math.max(0, s - w))) /
+              (Math.min(m.dur, s + w) - Math.max(0, s - w))) *
+            60;
+          var gain = alt - m.alt[0];
+
+          // trend chip
+          var tw = m.trendWin,
+            delta,
+            wl;
+          if (tw) {
+            delta = alt - altAt(m, Math.max(0, s - tw));
+            wl = '(1H)';
+          } else {
+            delta = gain;
+            wl = '(CLIP)';
+          }
+          var tr = $('trend');
+          tr.className = 'trend' + (delta < -0.005 ? ' down' : '');
+          $('tv').textContent = sign(delta, m.real ? 1 : 0) + ' m';
+          $('tw').textContent = wl;
+
+          // dials
+          setDial('dl', 0.5 + rate / (2 * m.scale), 0.5);
+          $('dlpv').textContent = sign(rate, m.real ? 1 : 1);
+          setDial('dr', alt / 3000, 0);
+          $('drpv').textContent = Math.round(alt) + ' m';
+
+          // segments: position within the profile's height range
+          var lo = Math.min.apply(null, m.alt),
+            hi = Math.max.apply(null, m.alt);
+          var frac = hi > lo ? (alt - lo) / (hi - lo) : 0;
+          for (var i = 0; i < segs.length; i++)
+            segs[i].style.setProperty('--on', clamp(frac * 12 - i, 0, 1));
+
+          // tiles
+          $('tGain').innerHTML =
+            sign(gain, m.real ? 1 : 0) + ' <small>m</small>';
+          if (WEATHER) {
+            $('tPLabel').textContent = 'Pressure';
+            $('tPress').innerHTML =
+              Math.round(WEATHER.pressure) + ' <small>hPa</small>';
+            $('tTLabel').textContent = 'Temperature';
+            $('tTemp').innerHTML =
+              WEATHER.temp.toFixed(1) + ' <small>°C</small>';
+          } else {
+            $('tPLabel').textContent = 'Air pressure · ISA';
+            $('tPress').innerHTML =
+              Math.round(isaPressure(alt)) + ' <small>hPa</small>';
+            $('tTLabel').textContent = 'Air temp · ISA';
+            $('tTemp').innerHTML =
+              sign(isaTemp(alt), 1).replace('+', '') + ' <small>°C</small>';
+          }
+
+          $('prog').style.width = ((s / m.dur) * 100).toFixed(1) + '%';
+          $('clock').textContent = fmtClock(m, s);
+          $('scrub').value = Math.round((s / m.dur) * 1000);
+          updateChart(s, alt);
+        }
+
+        function ease(t) {
+          return 1 - Math.pow(1 - t, 3);
+        }
+        function frame(now) {
+          var dt = Math.min(0.1, (now - last) / 1000);
+          last = now;
+          if (intro) {
+            var p = clamp((now - introT0) / 1500, 0, 1);
+            render(altAt(M, 0) * ease(p), 0);
+            if (p >= 1) {
+              intro = false;
+              sec = 0;
+            }
+          } else if (playing) {
+            if (holdUntil) {
+              if (now >= holdUntil) {
+                holdUntil = 0;
+                sec = 0;
+                startIntro();
+              }
+            } else {
+              sec += dt * (M.dur / M.loopSec);
+              if (sec >= M.dur) {
+                sec = M.dur;
+                holdUntil = now + 1600;
+              }
+              render(altAt(M, sec), sec);
+            }
+          }
+          requestAnimationFrame(frame);
+        }
+        function startIntro() {
+          if (reduce) {
+            sec = 0;
+            render(altAt(M, 0), 0);
+            return;
+          }
+          intro = true;
+          introT0 = performance.now();
+          render(0, 0);
+        }
+
+        function setMode(k) {
+          key = k;
+          M = modes[k];
+          $('mClip').setAttribute('aria-pressed', k === 'clip');
+          $('mHike').setAttribute('aria-pressed', k === 'hike');
+          buildDials(M);
+          buildChart(M);
+          holdUntil = 0;
+          sec = 0;
+          $('note').innerHTML =
+            k === 'clip'
+              ? '<b>Measured.</b> Altitude, from the GPS track recorded inside your GoPro clip: 65 readings over 6.4 s at 10 Hz, 3D fix. The camera was nearly level, so the graph shows a slight drop of about 1.5 m. Pressure and temperature are <b>standard-atmosphere (ISA) values</b> computed from that altitude. They are not measured weather.'
+              : '<span class="tag">Example</span> A made-up 3-hour climb from 1,890 m to 2,485 m, played at speed, to show how the graph behaves on a real ascent. It is not recorded data. Pressure and temperature are <b>standard-atmosphere (ISA) values</b> computed from altitude.';
+          startIntro();
+        }
+
+        $('mClip').onclick = function () {
+          setMode('clip');
+        };
+        $('mHike').onclick = function () {
+          setMode('hike');
+        };
+        $('play').onclick = function () {
+          playing = !playing;
+          $('play').textContent = playing ? 'Pause' : 'Play';
+          if (playing && sec >= M.dur) {
+            sec = 0;
+            startIntro();
+          }
+        };
+        $('scrub').oninput = function () {
+          intro = false;
+          holdUntil = 0;
+          sec = (this.value / 1000) * M.dur;
+          playing = false;
+          $('play').textContent = 'Play';
+          render(altAt(M, sec), sec);
+        };
+        $('play').textContent = playing ? 'Pause' : 'Play';
+
+        setMode('clip');
+        last = performance.now();
+        requestAnimationFrame(frame);
+      })();
+    </script>
+  </body>
+</html>

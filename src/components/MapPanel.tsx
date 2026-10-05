@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SvgIcon, { type IconName } from './SvgIcon';
+import { useSettings } from './settings';
 
 export type BaseKey = 'streets' | 'topo' | 'satellite';
 export const BASE_LABELS: Record<BaseKey, string> = {
@@ -357,6 +358,7 @@ export default function MapPanel({
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const bar = useRef<HTMLDivElement>(null);
+  const { view } = useSettings();
 
   // close menus on outside click / Escape
   useEffect(() => {
@@ -373,113 +375,121 @@ export default function MapPanel({
   }, [openId]);
 
   const dd = { openId, setOpenId };
+  if (!view.search && !view.mapStyle && !view.layers && !view.tools)
+    return null;
   return (
     <div className="ctt-tb" ref={bar} role="toolbar" aria-label="Map tools">
-      <PlaceSearch onGo={onGo} />
+      {view.search && <PlaceSearch onGo={onGo} />}
 
-      <div className="ctt-tb-group">
-        <Dropdown
-          {...dd}
-          id="base"
-          icon="layers"
-          title="Basemap"
-          current={opts.base}
-          items={BASES}
-          onPick={(base) => set({ base })}
-        />
-        <Dropdown
-          {...dd}
-          id="color"
-          icon="gauge"
-          title="Colour by"
-          current={opts.color}
-          items={COLORS}
-          onPick={(color) => set({ color })}
-        />
-        <Dropdown
-          {...dd}
-          id="points"
-          icon="gps"
-          title="Points"
-          current={opts.points}
-          items={POINTS}
-          onPick={(points) => set({ points })}
-        />
-      </div>
+      {view.mapStyle && (
+        <div className="ctt-tb-group">
+          <Dropdown
+            {...dd}
+            id="base"
+            icon="layers"
+            title="Basemap"
+            current={opts.base}
+            items={BASES}
+            onPick={(base) => set({ base })}
+          />
+          <Dropdown
+            {...dd}
+            id="color"
+            icon="gauge"
+            title="Colour by"
+            current={opts.color}
+            items={COLORS}
+            onPick={(color) => set({ color })}
+          />
+          <Dropdown
+            {...dd}
+            id="points"
+            icon="gps"
+            title="Points"
+            current={opts.points}
+            items={POINTS}
+            onPick={(points) => set({ points })}
+          />
+        </div>
+      )}
 
-      <div className="ctt-tb-group">
-        <IconBtn
-          icon="gps"
-          label="Start / end markers"
-          on={opts.ends}
-          onClick={() => set({ ends: !opts.ends })}
-        />
-        <IconBtn
-          icon="arrowUp"
-          label="Direction arrows"
-          on={opts.arrows}
-          onClick={() => set({ arrows: !opts.arrows })}
-        />
-        <IconBtn
-          icon="mountain"
-          label="Hillshade relief"
-          on={opts.relief}
-          onClick={() => set({ relief: !opts.relief })}
-        />
-        <IconBtn
-          icon="eye"
-          label="Focus selected clip"
-          on={opts.focus}
-          onClick={() => set({ focus: !opts.focus })}
-        />
-        <IconBtn
-          icon="play"
-          label="Follow playhead"
-          on={opts.follow}
-          onClick={() => set({ follow: !opts.follow })}
-        />
-        <IconBtn
-          icon="chart"
-          label="Elevation profile"
-          on={opts.profile}
-          disabled={!hasSelected}
-          onClick={() => set({ profile: !opts.profile })}
-        />
-      </div>
+      {view.layers && (
+        <div className="ctt-tb-group">
+          <IconBtn
+            icon="gps"
+            label="Start / end markers"
+            on={opts.ends}
+            onClick={() => set({ ends: !opts.ends })}
+          />
+          <IconBtn
+            icon="arrowUp"
+            label="Direction arrows"
+            on={opts.arrows}
+            onClick={() => set({ arrows: !opts.arrows })}
+          />
+          <IconBtn
+            icon="mountain"
+            label="Hillshade relief"
+            on={opts.relief}
+            onClick={() => set({ relief: !opts.relief })}
+          />
+          <IconBtn
+            icon="eye"
+            label="Focus selected clip"
+            on={opts.focus}
+            onClick={() => set({ focus: !opts.focus })}
+          />
+          <IconBtn
+            icon="play"
+            label="Follow playhead"
+            on={opts.follow}
+            onClick={() => set({ follow: !opts.follow })}
+          />
+          <IconBtn
+            icon="chart"
+            label="Elevation profile"
+            on={opts.profile}
+            disabled={!hasSelected}
+            onClick={() => set({ profile: !opts.profile })}
+          />
+        </div>
+      )}
 
-      <div className="ctt-tb-group">
-        <IconBtn
-          icon="ruler"
-          label="Measure distance"
-          on={measuring}
-          onClick={onMeasure}
-        />
-        <IconBtn
-          icon="fit"
-          label="Fit all clips"
-          disabled={!hasClips}
-          onClick={onFitAll}
-        />
-        <IconBtn
-          icon="route"
-          label="Fit selected clip"
-          disabled={!hasSelected}
-          onClick={onFitSelected}
-        />
-        <IconBtn
-          icon="maximize"
-          label="Fullscreen map"
-          onClick={onFullscreen}
-        />
-        <Dropdown
-          {...dd}
-          id="export"
-          icon="download"
-          title="Export"
-          items={EXPORTS}
-          onPick={onExport}
-        />
-      </div>
+      {view.tools && (
+        <div className="ctt-tb-group">
+          <IconBtn
+            icon="ruler"
+            label="Measure distance"
+            on={measuring}
+            onClick={onMeasure}
+          />
+          <IconBtn
+            icon="fit"
+            label="Fit all clips"
+            disabled={!hasClips}
+            onClick={onFitAll}
+          />
+          <IconBtn
+            icon="route"
+            label="Fit selected clip"
+            disabled={!hasSelected}
+            onClick={onFitSelected}
+          />
+          <IconBtn
+            icon="maximize"
+            label="Fullscreen map"
+            onClick={onFullscreen}
+          />
+          <Dropdown
+            {...dd}
+            id="export"
+            icon="download"
+            title="Export"
+            items={EXPORTS}
+            onPick={onExport}
+          />
+        </div>
+      )}
     </div>
   );
 }

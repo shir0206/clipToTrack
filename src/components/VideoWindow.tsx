@@ -28,11 +28,16 @@ export function openVideoWindow(title: string): Window | null {
     <style>
       html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
       #${ROOT_ID} { width: 100vw; height: 100vh; display: flex; }
-      video { width: 100%; height: 100%; object-fit: contain; background: #000; outline: none; }
+      video { width: 100%; height: 100%; object-fit: contain; background: #000; outline: none; cursor: pointer; }
     </style>`;
   doc.body.innerHTML = `<div id="${ROOT_ID}"></div>`;
   return win;
 }
+
+const toggle = (v: HTMLVideoElement) => {
+  if (v.paused) v.play().catch(() => {});
+  else v.pause();
+};
 
 function setVideoWindowTitle(win: Window, title: string) {
   win.document.title = title;
@@ -92,7 +97,20 @@ export default function VideoWindow({
       notified = true;
       onCloseRef.current();
     };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && win.close();
+    // no native toolbar: click / Space = play-pause, ← → = seek 5 s, Esc = close
+    const onKey = (e: KeyboardEvent) => {
+      const v = videoRef.current;
+      if (e.key === 'Escape') win.close();
+      else if (!v) return;
+      else if (e.key === ' ' || e.key === 'k') {
+        e.preventDefault();
+        toggle(v);
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const to = v.currentTime + (e.key === 'ArrowRight' ? 5 : -5);
+        v.currentTime = Math.max(0, Math.min(to, v.duration || to));
+      }
+    };
     win.addEventListener('pagehide', notify); // user closed the window
     win.addEventListener('keydown', onKey);
     // fallback for browsers that don't fire pagehide on popups reliably
@@ -117,8 +135,8 @@ export default function VideoWindow({
       ref={videoRef}
       src={clip.videoUrl}
       poster={clip.thumbnail}
-      controls
       autoPlay
+      onClick={(e) => toggle(e.currentTarget)}
       playsInline
       onPlay={() => onPlayingChange?.(true)}
       onPause={() => onPlayingChange?.(false)}
