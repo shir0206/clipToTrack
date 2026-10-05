@@ -229,6 +229,10 @@ function openPlotWindow(title: string): Window | null {
   return win;
 }
 
+function setPlotWindowTitle(win: Window, title: string) {
+  win.document.title = title;
+}
+
 /** One metric (chart or instrument cluster) of the selected clip in its own window. Hovering it drives the map too. */
 function PlotWindow({
   win,
@@ -254,7 +258,7 @@ function PlotWindow({
   });
 
   useEffect(() => {
-    win.document.title = `${LABEL[metric]} · ${clip.title}`;
+    setPlotWindowTitle(win, `${LABEL[metric]} · ${clip.title}`);
   }, [win, metric, clip.title]);
 
   useEffect(() => {

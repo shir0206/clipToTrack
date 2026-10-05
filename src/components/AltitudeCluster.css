@@ -128,8 +128,7 @@
 .ctt-alt-label {
   padding-left: 0.32em;
   color: var(--alt-climb);
-  font:
-    600 14px/1 var(--alt-font-cap);
+  font: 600 14px/1 var(--alt-font-cap);
   letter-spacing: 0.32em;
   text-transform: uppercase;
   filter: brightness(1.15);
@@ -212,8 +211,7 @@
 }
 .ctt-alt-asl {
   color: var(--gt-muted);
-  font:
-    500 11px/1 var(--alt-font-cap);
+  font: 500 11px/1 var(--alt-font-cap);
   letter-spacing: 0.3em;
   text-transform: uppercase;
 }

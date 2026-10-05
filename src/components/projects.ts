@@ -324,8 +324,7 @@ export function projectViews(
         }
         let place = '';
         let top = 0;
-        for (const [pl, n] of counts)
-          if (n > top) [place, top] = [pl, n];
+        for (const [pl, n] of counts) if (n > top) [place, top] = [pl, n];
         place = place || p.place || '';
         const generated =
           p.id === UNDATED_ID ? 'Undated' : (p.title ?? 'Project');
