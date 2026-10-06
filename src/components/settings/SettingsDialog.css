@@ -1,4 +1,4 @@
-.ctt-set-backdrop {
+.settings-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -6,7 +6,7 @@
   place-items: center;
   background: var(--scrim);
 }
-.ctt-set {
+.settings-dialog {
   width: min(480px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   overflow: auto;
@@ -16,27 +16,27 @@
   color: var(--text);
   box-shadow: var(--shadow-dialog);
 }
-.ctt-set-head {
+.settings-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
 }
-.ctt-set-head h2 {
+.settings-heading {
   margin: 0;
   font-size: 18px;
 }
-.ctt-set section {
+.settings-section {
   margin-top: 16px;
 }
-.ctt-set h3 {
+.settings-title {
   margin: 0 0 2px;
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.6;
 }
-.ctt-set-row {
+.settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -45,25 +45,25 @@
   border-bottom: 1px solid var(--border);
   cursor: pointer;
 }
-.ctt-set-row:last-child {
+.settings-row:last-child {
   border-bottom: 0;
 }
-.ctt-set-row b {
+.settings-label {
   display: block;
   font-weight: 600;
   font-size: 14px;
 }
-.ctt-set-row small {
+.settings-hint {
   display: block;
   opacity: 0.65;
   font-size: 12px;
   margin-top: 1px;
 }
-.ctt-set-row button {
+.settings-button {
   flex: none;
 }
 /* switch */
-.ctt-switch {
+.toggle-switch {
   flex: none;
   appearance: none;
   position: relative;
@@ -75,7 +75,7 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.ctt-switch::after {
+.toggle-switch::after {
   content: '';
   position: absolute;
   top: 2px;
@@ -87,52 +87,52 @@
   box-shadow: var(--shadow-switch);
   transition: transform 0.15s;
 }
-.ctt-switch:checked {
+.toggle-switch:checked {
   background: var(--primary);
 }
-.ctt-switch:checked::after {
+.toggle-switch:checked::after {
   transform: translateX(16px);
 }
-.ctt-switch:focus-visible {
+.toggle-switch:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-.ctt-set-foot {
+.settings-footer {
   display: flex;
   justify-content: flex-end;
   margin-top: 14px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .ctt-switch,
-  .ctt-switch::after {
+  .toggle-switch,
+  .toggle-switch::after {
     transition: none;
   }
 }
 
 /* irrelevant / unavailable options: greyed and inert */
-.ctt-set-row.is-disabled {
+.settings-row.is-disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.ctt-set .ctt-link:disabled,
-.ctt-set .ctt-switch:disabled {
+.settings-dialog .link-button:disabled,
+.settings-dialog .toggle-switch:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.ctt-set-warn {
-  display: flex !important;
+.settings-warning {
+  display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px !important;
+  margin-top: 6px;
   color: var(--danger);
-  opacity: 1 !important;
+  font-size: 12px;
 }
-.ctt-set-actions {
+.settings-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.ctt-set-danger {
+.danger-button {
   border: 0;
   border-radius: 8px;
   padding: 6px 12px;
@@ -142,13 +142,10 @@
   cursor: pointer;
   font-size: 12px;
 }
-.ctt-set-danger:hover {
+.danger-button:hover {
   background: var(--danger-strong);
 }
-#set-view,
-#set-layout,
-#set-data {
-  margin-top: 16px;
+.settings-section.has-divider {
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }

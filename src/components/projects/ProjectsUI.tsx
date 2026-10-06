@@ -16,6 +16,7 @@ import {
   type Placement,
   type ProjectView,
 } from '../../lib/projects';
+import { clipColorVars } from '../../lib/clipColorStyle';
 import './ProjectsUI.css';
 
 const TOAST_MS = 5000;
@@ -30,9 +31,9 @@ function StatChips({ v }: { v: ProjectView }) {
   if (v.days) chips.push(['calendar', plural(v.days, 'day')]);
   if (v.distanceM) chips.push(['route', fmtKm(v.distanceM)]);
   return (
-    <p className="ctt-pchips">
+    <p className="project-chips">
       {chips.map(([icon, text]) => (
-        <span key={icon} className="ctt-pchip">
+        <span key={icon} className="project-chip">
           <SvgIcon name={icon} size={12} />
           {text}
         </span>
@@ -70,7 +71,7 @@ function RenameField({
   const keepFocus = (e: React.MouseEvent) => e.preventDefault(); // buttons must not blur the input first
   return (
     <div
-      className="ctt-rn"
+      className="rename-form"
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) save();
       }}
@@ -91,7 +92,7 @@ function RenameField({
         }}
       />
       <button
-        className="ctt-btn ctt-rn-ok"
+        className="icon-button rename-confirm"
         title="Save"
         aria-label="Save name"
         onMouseDown={keepFocus}
@@ -100,7 +101,7 @@ function RenameField({
         <SvgIcon name="check" size={13} />
       </button>
       <button
-        className="ctt-btn"
+        className="icon-button"
         title="Cancel"
         aria-label="Cancel rename"
         onMouseDown={keepFocus}
@@ -125,7 +126,7 @@ function DeleteConfirm({
   const n = v.clipIds.length;
   return (
     <div
-      className="ctt-confirm"
+      className="confirm-bar"
       role="alertdialog"
       aria-label={`Delete ${v.name}?`}
     >
@@ -134,10 +135,10 @@ function DeleteConfirm({
           ? `Delete this project and its ${plural(n, 'clip')} from the map and saved data?`
           : 'Delete this project?'}
       </span>
-      <button className="ctt-confirm-yes" autoFocus onClick={onDelete}>
+      <button className="confirm-accept" autoFocus onClick={onDelete}>
         Delete
       </button>
-      <button className="ctt-confirm-no" onClick={onCancel}>
+      <button className="confirm-cancel" onClick={onCancel}>
         Cancel
       </button>
     </div>
@@ -160,7 +161,7 @@ function DropChip({
   const [over, setOver] = useState(false);
   return (
     <div
-      className={`ctt-chip-drop${over ? ' is-over' : ''}${current ? ' is-current' : ''}`}
+      className={`drop-chip${over ? ' is-over' : ''}${current ? ' is-current' : ''}`}
       onDragOver={(e) => {
         if (!isClipDrag(e)) return;
         e.preventDefault();
@@ -219,10 +220,10 @@ function ProjectSelect({
   };
 
   return (
-    <div className="ctt-psel" ref={root}>
+    <div className="project-select" ref={root}>
       <button
         type="button"
-        className={`ctt-psel-btn${open ? ' is-open' : ''}`}
+        className={`select-button${open ? ' is-open' : ''}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Project"
@@ -246,26 +247,26 @@ function ProjectSelect({
           }
         }}
       >
-        <span className="ctt-psel-label">{items[cur].label}</span>
+        <span className="select-label">{items[cur].label}</span>
         <em>{items[cur].n}</em>
-        <SvgIcon name="chevron" size={13} className="ctt-psel-chev" />
+        <SvgIcon name="chevron" size={13} className="select-chevron" />
       </button>
       {open && (
-        <ul className="ctt-psel-list" role="listbox" aria-label="Projects">
+        <ul className="select-list" role="listbox" aria-label="Projects">
           {items.map((it, i) => (
             <li
               key={it.id}
               id={`ctt-psel-${i}`}
               role="option"
               aria-selected={it.id === activeId}
-              className={`${it.id === activeId ? 'is-on' : ''}${i === hi ? ' is-hi' : ''}${it.id === 'all' ? ' is-all' : ''}`}
+              className={`${it.id === activeId ? 'is-on' : ''}${i === hi ? ' is-highlighted' : ''}${it.id === 'all' ? ' is-all' : ''}`}
               onMouseEnter={() => setHi(i)}
               onClick={() => pick(it.id)}
             >
               <SvgIcon
                 name={it.id === 'all' ? 'layers' : 'folder'}
                 size={14}
-                className="ctt-psel-ico"
+                className="select-icon"
               />
               <span>{it.label}</span>
               <em>{it.n}</em>
@@ -297,7 +298,7 @@ function ProjectHead({
   const [editing, setEditing] = useState(startEditing);
   const [asking, setAsking] = useState(false);
   return (
-    <div className="ctt-phead">
+    <div className="project-header">
       {editing ? (
         <RenameField
           value={v.name}
@@ -308,13 +309,13 @@ function ProjectHead({
           onCancel={() => setEditing(false)}
         />
       ) : (
-        <div className="ctt-phead-title">
-          <span className="ctt-phead-ico">
+        <div className="project-title">
+          <span className="header-icon">
             <SvgIcon name="folder" size={15} />
           </span>
           <h2 title={v.name}>{v.name}</h2>
           <button
-            className="ctt-btn"
+            className="icon-button"
             aria-label="Rename project"
             title="Rename"
             onClick={() => setEditing(true)}
@@ -322,7 +323,7 @@ function ProjectHead({
             <SvgIcon name="edit" size={13} />
           </button>
           <button
-            className="ctt-btn"
+            className="icon-button"
             aria-label="Delete project"
             title="Delete project"
             aria-expanded={asking}
@@ -332,10 +333,10 @@ function ProjectHead({
           </button>
         </div>
       )}
-      <div className="ctt-phead-sub-container">
-        <div className="ctt-phead-sub-header">
+      <div className="subtitle-wrap">
+        <div className="subtitle-row">
           <SvgIcon name="calendar" size={13} />
-          <p className="ctt-phead-sub">{where(v)}</p>
+          <p className="project-subtitle">{where(v)}</p>
         </div>
         <StatChips v={v} />
       </div>
@@ -346,16 +347,16 @@ function ProjectHead({
           onCancel={() => setAsking(false)}
         />
       )}
-      <div className="ctt-phead-act">
-        <button className="ctt-link" onClick={onShowAll}>
+      <div className="project-actions">
+        <button className="link-button" onClick={onShowAll}>
           ← All projects
         </button>
-        <button className="ctt-link" onClick={onManage}>
+        <button className="link-button" onClick={onManage}>
           Manage project
         </button>
         {v.custom && (
           <button
-            className="ctt-link"
+            className="link-button"
             title="Back to the generated name"
             onClick={() => onRename('')}
           >
@@ -403,9 +404,9 @@ export function ProjectBar({
   const active = views.find((v) => v.id === activeId);
 
   const top = dragging ? (
-    <div className="ctt-ptray" aria-label="Drop the clip on a project">
+    <div className="project-tray" aria-label="Drop the clip on a project">
       <small>Drop on a project</small>
-      <div className="ctt-ptray-chips">
+      <div className="tray-chips">
         {views.map((v) => (
           <DropChip
             key={v.id}
@@ -421,11 +422,11 @@ export function ProjectBar({
       </div>
     </div>
   ) : (
-    <div className="ctt-pbar-row">
-      <span className="ctt-sort-label">Project</span>
+    <div className="project-row">
+      <span className="sort-label">Project</span>
       <ProjectSelect views={views} activeId={activeId} onChange={onChange} />
       <button
-        className="ctt-pbar-new"
+        className="project-create"
         title="Create a new project"
         onClick={() => setFresh(onCreate())}
       >
@@ -436,9 +437,9 @@ export function ProjectBar({
   );
 
   return (
-    <div className="ctt-pbar">
+    <div className="project-bar">
       {top}
-      <div className={`ctt-pgroup${active ? '' : ' is-plain'}`}>
+      <div className={`project-group${active ? '' : ' is-plain'}`}>
         {active && !dragging ? (
           <ProjectHead
             key={active.id}
@@ -498,20 +499,20 @@ export function ProjectNotice({
 
   return (
     <div
-      className="ctt-toast"
+      className="toast-message"
       role="status"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <span className="ctt-toast-ico">
+      <span className="toast-icon">
         <SvgIcon name="folder" size={16} />
       </span>
-      <div className="ctt-toast-body">
+      <div className="toast-body">
         <strong>{only ? 'Added to project' : 'Added to projects'}</strong>
         {rows.slice(0, 3).map(({ view, clips: cs, created }) => (
           <p key={view.id}>
             {cs.length === 1 ? cs[0].title : plural(cs.length, 'clip')} →{' '}
-            <span className={`ctt-pill${created ? ' is-new' : ''}`}>
+            <span className={`status-pill${created ? ' is-new' : ''}`}>
               {created ? 'New' : 'Existing'}
             </span>{' '}
             <b>{view.name}</b>
@@ -520,7 +521,7 @@ export function ProjectNotice({
         {rows.length > 3 && <small>+{rows.length - 3} more projects</small>}
         {only && activeId !== only.view.id && (
           <button
-            className="ctt-link"
+            className="link-button"
             onClick={() => {
               onOpen(only.view.id);
               onDismiss();
@@ -530,7 +531,7 @@ export function ProjectNotice({
           </button>
         )}
       </div>
-      <button className="ctt-btn" aria-label="Dismiss" onClick={onDismiss}>
+      <button className="icon-button" aria-label="Dismiss" onClick={onDismiss}>
         <SvgIcon name="close" size={13} />
       </button>
     </div>
@@ -541,20 +542,26 @@ export function ProjectNotice({
 const byDate = (a: Clip, b: Clip) =>
   (a.sort.date ?? Infinity) - (b.sort.date ?? Infinity) || a.index - b.index;
 
-function Thumb({ clip, size = 'md' }: { clip: Clip; size?: 'sm' | 'md' }) {
+function Thumb({
+  clip,
+  size = 'medium',
+}: {
+  clip: Clip;
+  size?: 'small' | 'medium';
+}) {
   return (
     <span
-      className={`ctt-pthumb is-${size}`}
+      className={`project-thumbnail is-${size}`}
       style={
         {
-          '--c': clip.color,
-          backgroundImage: clip.thumbnail
+          ...clipColorVars(clip.color),
+          '--thumbnail': clip.thumbnail
             ? `url(${clip.thumbnail})`
-            : undefined,
+            : 'var(--clip-glow)',
         } as CSSProperties
       }
     >
-      <i className="ctt-pnum">{clip.index}</i>
+      <i className="project-number">{clip.index}</i>
     </span>
   );
 }
@@ -654,31 +661,33 @@ export function ProjectsDialog({
 
   return (
     <div
-      className="ctt-set-backdrop"
+      className="settings-backdrop"
       onPointerDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="ctt-pd"
+        className="detail-panel"
         role="dialog"
         aria-modal="true"
         aria-label="Projects"
       >
-        <div className="ctt-pd-head">
+        <div className="detail-header">
           <h2>Projects</h2>
           <span
-            className="ctt-pd-info"
+            className="detail-info"
             title={RULE}
             aria-label={RULE}
             tabIndex={0}
           >
             <SvgIcon name="info" size={14} />
           </span>
-          <span className="ctt-pd-sub">Auto-grouped by date &amp; place</span>
-          <button className="ctt-pbtn is-primary" onClick={create}>
+          <span className="detail-subtitle">
+            Auto-grouped by date &amp; place
+          </span>
+          <button className="project-button is-primary" onClick={create}>
             <SvgIcon name="plus" size={13} /> New project
           </button>
           <button
-            className="ctt-btn"
+            className="icon-button"
             aria-label="Close projects"
             onClick={onClose}
           >
@@ -687,35 +696,37 @@ export function ProjectsDialog({
         </div>
 
         {!sel ? (
-          <p className="ctt-pd-empty">
+          <p className="detail-empty">
             No projects yet. Create one, or upload a clip to start one
             automatically.
           </p>
         ) : (
-          <div className="ctt-pd-body">
-            <ul className="ctt-plist" aria-label="Projects">
+          <div className="detail-body">
+            <ul className="project-list" aria-label="Projects">
               {views.map((v) => {
                 const cs = clipsOf(v);
                 return (
                   <li
                     key={v.id}
-                    className={`ctt-pitem${v.id === sel.id ? ' is-on' : ''}${overId === v.id ? ' is-over' : ''}`}
+                    className={`project-item${v.id === sel.id ? ' is-on' : ''}${overId === v.id ? ' is-over' : ''}`}
                     onClick={() => choose(v.id)}
                     {...dropOver(v.id)}
                     onDrop={drop(v.id)}
                   >
-                    <span className="ctt-pstack">
+                    <span className="thumbnail-stack">
                       {cs.length ? (
                         cs
                           .slice(0, 3)
-                          .map((c) => <Thumb key={c.id} clip={c} size="sm" />)
+                          .map((c) => (
+                            <Thumb key={c.id} clip={c} size="small" />
+                          ))
                       ) : (
-                        <span className="ctt-pthumb is-sm is-empty">
+                        <span className="project-thumbnail is-small is-empty">
                           <SvgIcon name="folder" size={13} />
                         </span>
                       )}
                     </span>
-                    <span className="ctt-pitem-tx">
+                    <span className="item-text">
                       <b>{v.name}</b>
                       <small>{v.range}</small>
                     </span>
@@ -725,7 +736,7 @@ export function ProjectsDialog({
               })}
               {dragId && (
                 <li
-                  className={`ctt-pnew${overId === 'new' ? ' is-over' : ''}`}
+                  className={`project-new${overId === 'new' ? ' is-over' : ''}`}
                   {...dropOver('new')}
                   onDrop={drop('new')}
                 >
@@ -734,7 +745,7 @@ export function ProjectsDialog({
               )}
             </ul>
 
-            <section className="ctt-pdetail" aria-label={sel.name}>
+            <section className="project-detail" aria-label={sel.name}>
               <header>
                 {editing ? (
                   <RenameField
@@ -746,13 +757,13 @@ export function ProjectsDialog({
                     onCancel={() => setEditing(false)}
                   />
                 ) : (
-                  <div className="ctt-phead-title">
-                    <span className="ctt-phead-ico">
+                  <div className="project-title">
+                    <span className="header-icon">
                       <SvgIcon name="folder" size={15} />
                     </span>
                     <h3 title={sel.name}>{sel.name}</h3>
                     <button
-                      className="ctt-btn"
+                      className="icon-button"
                       aria-label="Rename project"
                       title="Rename"
                       onClick={() => setEditing(true)}
@@ -760,7 +771,7 @@ export function ProjectsDialog({
                       <SvgIcon name="edit" size={13} />
                     </button>
                     <button
-                      className="ctt-btn"
+                      className="icon-button"
                       aria-label="Delete project"
                       title="Delete project"
                       aria-expanded={asking}
@@ -770,7 +781,7 @@ export function ProjectsDialog({
                     </button>
                     {sel.custom && (
                       <button
-                        className="ctt-link"
+                        className="link-button"
                         title="Back to the generated name"
                         onClick={() => onRename(sel.id, '')}
                       >
@@ -780,10 +791,10 @@ export function ProjectsDialog({
                   </div>
                 )}
 
-                <div className="ctt-phead-sub-container">
-                  <div className="ctt-phead-sub-header">
+                <div className="subtitle-wrap">
+                  <div className="subtitle-row">
                     <SvgIcon name="calendar" size={13} />
-                    <p className="ctt-phead-sub">{where(sel)}</p>
+                    <p className="project-subtitle">{where(sel)}</p>
                   </div>
                   <StatChips v={sel} />
                 </div>
@@ -797,16 +808,16 @@ export function ProjectsDialog({
                     onCancel={() => setAsking(false)}
                   />
                 )}
-                <div className="ctt-pd-act">
+                <div className="detail-actions">
                   <button
-                    className="ctt-pbtn is-primary"
+                    className="project-button is-primary"
                     disabled={!sel.clipIds.length}
                     onClick={() => onOpen(sel.id)}
                   >
                     Open on map
                   </button>
                   <button
-                    className="ctt-pbtn"
+                    className="project-button"
                     aria-pressed={adding}
                     disabled={!others.length}
                     title={others.length ? undefined : 'No other clips to add'}
@@ -818,18 +829,18 @@ export function ProjectsDialog({
               </header>
 
               {adding && (
-                <div className="ctt-padd">
+                <div className="add-panel">
                   <small>From other projects</small>
                   <ul>
                     {others.map(({ c, from }) => (
                       <li key={c.id}>
-                        <Thumb clip={c} size="sm" />
-                        <span className="ctt-pitem-tx">
+                        <Thumb clip={c} size="small" />
+                        <span className="item-text">
                           <b>{c.title}</b>
                           <small>{from}</small>
                         </span>
                         <button
-                          className="ctt-pbtn"
+                          className="project-button"
                           onClick={() => onMove(c.id, sel.id)}
                         >
                           Add
@@ -840,7 +851,7 @@ export function ProjectsDialog({
                 </div>
               )}
 
-              <div className="ctt-pupload">
+              <div className="project-upload">
                 <UploadZone
                   onFiles={(files) => onUpload(files, sel.id)}
                   busy={busy}
@@ -850,27 +861,27 @@ export function ProjectsDialog({
 
               {selClips.length ? (
                 <>
-                  <p className="ctt-pd-legend">
+                  <p className="detail-legend">
                     Border colour = route on the map · drag a clip onto a
                     project to move it
                   </p>
-                  <ul className="ctt-pclips">
+                  <ul className="clip-picker">
                     {selClips.map((c) => (
                       <li
                         key={c.id}
-                        className={dragId === c.id ? 'is-drag' : ''}
-                        style={{ '--c': c.color } as CSSProperties}
+                        className={dragId === c.id ? 'is-dragging' : ''}
+                        style={clipColorVars(c.color) as CSSProperties}
                         {...dragProps(c)}
                       >
                         <Thumb clip={c} />
-                        <span className="ctt-pitem-tx">
+                        <span className="item-text">
                           <b>{c.title}</b>
                           <small>
                             {c.date} · {c.distance}
                           </small>
                         </span>
                         <button
-                          className="ctt-btn"
+                          className="icon-button"
                           aria-label={`Remove ${c.title} from this project`}
                           title="Remove from project (moves to its own project)"
                           disabled={selClips.length < 2}
@@ -883,7 +894,7 @@ export function ProjectsDialog({
                   </ul>
                 </>
               ) : (
-                <p className="ctt-pd-none">
+                <p className="detail-placeholder">
                   This project is empty. Upload clips above, or use “Add clips”
                   to bring some in from other projects.
                 </p>

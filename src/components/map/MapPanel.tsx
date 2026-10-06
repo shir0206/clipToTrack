@@ -149,8 +149,8 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
   const listId = 'ctt-search-list';
 
   return (
-    <div className="ctt-search">
-      <SvgIcon name="search" size={15} className="ctt-search-ico" />
+    <div className="search-box">
+      <SvgIcon name="search" size={15} className="search-icon" />
       <input
         ref={input}
         value={q}
@@ -183,7 +183,7 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
       />
       {q && (
         <button
-          className="ctt-search-clear"
+          className="search-clear"
           aria-label="Clear search"
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => setQ('')}
@@ -193,19 +193,21 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
       )}
       {open && (
         <div
-          className="ctt-dd ctt-search-dd"
+          className="dropdown-menu search-results"
           onPointerDown={(e) => e.preventDefault() /* keep input focus */}
         >
           {view === 'hint' ? (
-            <p className="ctt-dd-note">
+            <p className="dropdown-note">
               Keep typing — suggestions appear from {MIN_CHARS} characters
             </p>
           ) : view === 'loading' ? (
-            <p className="ctt-dd-note">Searching…</p>
+            <p className="dropdown-note">Searching…</p>
           ) : view === 'error' ? (
-            <p className="ctt-dd-note">Search failed — check your connection</p>
+            <p className="dropdown-note">
+              Search failed — check your connection
+            </p>
           ) : view === 'empty' ? (
-            <p className="ctt-dd-note">No places found</p>
+            <p className="dropdown-note">No places found</p>
           ) : (
             <ul id={listId} role="listbox">
               {hits.map((h, i) => {
@@ -249,7 +251,7 @@ function IconBtn({
 }) {
   return (
     <button
-      className={`ctt-tb-btn${on ? ' is-on' : ''}`}
+      className={`toolbar-button${on ? ' is-on' : ''}`}
       data-tip={label}
       aria-label={label}
       aria-pressed={on}
@@ -287,9 +289,9 @@ function Dropdown<T extends string>({
   const open = openId === id;
   const label = items.find((i) => i.value === current)?.label;
   return (
-    <div className="ctt-dd-wrap">
+    <div className="dropdown-anchor">
       <button
-        className={`ctt-tb-btn ctt-tb-menu${open ? ' is-on' : ''}`}
+        className={`toolbar-button toolbar-menu${open ? ' is-on' : ''}`}
         title={title}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -301,7 +303,7 @@ function Dropdown<T extends string>({
         <SvgIcon name="chevron" size={12} />
       </button>
       {open && (
-        <div className="ctt-dd" role="menu">
+        <div className="dropdown-menu" role="menu">
           {items.map((i) => (
             <button
               key={i.value}
@@ -378,11 +380,16 @@ export default function MapPanel({
   if (!view.search && !view.mapStyle && !view.layers && !view.tools)
     return null;
   return (
-    <div className="ctt-tb" ref={bar} role="toolbar" aria-label="Map tools">
+    <div
+      className="map-toolbar"
+      ref={bar}
+      role="toolbar"
+      aria-label="Map tools"
+    >
       {view.search && <PlaceSearch onGo={onGo} />}
 
       {view.mapStyle && (
-        <div className="ctt-tb-group">
+        <div className="toolbar-group">
           <Dropdown
             {...dd}
             id="base"
@@ -414,7 +421,7 @@ export default function MapPanel({
       )}
 
       {view.layers && (
-        <div className="ctt-tb-group">
+        <div className="toolbar-group">
           <IconBtn
             icon="gps"
             label="Start / end markers"
@@ -456,7 +463,7 @@ export default function MapPanel({
       )}
 
       {view.tools && (
-        <div className="ctt-tb-group">
+        <div className="toolbar-group">
           <IconBtn
             icon="ruler"
             label="Measure distance"

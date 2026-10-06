@@ -177,20 +177,16 @@ function RollingNumber({
     .slice(-width);
   let lead = true;
   return (
-    <div className={`ctt-alt-digits${idle ? ' idle' : ''}`} aria-hidden="true">
+    <div className={`digit-row${idle ? ' is-idle' : ''}`} aria-hidden="true">
       {[...s].map((ch, i) => {
         const d = +ch;
         const hide = lead && d === 0 && i < width - 3;
         if (d !== 0) lead = false;
         return (
-          <span
-            key={i}
-            className="ctt-alt-col"
-            style={{ opacity: hide ? 0 : 1 }}
-          >
+          <span key={i} className={`digit-column${hide ? ' is-hidden' : ''}`}>
             <span
-              className="ctt-alt-strip"
-              style={{ transform: `translateY(${-d}em)` }}
+              className="digit-strip"
+              style={{ '--digit': d } as CSSProperties}
             >
               {DIGITS.map((k) => (
                 <span key={k}>{k}</span>
@@ -274,8 +270,8 @@ function Profile({ s, i }: { s: Series; i: number | null }) {
   const cy = g && i !== null ? g.Y(s.alt[i]) : 0;
 
   return (
-    <div className="ctt-alt-graph" aria-hidden="true">
-      <div className="ctt-alt-plot" ref={ref}>
+    <div className="altitude-graph" aria-hidden="true">
+      <div className="graph-plot" ref={ref}>
         {g && (
           <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
             <defs>
@@ -298,13 +294,13 @@ function Profile({ s, i }: { s: Series; i: number | null }) {
             {g.yTicks.map((t, k) => (
               <g key={`y${k}`}>
                 <line
-                  className="ctt-alt-grid"
+                  className="graph-grid"
                   x1={PL}
                   x2={W - PR}
                   y1={t.y}
                   y2={t.y}
                 />
-                <text className="ctt-alt-tick" x={W - PR + 8} y={t.y + 4}>
+                <text className="graph-tick" x={W - PR + 8} y={t.y + 4}>
                   {t.label}
                 </text>
               </g>
@@ -312,14 +308,14 @@ function Profile({ s, i }: { s: Series; i: number | null }) {
             {g.xTicks.map((t, k) => (
               <g key={`x${k}`}>
                 <line
-                  className="ctt-alt-grid"
+                  className="graph-grid"
                   x1={t.x}
                   x2={t.x}
                   y1={PT}
                   y2={g.base}
                 />
                 <text
-                  className="ctt-alt-tick"
+                  className="graph-tick"
                   x={t.x}
                   y={H - 6}
                   textAnchor={k === 0 ? 'start' : 'middle'}
@@ -329,21 +325,21 @@ function Profile({ s, i }: { s: Series; i: number | null }) {
               </g>
             ))}
             <line
-              className="ctt-alt-start"
+              className="graph-start"
               x1={PL}
               x2={W - PR}
               y1={g.startY}
               y2={g.startY}
             />
-            <path className="ctt-alt-ghost" d={g.line} />
+            <path className="graph-ghost" d={g.line} />
             <g clipPath={`url(#${uid}-cp)`}>
               <path d={g.area} fill={`url(#${uid}-ar)`} />
-              <path className="ctt-alt-line" d={g.line} />
+              <path className="graph-line" d={g.line} />
             </g>
             {i !== null && (
               <>
-                <circle className="ctt-alt-pulse" r="5" cx={cx} cy={cy} />
-                <circle className="ctt-alt-dot" r="5" cx={cx} cy={cy} />
+                <circle className="graph-pulse" r="5" cx={cx} cy={cy} />
+                <circle className="graph-dot" r="5" cx={cx} cy={cy} />
               </>
             )}
           </svg>
@@ -395,9 +391,9 @@ function Tile({
   unit?: string;
 }) {
   return (
-    <div className="ctt-alt-tile">
-      <span className="ctt-alt-ico">{ico}</span>
-      <span className="ctt-alt-tx">
+    <div className="gauge-tile">
+      <span className="tile-icon">{ico}</span>
+      <span className="tile-text">
         <em>{label}</em>
         <b>
           {value}
@@ -428,7 +424,7 @@ export default function AltitudeCluster({ clip, probe, weather }: Props) {
 
   if (!S)
     return (
-      <p className="ctt-hint ctt-hint-pad">No altitude data in this clip.</p>
+      <p className="video-hint is-padded">No altitude data in this clip.</p>
     );
 
   const i = idx !== null ? Math.min(idx, S.alt.length - 1) : null;
@@ -478,7 +474,7 @@ export default function AltitudeCluster({ clip, probe, weather }: Props) {
 
   return (
     <div
-      className="ctt-gt ctt-alt"
+      className="gauge-cluster altitude-cluster"
       role="img"
       aria-label={
         alt !== undefined
@@ -487,7 +483,7 @@ export default function AltitudeCluster({ clip, probe, weather }: Props) {
       }
     >
       <Dial
-        className="ctt-alt-dial"
+        className="altitude-dial"
         labels={rateLabels}
         frac={rateFrac}
         from={0.5}
@@ -498,8 +494,8 @@ export default function AltitudeCluster({ clip, probe, weather }: Props) {
         pills={[['VERTICAL', i !== null ? sign(rate, 1) : '--']]}
       />
 
-      <section className="ctt-alt-mid">
-        <div className="ctt-alt-seg" aria-hidden="true">
+      <section className="altitude-middle">
+        <div className="gauge-segment" aria-hidden="true">
           {Array.from({ length: 12 }, (_, k) => (
             <i
               key={k}
@@ -508,31 +504,31 @@ export default function AltitudeCluster({ clip, probe, weather }: Props) {
           ))}
         </div>
 
-        <div className="ctt-alt-readout">
-          <span className="ctt-alt-label">Altitude</span>
-          <div className="ctt-alt-big">
+        <div className="gauge-readout">
+          <span className="gauge-label">Altitude</span>
+          <div className="altitude-value">
             <RollingNumber
               value={alt ?? 0}
               width={width}
               idle={alt === undefined}
             />
-            <span className="ctt-alt-unit">m</span>
+            <span className="altitude-unit">m</span>
           </div>
-          <div className={`ctt-alt-trend${down ? ' down' : ''}`}>
+          <div className={`trend-indicator${down ? ' is-down' : ''}`}>
             {i !== null ? (
               <>
-                <span className="arrow" />
-                <span className="v">{sign(delta, d)} m</span>
-                <span className="w">{S.trendLabel}</span>
+                <span className="trend-arrow" />
+                <span className="trend-value">{sign(delta, d)} m</span>
+                <span className="trend-window">{S.trendLabel}</span>
               </>
             ) : null}
           </div>
-          <span className="ctt-alt-asl">Meters above sea level</span>
+          <span className="altitude-label">Meters above sea level</span>
         </div>
 
         <Profile s={S} i={i} />
 
-        <div className="ctt-alt-tiles">
+        <div className="gauge-tiles">
           <Tile
             ico={ICON_GAIN}
             label="Alt. change"
@@ -554,16 +550,22 @@ export default function AltitudeCluster({ clip, probe, weather }: Props) {
         </div>
 
         {i === null ? (
-          <p className="ctt-gt-hint">Hover or play the route on the map</p>
+          <p className="gauge-hint">Hover or play the route on the map</p>
         ) : (
-          <div className="ctt-gt-bar" aria-hidden="true">
-            <i style={{ width: `${Math.round(progress * 100)}%` }} />
+          <div className="gauge-bar" aria-hidden="true">
+            <i
+              style={
+                {
+                  '--progress': `${Math.round(progress * 100)}%`,
+                } as CSSProperties
+              }
+            />
           </div>
         )}
       </section>
 
       <Dial
-        className="ctt-alt-dial"
+        className="altitude-dial"
         labels={altLabels}
         frac={altFrac}
         sub={5}

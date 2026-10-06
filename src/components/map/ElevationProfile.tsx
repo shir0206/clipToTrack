@@ -13,6 +13,7 @@ import type { Clip } from '../../types';
 import SvgIcon, { type IconName } from '../common/SvgIcon';
 import SpeedCluster from '../instruments/SpeedCluster/SpeedCluster';
 import AltitudeCluster from '../instruments/AltitudeCluster/AltitudeCluster';
+import { clipColorVars } from '../../lib/clipColorStyle';
 
 type Props = {
   clip: Clip;
@@ -111,7 +112,7 @@ function Pane({
 
   const popBtn = onPop && (
     <button
-      className="ctt-btn ctt-pane-pop"
+      className="icon-button pane-popover"
       aria-label={`Open ${LABEL[metric]} in a new window`}
       title="Open in a new window"
       onClick={onPop}
@@ -125,14 +126,14 @@ function Pane({
 
   return (
     <section
-      className={`ctt-prof-pane${dial ? ' is-dial' : ''}`}
+      className={`profile-pane${dial ? ' is-dial' : ''}`}
       aria-label={LABEL[metric]}
     >
       {dial && popBtn}
       {!dial && (
-        <div className="ctt-prof-pane-head">
+        <div className="pane-header">
           <b>{LABEL[metric]}</b>
-          <span className="ctt-prof-read">
+          <span className="profile-readout">
             {chart && showProbe
               ? `${chart.xs[probe!].toFixed(0)} m · ${pv!.toFixed(1)} ${unit}`
               : chart
@@ -151,7 +152,7 @@ function Pane({
         )
       ) : chart ? (
         <div
-          className="ctt-prof-plot"
+          className="profile-plot"
           onPointerMove={onMove}
           onPointerLeave={() => onProbe(null)}
         >
@@ -168,21 +169,27 @@ function Pane({
           {showProbe && (
             <>
               <i
-                className="ctt-prof-cross"
-                style={{ left: `${(chart.xs[probe!] / chart.total) * 100}%` }}
+                className="profile-crosshair"
+                style={
+                  {
+                    '--x': `${(chart.xs[probe!] / chart.total) * 100}%`,
+                  } as CSSProperties
+                }
               />
               <i
-                className="ctt-prof-dot"
-                style={{
-                  left: `${(chart.xs[probe!] / chart.total) * 100}%`,
-                  top: `${(chart.py(pv!) / H) * 100}%`,
-                }}
+                className="profile-dot"
+                style={
+                  {
+                    '--x': `${(chart.xs[probe!] / chart.total) * 100}%`,
+                    '--y': `${(chart.py(pv!) / H) * 100}%`,
+                  } as CSSProperties
+                }
               />
             </>
           )}
         </div>
       ) : (
-        <p className="ctt-hint ctt-hint-pad">
+        <p className="video-hint is-padded">
           No {metric === 'alt' ? 'altitude' : 'speed'} data in this clip.
         </p>
       )}
@@ -287,9 +294,12 @@ function PlotWindow({
 
   if (!root) return null;
   return createPortal(
-    <div className="ctt-app ctt-pop">
-      <div className="ctt-prof" style={{ '--c': clip.color } as CSSProperties}>
-        <div className="ctt-prof-body">
+    <div className="app-shell point-popup">
+      <div
+        className="profile-panel"
+        style={clipColorVars(clip.color) as CSSProperties}
+      >
+        <div className="profile-body">
           <Pane
             clip={clip}
             metric={metric}
@@ -443,11 +453,13 @@ export default function ElevationProfile({
   return (
     <div
       ref={root}
-      className="ctt-prof"
-      style={{ '--c': clip.color, '--h': `${height}px` } as CSSProperties}
+      className="profile-panel"
+      style={
+        { ...clipColorVars(clip.color), '--h': `${height}px` } as CSSProperties
+      }
     >
       <div
-        className="ctt-prof-grip"
+        className="profile-grip"
         role="separator"
         aria-orientation="horizontal"
         aria-label="Resize profile"
@@ -459,15 +471,15 @@ export default function ElevationProfile({
         onKeyDown={onGripKey}
         onDoubleClick={() => setHeight(clampH(DEFAULT_H))}
       />
-      <div className="ctt-prof-head">
+      <div className="profile-header">
         <SvgIcon name="chart" size={14} />
         <strong>{clip.title}</strong>
 
-        <div className="ctt-prof-tabs">
+        <div className="profile-tabs">
           {(['alt', 'speed'] as const).map((k) => (
             <button
               key={k}
-              className={`ctt-chip ctt-tab${tab === k ? ' is-on' : ''}${overTab === k ? ' is-drop' : ''}`}
+              className={`map-chip profile-tab${tab === k ? ' is-on' : ''}${overTab === k ? ' is-drop' : ''}`}
               aria-pressed={tab === k}
               title="Drag onto the other tab to view them side by side"
               onClick={() => pickSingle(k)}
@@ -480,10 +492,10 @@ export default function ElevationProfile({
 
           {split ? (
             <span
-              className={`ctt-chip ctt-tab-split${tab === 'split' ? ' is-on' : ''}`}
+              className={`map-chip split-tab${tab === 'split' ? ' is-on' : ''}`}
             >
               <button
-                className="ctt-tab-split-main"
+                className="split-main"
                 aria-pressed={tab === 'split'}
                 onClick={() => setTab('split')}
               >
@@ -491,7 +503,7 @@ export default function ElevationProfile({
                 {LABEL[split[0]]} | {LABEL[split[1]]}
               </button>
               <button
-                className="ctt-tab-split-x"
+                className="split-close"
                 aria-label="Cancel side-by-side view"
                 title="Cancel side-by-side view"
                 onClick={cancelSplit}
@@ -505,7 +517,7 @@ export default function ElevationProfile({
         {metrics.map((m) => (
           <div
             key={m}
-            className="ctt-prof-tabs ctt-prof-view"
+            className="profile-tabs profile-view"
             role="group"
             aria-label={`${LABEL[m]} view`}
           >
@@ -513,7 +525,7 @@ export default function ElevationProfile({
             {(['graph', 'dial'] as const).map((v) => (
               <button
                 key={v}
-                className={`ctt-chip${modes[m] === v ? ' is-on' : ''}`}
+                className={`map-chip${modes[m] === v ? ' is-on' : ''}`}
                 aria-pressed={modes[m] === v}
                 onClick={() => setModes((s) => ({ ...s, [m]: v }))}
               >
@@ -525,7 +537,7 @@ export default function ElevationProfile({
         ))}
 
         <button
-          className="ctt-btn"
+          className="icon-button"
           aria-label="Close profile"
           onClick={onClose}
         >
@@ -533,7 +545,7 @@ export default function ElevationProfile({
         </button>
       </div>
 
-      <div className="ctt-prof-body">
+      <div className="profile-body">
         {metrics.map((m) => (
           <Pane
             key={m}
@@ -547,11 +559,11 @@ export default function ElevationProfile({
         ))}
 
         {drag && (
-          <div className="ctt-prof-drop" aria-hidden="true">
+          <div className="profile-dropzone" aria-hidden="true">
             {(['left', 'right'] as const).map((side) => (
               <div
                 key={side}
-                className={`ctt-prof-drop-half${overSide === side ? ' is-over' : ''}`}
+                className={`drop-half${overSide === side ? ' is-over' : ''}`}
                 onDragOver={(e) => {
                   e.preventDefault();
                   setOverSide(side);

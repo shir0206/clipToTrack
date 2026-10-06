@@ -612,12 +612,12 @@ export default function TrackMap({
       } as const;
       const hoverPopup = new maplibregl.Popup({
         ...popupOpts,
-        className: 'ctt-popup',
+        className: 'map-popup',
         closeButton: false,
       });
       const pinPopup = new maplibregl.Popup({
         ...popupOpts,
-        className: 'ctt-popup ctt-popup-pinned',
+        className: 'map-popup is-pinned',
         closeButton: true,
       });
       const setSrc = (id: string, d: FeatureCollection | Feature) =>
@@ -943,7 +943,7 @@ export default function TrackMap({
       });
   };
   const fullscreen = () => {
-    const box = el.current?.closest('.ctt-mapcol');
+    const box = el.current?.closest('.map-column');
     if (document.fullscreenElement) void document.exitFullscreen();
     else void box?.requestFullscreen?.();
   };
@@ -969,10 +969,10 @@ export default function TrackMap({
 
   return (
     <div
-      className={`ctt-mapcol${view.zoom ? '' : ' hide-zoom'}${view.gps ? '' : ' hide-gps'}${view.terrain ? '' : ' hide-terrain'}${view.scale ? '' : ' hide-scale'}`}
+      className={`map-column${view.zoom ? '' : ' hides-zoom'}${view.gps ? '' : ' hides-location'}${view.terrain ? '' : ' hides-terrain'}${view.scale ? '' : ' hides-scale'}`}
     >
-      <div className="ctt-mapstage">
-        <div ref={el} className="ctt-map" />
+      <div className="map-stage">
+        <div ref={el} className="map-canvas" />
         <MapPanel
           opts={opts}
           set={set}
@@ -995,7 +995,7 @@ export default function TrackMap({
 
         {range && view.legend && (
           <div
-            className="ctt-legend"
+            className="map-legend"
             aria-label={`Colour scale: ${opts.color}`}
           >
             <span>{range.min.toFixed(0)}</span>
@@ -1011,27 +1011,30 @@ export default function TrackMap({
         )}
 
         {(measuring || meas.length > 0) && (
-          <div className="ctt-measure">
+          <div className="measure-bar">
             <SvgIcon name="ruler" size={14} />
             <strong>
               {meas.length > 1 ? fmtLen(measured) : 'Click the map to measure'}
             </strong>
             <button
-              className="ctt-link"
+              className="link-button"
               onClick={() => setMeas((p) => p.slice(0, -1))}
               disabled={!meas.length}
             >
               Undo
             </button>
             <button
-              className="ctt-link"
+              className="link-button"
               onClick={() => setMeas([])}
               disabled={!meas.length}
             >
               Clear
             </button>
             {measuring && (
-              <button className="ctt-link" onClick={() => setMeasuring(false)}>
+              <button
+                className="link-button"
+                onClick={() => setMeasuring(false)}
+              >
                 Done
               </button>
             )}
@@ -1041,7 +1044,7 @@ export default function TrackMap({
         {view.coords && (
           <button
             ref={coordEl}
-            className="ctt-coords"
+            className="map-coordinates"
             title="Click to copy coordinates"
             onClick={() =>
               lastCoord.current &&

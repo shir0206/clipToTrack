@@ -69,20 +69,20 @@ export default function SettingsDialog({
 
   return (
     <div
-      className="ctt-set-backdrop"
+      className="settings-backdrop"
       onPointerDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         ref={box}
-        className="ctt-set"
+        className="settings-dialog"
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
       >
-        <div className="ctt-set-head">
-          <h2>Settings</h2>
+        <div className="settings-header">
+          <h2 className="settings-heading">Settings</h2>
           <button
-            className="ctt-btn"
+            className="icon-button"
             aria-label="Close settings"
             onClick={onClose}
           >
@@ -90,12 +90,14 @@ export default function SettingsDialog({
           </button>
         </div>
 
-        <section aria-labelledby="set-projects">
-          <h3 id="set-projects">Projects</h3>
-          <label className="ctt-set-row">
+        <section className="settings-section" aria-labelledby="set-projects">
+          <h3 className="settings-title" id="set-projects">
+            Projects
+          </h3>
+          <label className="settings-row">
             <span>
-              <b>Group clips into projects</b>
-              <small>
+              <b className="settings-label">Group clips into projects</b>
+              <small className="settings-hint">
                 {projectMode
                   ? 'Clips are grouped into trips by date and place'
                   : 'Showing a plain list of clips. Your projects are kept and come back when you turn this on'}
@@ -104,33 +106,38 @@ export default function SettingsDialog({
             <input
               type="checkbox"
               role="switch"
-              className="ctt-switch"
+              className="toggle-switch"
               checked={projectMode}
               onChange={(e) => setProjectMode(e.target.checked)}
             />
           </label>
         </section>
 
-        <section aria-labelledby="set-view">
-          <h3 id="set-view">View · map toolbars</h3>
+        <section
+          className="settings-section has-divider"
+          aria-labelledby="set-view"
+        >
+          <h3 className="settings-title" id="set-view">
+            View · map toolbars
+          </h3>
           {VIEW_ITEMS.map(([k, label, hint]) => {
             // the legend only exists while the map is coloured by speed / altitude
             const off = k === 'legend' && colorMode === 'route';
             return (
               <label
                 key={k}
-                className={`ctt-set-row${off ? ' is-disabled' : ''}`}
+                className={`settings-row${off ? ' is-disabled' : ''}`}
               >
                 <span>
-                  <b>{label}</b>
-                  <small>
+                  <b className="settings-label">{label}</b>
+                  <small className="settings-hint">
                     {off ? 'Not in use: map is coloured by route colour' : hint}
                   </small>
                 </span>
                 <input
                   type="checkbox"
                   role="switch"
-                  className="ctt-switch"
+                  className="toggle-switch"
                   disabled={off}
                   checked={view[k]}
                   onChange={(e) => setView({ [k]: e.target.checked })}
@@ -138,16 +145,16 @@ export default function SettingsDialog({
               </label>
             );
           })}
-          <div className="ctt-set-foot">
+          <div className="settings-footer">
             <button
-              className="ctt-link"
+              className="link-button"
               disabled={allOff}
               onClick={() => setAllView(false)}
             >
               Hide all
             </button>
             <button
-              className="ctt-link"
+              className="link-button"
               disabled={allOn}
               onClick={() => setAllView(true)}
             >
@@ -156,21 +163,26 @@ export default function SettingsDialog({
           </div>
         </section>
 
-        <section aria-labelledby="set-layout">
-          <h3 id="set-layout">Layout</h3>
+        <section
+          className="settings-section has-divider"
+          aria-labelledby="set-layout"
+        >
+          <h3 className="settings-title" id="set-layout">
+            Layout
+          </h3>
           <div
-            className={`ctt-set-row${layoutIsDefault ? ' is-disabled' : ''}`}
+            className={`settings-row${layoutIsDefault ? ' is-disabled' : ''}`}
           >
             <span>
-              <b>Reset panel sizes</b>
-              <small>
+              <b className="settings-label">Reset panel sizes</b>
+              <small className="settings-hint">
                 {layoutIsDefault
                   ? 'Already at the default sizes'
                   : 'Clip list width and elevation dock height'}
               </small>
             </span>
             <button
-              className="ctt-link"
+              className="link-button"
               disabled={layoutIsDefault}
               onClick={onResetLayout}
             >
@@ -179,27 +191,32 @@ export default function SettingsDialog({
           </div>
         </section>
 
-        <section aria-labelledby="set-data">
-          <h3 id="set-data">Saved data</h3>
-          <div className={`ctt-set-row${clipCount ? '' : ' is-disabled'}`}>
+        <section
+          className="settings-section has-divider"
+          aria-labelledby="set-data"
+        >
+          <h3 className="settings-title" id="set-data">
+            Saved data
+          </h3>
+          <div className={`settings-row${clipCount ? '' : ' is-disabled'}`}>
             <span>
-              <b>Remove all clips</b>
-              <small>
+              <b className="settings-label">Remove all clips</b>
+              <small className="settings-hint">
                 {clipCount
                   ? `Deletes ${clipCount} clip${clipCount === 1 ? '' : 's'} from the map and from this browser`
                   : 'Nothing to remove'}
               </small>
               {clipCount > 0 && (
-                <small className="ctt-set-warn" role="note">
+                <small className="settings-warning" role="note">
                   <SvgIcon name="warning" size={14} />
                   One-way: once you confirm, it can’t be undone.
                 </small>
               )}
             </span>
             {confirmClear ? (
-              <span className="ctt-set-actions">
+              <span className="settings-actions">
                 <button
-                  className="ctt-set-danger"
+                  className="danger-button"
                   autoFocus
                   onClick={() => {
                     onClearClips();
@@ -209,7 +226,7 @@ export default function SettingsDialog({
                   Yes
                 </button>
                 <button
-                  className="ctt-link"
+                  className="link-button"
                   onClick={() => setConfirmClear(false)}
                 >
                   Cancel
@@ -217,7 +234,7 @@ export default function SettingsDialog({
               </span>
             ) : (
               <button
-                className="ctt-link"
+                className="link-button"
                 disabled={!clipCount}
                 onClick={() => setConfirmClear(true)}
               >

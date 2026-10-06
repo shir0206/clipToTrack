@@ -1,5 +1,5 @@
 /* Speed cluster: glossy automotive instrument panel. Clip colour (--clip-color) is the glow accent. */
-.ctt-gt {
+.gauge-cluster {
   position: relative;
   container-type: size;
   flex: 1;
@@ -13,28 +13,20 @@
   border-radius: 14px;
   border: 1px solid var(--gauge-track);
   background:
-    radial-gradient(
-      70% 90% at 50% 0%,
-      var(--highlight),
-      transparent 70%
-    ),
-    linear-gradient(
-      180deg,
-      var(--gauge-panel),
-      var(--gauge-deep)
-    );
+    radial-gradient(70% 90% at 50% 0%, var(--highlight), transparent 70%),
+    linear-gradient(180deg, var(--gauge-panel), var(--gauge-deep));
   box-shadow: inset 0 1px 0 var(--highlight);
   color: var(--gauge-text);
   font-family: var(--font-sans);
 }
-.ctt-gt > * {
+.gauge-cluster > * {
   position: relative;
   z-index: 1;
 }
 
 /* curved side "wings" behind the dials */
-.ctt-gt::before,
-.ctt-gt::after {
+.gauge-cluster::before,
+.gauge-cluster::after {
   content: '';
   position: absolute;
   top: 12%;
@@ -45,12 +37,12 @@
   background: var(--gradient-wing);
   pointer-events: none;
 }
-.ctt-gt::before {
+.gauge-cluster::before {
   left: -6%;
   border-radius: 0 60% 60% 0 / 0 50% 50% 0;
   border-left: 0;
 }
-.ctt-gt::after {
+.gauge-cluster::after {
   right: -6%;
   border-radius: 60% 0 0 60% / 50% 0 0 50%;
   border-right: 0;
@@ -58,13 +50,13 @@
 
 /* not enough width (side-by-side pane): drop the tachometer */
 @container (max-width: 600px) {
-  .ctt-gt-tach {
+  .gauge-tachometer {
     display: none;
   }
 }
 
 /* dials (SVG) */
-.ctt-gt-dial {
+.gauge-dial {
   height: 100%;
   width: auto;
   aspect-ratio: 1;
@@ -72,47 +64,47 @@
   min-width: 0;
   filter: drop-shadow(var(--shadow-dial));
 }
-.ctt-gt-bezel {
+.gauge-bezel {
   fill: none;
   stroke-width: 2.5;
 }
-.ctt-gt-face {
+.gauge-face {
   stroke: var(--gauge-deep);
   stroke-width: 1;
 }
-.ctt-gt-track,
-.ctt-gt-fill,
-.ctt-gt-red {
+.gauge-track,
+.gauge-fill,
+.gauge-redline {
   fill: none;
   stroke-width: 4;
   stroke-linecap: round;
 }
-.ctt-gt-track {
+.gauge-track {
   stroke: var(--gauge-track);
 }
-.ctt-gt-red {
+.gauge-redline {
   stroke: var(--gauge-danger);
   stroke-linecap: butt;
   opacity: 0.9;
 }
-.ctt-gt-fill {
+.gauge-fill {
   stroke: var(--clip-color);
   filter: drop-shadow(0 0 3px var(--clip-color));
 }
-.ctt-gt-dial line.maj {
+.gauge-dial .major-tick {
   stroke: var(--gauge-text);
   stroke-width: 1.5;
 }
-.ctt-gt-dial line.min {
+.gauge-dial .minor-tick {
   stroke: var(--gauge-text-minor);
   stroke-width: 0.8;
   opacity: 0.65;
 }
-.ctt-gt-dial line.red {
+.gauge-dial .redline-tick {
   stroke: var(--gauge-danger);
   opacity: 1;
 }
-.ctt-gt-lbl {
+.dial-label {
   fill: var(--gauge-text);
   font-size: 12px;
   font-weight: 600;
@@ -120,34 +112,34 @@
   dominant-baseline: central;
   font-variant-numeric: tabular-nums;
 }
-.ctt-gt-cap,
-.ctt-gt-unit {
+.gauge-caption,
+.gauge-unit {
   fill: var(--gauge-text-muted);
   text-anchor: middle;
   font-weight: 500;
 }
-.ctt-gt-cap {
+.gauge-caption {
   font-size: 7px;
   letter-spacing: 0.14em;
 }
-.ctt-gt-unit {
+.gauge-unit {
   font-size: 8px;
 }
 
 /* info pills (altitude / gear) */
-.ctt-gt-pill rect {
+.gauge-pill rect {
   fill: var(--gauge-panel);
   stroke: var(--gauge-border);
   stroke-width: 0.8;
 }
-.ctt-gt-pill-cap {
+.pill-caption {
   fill: var(--gauge-text-muted);
   font-size: 5px;
   letter-spacing: 0.12em;
   text-anchor: middle;
   dominant-baseline: central;
 }
-.ctt-gt-pill-val {
+.pill-value {
   fill: var(--gauge-text);
   font-size: 9px;
   font-weight: 600;
@@ -155,32 +147,32 @@
   dominant-baseline: central;
   font-variant-numeric: tabular-nums;
 }
-.ctt-gt-badge rect {
+.gauge-badge rect {
   fill: var(--clip-color);
   opacity: 0.85;
 }
 
 /* needle + chrome hub */
-.ctt-gt-needle {
+.gauge-needle {
   transform-box: view-box;
   transform-origin: 50% 50%;
   transform: rotate(calc(135deg + var(--fraction) * 270deg));
   transition: transform 0.14s linear;
   filter: drop-shadow(var(--shadow-needle));
 }
-.ctt-gt-needle polygon {
+.gauge-needle polygon {
   fill: var(--gauge-text);
 }
-.ctt-gt-hub {
+.gauge-hub {
   stroke: var(--gauge-text-minor);
   stroke-width: 1;
 }
-.ctt-gt-hub-dot {
+.hub-dot {
   fill: var(--gauge-track);
 }
 
 /* centre console */
-.ctt-gt-mid {
+.gauge-middle {
   position: relative;
   z-index: 1;
   flex: 1 1 280px;
@@ -193,27 +185,23 @@
   font-size: clamp(10px, 5.5cqh, 13px);
 }
 /* trapezoid glass panel behind the readout */
-.ctt-gt-mid::before {
+.gauge-middle::before {
   content: '';
   position: absolute;
   z-index: -1;
   inset: 22% -4% 0;
   clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
-  background: linear-gradient(
-    180deg,
-    var(--highlight),
-    transparent 85%
-  );
+  background: linear-gradient(180deg, var(--highlight), transparent 85%);
 }
 
 /* skewed LED segments */
-.ctt-gt-seg {
+.gauge-segment {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 5px;
   padding: 0 6%;
 }
-.ctt-gt-seg i {
+.gauge-segment i {
   position: relative;
   height: 8px;
   border-radius: 3px;
@@ -221,7 +209,7 @@
   background: var(--gradient-segment);
   border: 1px solid var(--gauge-border);
 }
-.ctt-gt-seg i::after {
+.gauge-segment i::after {
   content: '';
   position: absolute;
   inset: -1px;
@@ -232,7 +220,7 @@
   transition: opacity 0.14s linear;
 }
 
-.ctt-gt-readout {
+.gauge-readout {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -247,20 +235,20 @@
     )
     1;
 }
-.ctt-gt-label {
+.gauge-label {
   color: var(--clip-color);
   font-size: 1.15em;
   font-weight: 600;
   letter-spacing: 0.04em;
   filter: brightness(1.35);
 }
-.ctt-gt-read {
+.gauge-reading {
   display: flex;
   align-items: baseline;
   justify-content: center;
   gap: 8px;
 }
-.ctt-gt-read b {
+.gauge-reading b {
   font-size: clamp(36px, 28cqh, 84px);
   font-weight: 800;
   line-height: 1;
@@ -268,19 +256,19 @@
   font-variant-numeric: tabular-nums;
   text-shadow: 0 2px 14px var(--divider-strong);
 }
-.ctt-gt-read span {
+.gauge-reading span {
   color: var(--gauge-text-muted);
   font-size: 1.5em;
   font-weight: 400;
 }
 
 /* glass tiles with icon */
-.ctt-gt-tiles {
+.gauge-tiles {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.ctt-gt-tile {
+.gauge-tile {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -290,7 +278,7 @@
   background: var(--gradient-glass);
   box-shadow: inset 0 1px 0 var(--divider);
 }
-.ctt-gt-ico {
+.tile-icon {
   display: grid;
   place-items: center;
   flex: none;
@@ -301,17 +289,17 @@
   background: var(--gradient-icon);
   border: 1px solid var(--gauge-border);
 }
-.ctt-gt-tx {
+.tile-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.ctt-gt-tx em {
+.tile-text em {
   font-style: normal;
   color: var(--gauge-text-muted);
   font-size: 0.9em;
 }
-.ctt-gt-tx b {
+.tile-text b {
   font-size: 1.15em;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -319,26 +307,23 @@
 }
 
 /* trip progress */
-.ctt-gt-bar {
+.gauge-bar {
   height: 6px;
   border-radius: 3px;
   background: var(--gauge-track);
   border: 1px solid var(--gauge-edge);
   overflow: hidden;
 }
-.ctt-gt-bar i {
+.gauge-bar i {
   display: block;
   height: 100%;
+  width: var(--progress);
   border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    var(--clip-color),
-    var(--contrast)
-  );
+  background: linear-gradient(90deg, var(--clip-color), var(--contrast));
   box-shadow: 0 0 8px var(--clip-color);
   transition: width 0.14s linear;
 }
-.ctt-gt-hint {
+.gauge-hint {
   margin: 0;
   text-align: center;
   color: var(--gauge-text-muted);
@@ -346,9 +331,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ctt-gt-needle,
-  .ctt-gt-seg i::after,
-  .ctt-gt-bar i {
+  .gauge-needle,
+  .gauge-segment i::after,
+  .gauge-bar i {
     transition: none;
   }
 }

@@ -178,7 +178,7 @@ export default function SvgIcon({
 }: Props) {
   return (
     <svg
-      className={`ctt-icon${className ? ` ${className}` : ''}`}
+      className={`inline-icon${className ? ` ${className}` : ''}`}
       width={size}
       height={size}
       viewBox="0 0 24 24"

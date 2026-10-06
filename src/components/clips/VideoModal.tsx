@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import type { Clip } from '../../types';
 import SvgIcon from '../common/SvgIcon';
+import { clipColorVars } from '../../lib/clipColorStyle';
 
 type Props = {
   clip: Clip;
@@ -46,7 +47,7 @@ export default function VideoModal({
 
   return (
     <div
-      className="ctt-modal"
+      className="video-modal"
       role="dialog"
       aria-modal="true"
       aria-label={clip.title}
@@ -55,18 +56,18 @@ export default function VideoModal({
       <div
         ref={box}
         tabIndex={-1}
-        className="ctt-modal-box"
-        style={{ '--c': clip.color } as CSSProperties}
+        className="modal-box"
+        style={clipColorVars(clip.color) as CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="ctt-modal-head">
-          <span className="ctt-badge">{clip.index}</span>
+        <div className="modal-header">
+          <span className="track-badge">{clip.index}</span>
           <strong>{clip.title}</strong>
           <small>
             {clip.date} · {clip.camera}
           </small>
           <button
-            className="ctt-btn"
+            className="icon-button"
             aria-label="Close video"
             onClick={onClose}
           >
@@ -75,7 +76,7 @@ export default function VideoModal({
         </div>
         <video
           ref={videoRef}
-          className="ctt-modal-video"
+          className="modal-video"
           src={clip.videoUrl}
           poster={clip.thumbnail}
           autoPlay

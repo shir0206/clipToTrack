@@ -29,7 +29,7 @@ export default function UploadZone({ onFiles, busy, progress }: Props) {
 
   return (
     <div
-      className={`ctt-upload${over ? ' is-over' : ''}${busy ? ' is-busy' : ''}`}
+      className={`upload-zone${over ? ' is-over' : ''}${busy ? ' is-busy' : ''}`}
       role="button"
       tabIndex={0}
       aria-label="Add GoPro video"
@@ -51,7 +51,7 @@ export default function UploadZone({ onFiles, busy, progress }: Props) {
         handle(e.dataTransfer.files);
       }}
     >
-      <span className="ctt-upload-ico">
+      <span className="upload-icon">
         <SvgIcon name="upload" size={20} />
       </span>
       <strong>
@@ -63,12 +63,12 @@ export default function UploadZone({ onFiles, busy, progress }: Props) {
       </strong>
       {busy && progress ? (
         <>
-          <span className="ctt-upload-file">
+          <span className="upload-file">
             {progress.of > 1 ? `${progress.n}/${progress.of} · ` : ''}
             {progress.name}
           </span>
           <div
-            className="ctt-bar"
+            className="progress-bar"
             role="progressbar"
             aria-label="Reading file"
             aria-valuemin={0}

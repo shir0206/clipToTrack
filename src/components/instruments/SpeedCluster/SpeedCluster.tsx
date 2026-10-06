@@ -121,7 +121,7 @@ export function Dial({
     ticks.push(
       <line
         key={i}
-        className={`${major ? 'maj' : 'min'}${red ? ' red' : ''}`}
+        className={`${major ? 'major-tick' : 'minor-tick'}${red ? ' redline-tick' : ''}`}
         x1={x0}
         y1={y0}
         x2={x1}
@@ -132,7 +132,7 @@ export function Dial({
 
   return (
     <svg
-      className={`ctt-gt-dial ${className}`}
+      className={`gauge-dial ${className}`}
       viewBox="0 0 200 200"
       style={{ '--f': f } as CSSProperties}
       aria-hidden="true"
@@ -169,14 +169,14 @@ export function Dial({
       </defs>
 
       <circle
-        className="ctt-gt-bezel"
+        className="gauge-bezel"
         cx="100"
         cy="100"
         r="97.5"
         stroke={`url(#${uid}-bezel)`}
       />
       <circle
-        className="ctt-gt-face"
+        className="gauge-face"
         cx="100"
         cy="100"
         r="95.5"
@@ -191,13 +191,13 @@ export function Dial({
         pointerEvents="none"
       />
 
-      <path className="ctt-gt-track" d={arc(0, 1, 91)} />
+      <path className="gauge-track" d={arc(0, 1, 91)} />
       {redFrom !== undefined && (
-        <path className="ctt-gt-red" d={arc(redFrom, 1, 91)} />
+        <path className="gauge-redline" d={arc(redFrom, 1, 91)} />
       )}
       {Math.abs(f - from) > 0.002 && (
         <path
-          className={`ctt-gt-fill${tone ? ` ${tone}` : ''}`}
+          className={`gauge-fill${tone ? ` is-${tone}` : ''}`}
           d={arc(Math.min(from, f), Math.max(from, f), 91)}
         />
       )}
@@ -205,28 +205,28 @@ export function Dial({
       {labels.map((l, i) => {
         const [x, y] = polar(START + (SWEEP * i) / n, 60);
         return (
-          <text key={i} className="ctt-gt-lbl" x={x} y={y}>
+          <text key={i} className="dial-label" x={x} y={y}>
             {l}
           </text>
         );
       })}
 
-      <text className="ctt-gt-cap" x="100" y="130">
+      <text className="gauge-caption" x="100" y="130">
         {title}
       </text>
-      <text className="ctt-gt-unit" x="100" y="142">
+      <text className="gauge-unit" x="100" y="142">
         {unit}
       </text>
 
       {pills.map(([cap, val], i) => {
         const x = pills.length === 1 ? 78 : i === 0 ? 50 : 106;
         return (
-          <g key={cap} className="ctt-gt-pill">
+          <g key={cap} className="gauge-pill">
             <rect x={x} y="156" width="44" height="22" rx="8" />
-            <text className="ctt-gt-pill-cap" x={x + 22} y="164">
+            <text className="pill-caption" x={x + 22} y="164">
               {cap}
             </text>
-            <text className="ctt-gt-pill-val" x={x + 22} y="173">
+            <text className="pill-value" x={x + 22} y="173">
               {val}
             </text>
           </g>
@@ -234,24 +234,24 @@ export function Dial({
       })}
 
       {badge && (
-        <g className="ctt-gt-badge" transform="translate(100 166) skewX(-22)">
+        <g className="gauge-badge" transform="translate(100 166) skewX(-22)">
           <rect x="-11" y="-5" width="6" height="10" rx="1" />
           <rect x="-3" y="-5" width="6" height="10" rx="1" />
           <rect x="5" y="-5" width="6" height="10" rx="1" />
         </g>
       )}
 
-      <g className="ctt-gt-needle">
+      <g className="gauge-needle">
         <polygon points="82,98.2 161,99.5 161,100.5 82,101.8" />
       </g>
       <circle
-        className="ctt-gt-hub"
+        className="gauge-hub"
         cx="100"
         cy="100"
         r="9"
         fill={`url(#${uid}-hub)`}
       />
-      <circle className="ctt-gt-hub-dot" cx="100" cy="100" r="3" />
+      <circle className="hub-dot" cx="100" cy="100" r="3" />
     </svg>
   );
 }
@@ -279,7 +279,7 @@ export default function SpeedCluster({ clip, probe }: Props) {
   const idx = probe ?? held;
 
   if (stats.maxSpeed === undefined)
-    return <p className="ctt-hint ctt-hint-pad">No speed data in this clip.</p>;
+    return <p className="video-hint is-padded">No speed data in this clip.</p>;
 
   const step = niceStep(stats.maxSpeed);
   const scale = step * SPEED_INTERVALS;
@@ -315,12 +315,12 @@ export default function SpeedCluster({ clip, probe }: Props) {
 
   return (
     <div
-      className="ctt-gt"
+      className="gauge-cluster"
       role="img"
       aria-label={`Speedometer: ${v !== undefined ? Math.round(v) : 'no'} km/h, ${v !== undefined ? Math.round(eng.rpm) : 'no'} rpm`}
     >
       <Dial
-        className="ctt-gt-tach"
+        className="gauge-tachometer"
         labels={rpmLabels}
         frac={rpmFrac}
         redFrom={ENGINE.redlineRpm / ENGINE.maxRpm}
@@ -333,8 +333,8 @@ export default function SpeedCluster({ clip, probe }: Props) {
         ]}
       />
 
-      <section className="ctt-gt-mid">
-        <div className="ctt-gt-seg" aria-hidden="true">
+      <section className="gauge-middle">
+        <div className="gauge-segment" aria-hidden="true">
           {Array.from({ length: 12 }, (_, k) => (
             <i
               key={k}
@@ -342,44 +342,50 @@ export default function SpeedCluster({ clip, probe }: Props) {
             />
           ))}
         </div>
-        <div className="ctt-gt-readout">
-          <span className="ctt-gt-label">SPEED</span>
-          <div className="ctt-gt-read">
+        <div className="gauge-readout">
+          <span className="gauge-label">SPEED</span>
+          <div className="gauge-reading">
             <b>{v !== undefined ? Math.round(v) : '--'}</b>
             <span>km/h</span>
           </div>
         </div>
-        <div className="ctt-gt-tiles">
-          <div className="ctt-gt-tile">
-            <span className="ctt-gt-ico">
+        <div className="gauge-tiles">
+          <div className="gauge-tile">
+            <span className="tile-icon">
               <SvgIcon name="route" size={20} />
             </span>
-            <span className="ctt-gt-tx">
+            <span className="tile-text">
               <em>Distance</em>
               <b>{fin(done) ? `${Math.round(done)} m` : '--'}</b>
             </span>
           </div>
-          <div className="ctt-gt-tile">
-            <span className="ctt-gt-ico">
+          <div className="gauge-tile">
+            <span className="tile-icon">
               <SvgIcon name="gauge" size={20} />
             </span>
-            <span className="ctt-gt-tx">
+            <span className="tile-text">
               <em>Max speed</em>
               <b>{Math.round(stats.maxSpeed)} km/h</b>
             </span>
           </div>
         </div>
         {idx === null ? (
-          <p className="ctt-gt-hint">Hover or play the route on the map</p>
+          <p className="gauge-hint">Hover or play the route on the map</p>
         ) : (
-          <div className="ctt-gt-bar" aria-hidden="true">
-            <i style={{ width: `${Math.round(distFrac * 100)}%` }} />
+          <div className="gauge-bar" aria-hidden="true">
+            <i
+              style={
+                {
+                  '--progress': `${Math.round(distFrac * 100)}%`,
+                } as CSSProperties
+              }
+            />
           </div>
         )}
       </section>
 
       <Dial
-        className="ctt-gt-speedo"
+        className="gauge-speedometer"
         labels={speedLabels}
         frac={speedFrac}
         redFrom={5 / 6}

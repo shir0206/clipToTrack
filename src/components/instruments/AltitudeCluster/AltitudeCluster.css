@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700;800&family=Saira+Condensed:wght@500;600&display=swap');
 
 /*
- * Altitude cluster. Rendered with the `ctt-gt ctt-alt` classes, so it inherits the panel, side wings,
+ * Altitude cluster. Rendered with the `gauge-cluster altitude-cluster` classes, so it inherits the panel, side wings,
  * dial chrome (bezel, ticks, needle, pills) and trip-progress bar from SpeedCluster.css; everything
  * below only adds or overrides what is specific to the altitude view.
  */
-.ctt-alt {
+.altitude-cluster {
   /* climb = the clip's own colour; drop = the gauge red */
   --font-condensed: 'Saira Condensed', 'Saira', system-ui, sans-serif;
   font-family:
@@ -18,34 +18,30 @@
 }
 
 /* dials: same chrome as the speed cluster, slower needle, orange when the value arc goes down */
-.ctt-alt .ctt-gt-needle {
+.altitude-cluster .gauge-needle {
   transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.ctt-alt .ctt-gt-fill.down {
+.altitude-cluster .gauge-fill.is-down {
   stroke: var(--gauge-danger);
   filter: drop-shadow(0 0 3px var(--gauge-danger));
 }
-.ctt-alt .ctt-gt-lbl {
+.altitude-cluster .dial-label {
   font-size: 11px;
 }
-.ctt-alt .ctt-gt-bar i {
-  background: linear-gradient(
-    90deg,
-    var(--clip-color),
-    var(--contrast)
-  );
+.altitude-cluster .gauge-bar i {
+  background: linear-gradient(90deg, var(--clip-color), var(--contrast));
   box-shadow: 0 0 8px var(--clip-color);
 }
 
 /* not enough width: drop both dials, keep the centre console */
 @container (max-width: 560px) {
-  .ctt-alt .ctt-alt-dial {
+  .altitude-cluster .altitude-dial {
     display: none;
   }
 }
 
 /* dials are secondary: small side gauges so the numbers and the graph get the room */
-.ctt-alt .ctt-alt-dial {
+.altitude-cluster .altitude-dial {
   flex: none;
   height: auto;
   width: clamp(84px, 13cqw, 118px);
@@ -53,7 +49,7 @@
 }
 
 /* centre console */
-.ctt-alt-mid {
+.altitude-middle {
   position: relative;
   z-index: 1;
   flex: 1 1 0;
@@ -67,28 +63,24 @@
   justify-content: center;
   gap: clamp(6px, 3cqh, 12px);
 }
-.ctt-alt-mid::before {
+.altitude-middle::before {
   content: '';
   position: absolute;
   z-index: -1;
   inset: 18% -3% 0;
   clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%);
-  background: linear-gradient(
-    180deg,
-    var(--highlight),
-    transparent 85%
-  );
+  background: linear-gradient(180deg, var(--highlight), transparent 85%);
 }
 
 /* skewed LED segments */
-.ctt-alt-seg {
+.gauge-segment {
   flex: none;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 5px;
   padding: 0 6%;
 }
-.ctt-alt-seg i {
+.gauge-segment i {
   position: relative;
   height: 8px;
   border-radius: 3px;
@@ -96,7 +88,7 @@
   background: var(--gradient-segment);
   border: 1px solid var(--gauge-border);
 }
-.ctt-alt-seg i::after {
+.gauge-segment i::after {
   content: '';
   position: absolute;
   inset: -1px;
@@ -108,7 +100,7 @@
 }
 
 /* readout */
-.ctt-alt-readout {
+.gauge-readout {
   flex: none;
   display: grid;
   justify-items: center;
@@ -123,7 +115,7 @@
     )
     1;
 }
-.ctt-alt-label {
+.gauge-label {
   padding-left: 0.32em;
   color: var(--clip-color);
   font: 600 14px/1 var(--font-condensed);
@@ -131,13 +123,13 @@
   text-transform: uppercase;
   filter: brightness(1.15);
 }
-.ctt-alt-big {
+.altitude-value {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   gap: 10px;
 }
-.ctt-alt-digits {
+.digit-row {
   display: flex;
   font-size: clamp(44px, 24cqh, 150px);
   font-weight: 800;
@@ -147,27 +139,31 @@
   text-shadow: 0 2px 18px var(--divider-strong);
   transition: opacity 0.2s linear;
 }
-.ctt-alt-digits.idle {
+.digit-row.is-idle {
   opacity: 0.3;
 }
-.ctt-alt-col {
+.digit-column {
   display: block;
   width: 0.64em;
   height: 1em;
   overflow: hidden;
 }
-.ctt-alt-strip {
+.digit-column.is-hidden {
+  opacity: 0;
+}
+.digit-strip {
   display: block;
+  transform: translateY(calc(var(--digit) * -1em));
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform;
 }
-.ctt-alt-strip span {
+.digit-strip span {
   display: block;
   height: 1em;
   line-height: 1;
   text-align: center;
 }
-.ctt-alt-unit {
+.altitude-unit {
   color: var(--gauge-text-muted);
   font-size: clamp(20px, 9cqh, 56px);
   font-weight: 600;
@@ -175,7 +171,7 @@
 }
 
 /* climb / drop chip */
-.ctt-alt-trend {
+.trend-indicator {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -183,31 +179,31 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.ctt-alt-trend .arrow {
+.trend-arrow {
   width: 0;
   height: 0;
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
   border-bottom: 11px solid var(--clip-color);
 }
-.ctt-alt-trend.down .arrow {
+.trend-indicator.is-down .trend-arrow {
   border-bottom: 0;
   border-top: 11px solid var(--gauge-danger);
 }
-.ctt-alt-trend .v {
+.trend-value {
   color: var(--clip-color);
   font-size: 22px;
 }
-.ctt-alt-trend.down .v {
+.trend-indicator.is-down .trend-value {
   color: var(--gauge-danger);
 }
-.ctt-alt-trend .w {
+.trend-window {
   color: var(--gauge-text-muted);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
 }
-.ctt-alt-asl {
+.altitude-label {
   color: var(--gauge-text-muted);
   font: 500 11px/1 var(--font-condensed);
   letter-spacing: 0.3em;
@@ -215,7 +211,7 @@
 }
 
 /* altitude profile: fills whatever height is left in the console */
-.ctt-alt-graph {
+.altitude-graph {
   position: relative;
   flex: 1 1 0;
   min-height: 72px;
@@ -224,31 +220,31 @@
   background: var(--gradient-glass);
   box-shadow: inset 0 1px 0 var(--highlight);
 }
-.ctt-alt-plot {
+.graph-plot {
   position: absolute;
   inset: 8px 6px 4px 8px;
 }
-.ctt-alt-plot svg {
+.graph-plot svg {
   display: block;
   overflow: visible;
 }
-.ctt-alt-grid {
+.graph-grid {
   stroke: var(--divider);
   stroke-width: 1;
 }
-.ctt-alt-tick {
+.graph-tick {
   fill: var(--gauge-text-muted);
   font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
-.ctt-alt-ghost {
+.graph-ghost {
   fill: none;
   stroke: var(--gauge-border);
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
-.ctt-alt-line {
+.graph-line {
   fill: none;
   stroke: var(--clip-color);
   stroke-width: 2.2;
@@ -256,21 +252,21 @@
   stroke-linecap: round;
   filter: drop-shadow(0 0 4px var(--clip-color));
 }
-.ctt-alt-dot {
+.graph-dot {
   fill: var(--clip-color);
   stroke: var(--contrast);
   stroke-width: 2;
   filter: drop-shadow(0 0 6px var(--clip-color));
 }
-.ctt-alt-pulse {
+.graph-pulse {
   fill: none;
   stroke: var(--clip-color);
   stroke-width: 1.5;
   transform-box: fill-box;
   transform-origin: center;
-  animation: ctt-alt-pulse 1.8s ease-out infinite;
+  animation: graph-pulse 1.8s ease-out infinite;
 }
-@keyframes ctt-alt-pulse {
+@keyframes graph-pulse {
   from {
     transform: scale(1);
     opacity: 0.8;
@@ -280,7 +276,7 @@
     opacity: 0;
   }
 }
-.ctt-alt-start {
+.graph-start {
   stroke: var(--gauge-danger);
   stroke-width: 1;
   stroke-dasharray: 3 4;
@@ -288,13 +284,13 @@
 }
 
 /* tiles: alt. change / air pressure / air temperature */
-.ctt-alt-tiles {
+.gauge-tiles {
   flex: none;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
-.ctt-alt-tile {
+.gauge-tile {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -305,7 +301,7 @@
   background: var(--gradient-glass);
   box-shadow: inset 0 1px 0 var(--divider);
 }
-.ctt-alt-ico {
+.tile-icon {
   display: grid;
   place-items: center;
   flex: none;
@@ -316,16 +312,16 @@
   background: var(--gradient-icon);
   border: 1px solid var(--gauge-border);
 }
-.ctt-alt-ico svg {
+.tile-icon svg {
   width: 18px;
   height: 18px;
 }
-.ctt-alt-tx {
+.tile-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.ctt-alt-tx em {
+.tile-text em {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -334,13 +330,13 @@
   font-style: normal;
   letter-spacing: 0.04em;
 }
-.ctt-alt-tx b {
+.tile-text b {
   font-size: 17px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.ctt-alt-tx b small {
+.tile-text b small {
   color: var(--gauge-text-muted);
   font-size: 11px;
   font-weight: 500;
@@ -348,33 +344,33 @@
 
 /* short panes: shed the least important rows first */
 @container (max-height: 340px) {
-  .ctt-alt-tiles,
-  .ctt-alt-asl {
+  .gauge-tiles,
+  .altitude-label {
     display: none;
   }
 }
 @container (max-height: 190px) {
-  .ctt-alt-graph {
+  .altitude-graph {
     display: none;
   }
 }
 @container (max-width: 480px) {
-  .ctt-alt-tiles {
+  .gauge-tiles {
     grid-template-columns: 1fr 1fr;
   }
-  .ctt-alt-tiles .ctt-alt-tile:last-child {
+  .gauge-tiles .gauge-tile:last-child {
     grid-column: 1 / -1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ctt-alt .ctt-gt-needle,
-  .ctt-alt-strip,
-  .ctt-alt-seg i::after,
-  .ctt-alt-digits {
+  .altitude-cluster .gauge-needle,
+  .digit-strip,
+  .gauge-segment i::after,
+  .digit-row {
     transition: none;
   }
-  .ctt-alt-pulse {
+  .graph-pulse {
     animation: none;
   }
 }

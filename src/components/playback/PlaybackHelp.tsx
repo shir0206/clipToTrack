@@ -80,7 +80,7 @@ function CopyChip({ value }: { value: string }) {
   const [done, setDone] = useState(false);
   return (
     <button
-      className="ctt-ph-copy"
+      className="help-step"
       title="Browsers don't allow websites to open this page, so copy the address and paste it into a new tab"
       onClick={() => {
         void navigator.clipboard?.writeText(value).then(() => {
@@ -89,8 +89,8 @@ function CopyChip({ value }: { value: string }) {
         });
       }}
     >
-      <code>{value}</code>
-      <span>{done ? 'Copied' : 'Copy'}</span>
+      <code className="help-code">{value}</code>
+      <span className="help-label">{done ? 'Copied' : 'Copy'}</span>
     </button>
   );
 }
@@ -117,53 +117,54 @@ export default function PlaybackHelp({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="ctt-ph-backdrop"
+      className="help-backdrop"
       onKeyDown={(e) => e.key === 'Escape' && close()}
     >
       <div
-        className="ctt-ph"
+        className="help-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="ctt-ph-title"
       >
-        <header>
+        <header className="help-header">
           <SvgIcon name="info" size={18} />
-          <h2 id="ctt-ph-title">
+          <h2 className="help-title" id="ctt-ph-title">
             Your browser needs your OK to show this video
           </h2>
         </header>
 
-        <p>
+        <p className="help-text">
           The clip was added, but {browser.name} can't draw its picture (you'd
           see a black square with sound). GoPro records HEVC (H.265), 10-bit, up
           to 5.3K. Browsers don't ship their own HEVC decoder; they borrow the
           one in your computer, and it has to be installed, switched on and
           powerful enough for 5.3K.
         </p>
-        <p>
+        <p className="help-text">
           This page can't switch that on for you: websites aren't allowed to
-          change browser settings or flags, or to open <code>chrome://</code>{' '}
-          pages. It needs a one-time approval from you:
+          change browser settings or flags, or to open{' '}
+          <code className="help-code">chrome://</code> pages. It needs a
+          one-time approval from you:
         </p>
 
-        <ol className="ctt-ph-steps">
+        <ol className="help-steps">
           {stepsFor(browser).map((s) => (
-            <li key={s.text}>
+            <li className="help-item" key={s.text}>
               {s.text}
               {s.copy && <CopyChip value={s.copy} />}
             </li>
           ))}
         </ol>
 
-        <p className="ctt-ph-alt">
-          <b>No change needed:</b> add the small <code>.LRV</code> file the
-          camera saves next to each MP4 (H.264, plays everywhere), or convert
-          the clip to H.264 with HandBrake / ffmpeg. The route and stats work
-          either way.
+        <p className="help-alternate">
+          <b>No change needed:</b> add the small{' '}
+          <code className="help-code">.LRV</code> file the camera saves next to
+          each MP4 (H.264, plays everywhere), or convert the clip to H.264 with
+          HandBrake / ffmpeg. The route and stats work either way.
         </p>
 
-        <footer>
-          <label>
+        <footer className="help-footer">
+          <label className="help-option">
             <input
               type="checkbox"
               checked={never}
@@ -171,7 +172,7 @@ export default function PlaybackHelp({ onClose }: { onClose: () => void }) {
             />
             Don't show this again
           </label>
-          <button ref={ok} className="ctt-ph-ok" onClick={close}>
+          <button ref={ok} className="help-confirm" onClick={close}>
             Got it
           </button>
         </footer>

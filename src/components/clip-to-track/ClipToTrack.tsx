@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
 } from 'react';
@@ -19,7 +20,11 @@ import PlaybackHelp, { playbackHelpDismissed } from '../playback/PlaybackHelp';
 import { probeDecode } from '../../lib/video/videoSupport';
 import { useClips } from '../../hooks/useClips';
 import { useProjectMode, useProjects } from '../../hooks/useProjects';
-import { ProjectBar, ProjectNotice, ProjectsDialog } from '../projects/ProjectsUI';
+import {
+  ProjectBar,
+  ProjectNotice,
+  ProjectsDialog,
+} from '../projects/ProjectsUI';
 import './ClipToTrack.css';
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
@@ -257,16 +262,16 @@ export default function ClipToTrack() {
   const panelBody = (
     <>
       {!emptyProject && (
-        <div className="ctt-sort" role="group" aria-label="Sort clips">
-          <span className="ctt-sort-label">Sort</span>
-          <div className="ctt-sort-chips">
+        <div className="sort-bar" role="group" aria-label="Sort clips">
+          <span className="sort-label">Sort</span>
+          <div className="sort-chips">
             {SORTS.map(([k, label, icon]) => {
               const on = sort.key === k;
               const asc = sort.dir === 1;
               return (
                 <button
                   key={k}
-                  className={`ctt-sort-chip${on ? ' is-on' : ''}`}
+                  className={`sort-chip${on ? ' is-on' : ''}`}
                   disabled={visible.length < 2}
                   aria-pressed={on}
                   title={
@@ -294,7 +299,7 @@ export default function ClipToTrack() {
                     <SvgIcon
                       name={asc ? 'arrowUp' : 'arrowDown'}
                       size={12}
-                      className="ctt-sort-dir"
+                      className="sort-direction"
                     />
                   )}
                 </button>
@@ -304,7 +309,7 @@ export default function ClipToTrack() {
         </div>
       )}
       {emptyProject ? (
-        <div className="ctt-pempty">
+        <div className="project-empty">
           <p>
             This project is empty. Drop GoPro clips here and they’ll be added to
             it.
@@ -312,7 +317,7 @@ export default function ClipToTrack() {
           {upload}
         </div>
       ) : (
-        <ul className="ctt-list" role="listbox" aria-label="Clips">
+        <ul className="plain-list" role="listbox" aria-label="Clips">
           {sorted.map((clip) => (
             <ClipCard
               key={clip.id}
@@ -343,10 +348,10 @@ export default function ClipToTrack() {
   );
 
   return (
-    <div className={`ctt-app${dragging ? ' is-resizing' : ''}`}>
-      <header className="ctt-header">
+    <div className={`app-shell${dragging ? ' is-resizing' : ''}`}>
+      <header className="app-header">
         <Logo tagline="GoPro clips. Mapped to your adventures." />
-        <div className="ctt-header-actions">
+        <div className="header-actions">
           {projectMode && (
             <button
               onClick={() =>
@@ -362,13 +367,16 @@ export default function ClipToTrack() {
         </div>
       </header>
 
-      <main className="ctt-layout">
-        <aside className="ctt-panel" style={{ width: panelW }}>
-          <div className="ctt-panel-title">
+      <main className="app-layout">
+        <aside
+          className="side-panel"
+          style={{ '--panel-width': `${panelW}px` } as CSSProperties}
+        >
+          <div className="panel-title">
             Clips{' '}
             <span>
               {clips.length > 0 && (
-                <button className="ctt-link" onClick={handleClear}>
+                <button className="link-button" onClick={handleClear}>
                   <SvgIcon name="trash" size={13} />
                   Clear all
                 </button>
@@ -401,7 +409,7 @@ export default function ClipToTrack() {
             panelBody
           )}
           {error && (
-            <p className="ctt-error" role="alert">
+            <p className="error-message" role="alert">
               Couldn’t load {error}
             </p>
           )}
@@ -409,7 +417,7 @@ export default function ClipToTrack() {
         </aside>
 
         <div
-          className={`ctt-resizer${dragging ? ' is-dragging' : ''}`}
+          className={`panel-resizer${dragging ? ' is-dragging' : ''}`}
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize sidebar"
@@ -424,7 +432,7 @@ export default function ClipToTrack() {
           onDoubleClick={() => setPanelW(clampW(window.innerWidth * 0.33))}
         />
 
-        <section className="ctt-map-wrap">
+        <section className="map-frame">
           <TrackMap
             clips={mapClips}
             apiRef={mapApi}
@@ -434,7 +442,7 @@ export default function ClipToTrack() {
             onHover={setHoveredClipId}
           />
           {clips.length === 0 && (
-            <div className="ctt-empty">
+            <div className="empty-state">
               <h2>No tracks yet</h2>
               <p>Drop a GoPro MP4 to map your adventure.</p>
             </div>

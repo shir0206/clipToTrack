@@ -3,6 +3,7 @@ import type { Clip } from '../../types';
 import SvgIcon, { type IconName } from '../common/SvgIcon';
 import { watchPicture } from '../../lib/video/videoSupport';
 import { CLIP_MIME } from '../../lib/projects';
+import { clipColorVars } from '../../lib/clipColorStyle';
 
 type Props = {
   clip: Clip;
@@ -134,8 +135,8 @@ export default function ClipCard({
       aria-selected={selected}
       tabIndex={0}
       aria-label={`Select track ${clip.index} ${clip.title}${place ? ` - ${place}` : ''}`}
-      className={`ctt-card${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
-      style={{ '--c': clip.color } as CSSProperties}
+      className={`clip-card${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
+      style={clipColorVars(clip.color) as CSSProperties}
       onClick={onSelect}
       draggable={!!onDragStart}
       onDragStart={(e) => {
@@ -156,10 +157,10 @@ export default function ClipCard({
       onMouseLeave={() => onHover(false)}
     >
       <div
-        className={`ctt-thumb${canPlay ? ' is-playable' : ''}`}
+        className={`clip-thumbnail${canPlay ? ' is-playable' : ''}`}
         style={
           clip.thumbnail
-            ? { backgroundImage: `url(${clip.thumbnail})` }
+            ? ({ '--thumbnail': `url(${clip.thumbnail})` } as CSSProperties)
             : undefined
         }
         onClick={
@@ -174,7 +175,7 @@ export default function ClipCard({
         {clip.videoUrl && !videoError && (
           <video
             ref={videoRef}
-            className="ctt-video"
+            className="video-frame"
             src={clip.videoUrl}
             poster={clip.thumbnail}
             preload="metadata"
@@ -192,7 +193,7 @@ export default function ClipCard({
         )}
         {!clip.videoUrl && (
           <span
-            className="ctt-thumb-hint"
+            className="thumbnail-hint"
             title="The video file isn't kept after a reload — add it again to play"
           >
             Re-add video to play
@@ -200,16 +201,16 @@ export default function ClipCard({
         )}
       </div>
 
-      <div className="ctt-card-body">
-        <div className="ctt-card-head">
-          <div className="ctt-card-head-container">
-            <div className="ctt-phead-title">
-              <div className="ctt-title-row">
-                <span className="ctt-badge" />
+      <div className="card-body">
+        <div className="card-header">
+          <div className="header-group">
+            <div className="project-title">
+              <div className="title-row">
+                <span className="track-badge" />
                 <h3>{clip.title}</h3>
               </div>
               <button
-                className="ctt-btn ctt-btn-spacer"
+                className="icon-button button-spacer"
                 aria-label={`${hidden ? 'Show' : 'Hide'} ${clip.title} on map`}
                 aria-pressed={hidden}
                 title={hidden ? 'Show on map' : 'Hide on map'}
@@ -218,7 +219,7 @@ export default function ClipCard({
                 <SvgIcon name={hidden ? 'eyeOff' : 'eye'} size={15} />
               </button>
               <button
-                className="ctt-btn"
+                className="icon-button"
                 aria-label={`Delete ${clip.title}`}
                 title="Delete clip"
                 aria-expanded={confirming}
@@ -228,26 +229,26 @@ export default function ClipCard({
               </button>
             </div>
             {place && (
-              <p className="ctt-meta">
+              <p className="card-meta">
                 <SvgIcon name="mapPin" size={14} />
                 {place}
               </p>
             )}
-            <p className="ctt-meta">
+            <p className="card-meta">
               <SvgIcon name="calendar" size={12} />
               {clip.date}
             </p>
-            <p className="ctt-meta">
+            <p className="card-meta">
               <SvgIcon name="camera" size={12} />
               {clip.camera}
             </p>
           </div>
         </div>
 
-        <div className="ctt-controls">
-          <div className="ctt-controls-btns">
+        <div className="card-controls">
+          <div className="control-buttons">
             <button
-              className="ctt-btn ctt-btn-primary"
+              className="icon-button is-primary"
               aria-label={`${playing ? 'Pause' : 'Play'} ${clip.title}`}
               disabled={!canPlay}
               onClick={stop(handleToggle)}
@@ -255,7 +256,7 @@ export default function ClipCard({
               <SvgIcon name={playing ? 'pause' : 'play'} size={14} />
             </button>
             <button
-              className="ctt-btn"
+              className="icon-button"
               aria-label={`Stop ${clip.title}`}
               disabled={!canPlay}
               onClick={(e) => {
@@ -266,7 +267,7 @@ export default function ClipCard({
               <SvgIcon name="stop" size={13} />
             </button>
             <button
-              className="ctt-btn"
+              className="icon-button"
               aria-label={`Maximize ${clip.title}`}
               title="Open larger"
               disabled={!canPlay}
@@ -276,8 +277,8 @@ export default function ClipCard({
             </button>
           </div>
           {active && (
-            <span className="ctt-playing" role="status">
-              <span className="ctt-eq" aria-hidden="true">
+            <span className="playing-indicator" role="status">
+              <span className="equalizer" aria-hidden="true">
                 <i />
                 <i />
                 <i />
@@ -288,21 +289,21 @@ export default function ClipCard({
         </div>
         {confirming && (
           <div
-            className="ctt-confirm"
+            className="confirm-bar"
             role="alertdialog"
             aria-label={`Delete ${clip.title}?`}
             onClick={(e) => e.stopPropagation()}
           >
             <span>Remove from map and saved data?</span>
             <button
-              className="ctt-confirm-yes"
+              className="confirm-accept"
               autoFocus
               onClick={stop(onDelete)}
             >
               Delete
             </button>
             <button
-              className="ctt-confirm-no"
+              className="confirm-cancel"
               onClick={stop(() => setConfirming(false))}
             >
               Cancel
@@ -310,15 +311,15 @@ export default function ClipCard({
           </div>
         )}
         {videoError && (
-          <p className="ctt-video-error" role="status">
+          <p className="video-error" role="status">
             {videoError}
           </p>
         )}
       </div>
 
-      <dl className="ctt-stats">
+      <dl className="card-stats">
         {stats.map(([icon, label, value]) => (
-          <div key={label} className="ctt-stat">
+          <div key={label} className="stat-item">
             <SvgIcon name={icon} size={16} />
             <div>
               <dt>{label}</dt>
@@ -328,20 +329,20 @@ export default function ClipCard({
         ))}
       </dl>
 
-      <p className="ctt-quality">
+      <p className="quality-label">
         <SvgIcon name="gps" size={12} />
         {clip.gpsQuality}
       </p>
 
       {!!clip.details?.length && (
-        <details className="ctt-more" onClick={(e) => e.stopPropagation()}>
+        <details className="more-menu" onClick={(e) => e.stopPropagation()}>
           <summary>
             <SvgIcon name="info" size={14} />
             More details
-            <SvgIcon name="chevron" size={14} className="ctt-chev" />
+            <SvgIcon name="chevron" size={14} className="chevron-icon" />
           </summary>
           {clip.details.map((g) => (
-            <section key={g.title} className="ctt-more-group">
+            <section key={g.title} className="more-group">
               <h4>{g.title}</h4>
               <dl>
                 {g.rows.map(([k, v]) => (

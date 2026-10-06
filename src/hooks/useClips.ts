@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { clipFromMetadata, type ClipMetadata } from '../lib/gopro/clipFromMetadata';
-import { extractGoProMetadata, NoGpsFixError } from '../lib/gopro/extractGoProMetadata';
+import {
+  clipFromMetadata,
+  type ClipMetadata,
+} from '../lib/gopro/clipFromMetadata';
+import {
+  extractGoProMetadata,
+  NoGpsFixError,
+} from '../lib/gopro/extractGoProMetadata';
 import { pickAnchors } from '../lib/gopro/gpsBridge';
 import { captureThumbnail } from '../lib/video/videoThumbnail';
 import type { Clip, UploadProgress } from '../types';

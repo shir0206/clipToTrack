@@ -1,4 +1,5 @@
 import type { Clip } from '../types';
+import { clipColorStyleText } from './clipColorStyle';
 
 const GPS_EPOCH = Date.UTC(2000, 0, 1);
 const DAY_MS = 86_400_000;
@@ -62,14 +63,14 @@ export function pointPopupHtml(clip: Clip, i: number): string {
   ];
 
   return `
-<div class="ctt-pop" style="--c:${esc(clip.color)}">
-  <div class="ctt-pop-head">
-    <span class="ctt-pop-num">#${p.index ?? i + 1}</span>
+<div class="point-popup" style="${esc(clipColorStyleText(clip.color))}">
+  <div class="popup-header">
+    <span class="popup-number">#${p.index ?? i + 1}</span>
     <strong>${esc(clip.title)}</strong>
-    ${tag ? `<span class="ctt-pop-tag">${tag}</span>` : ''}
+    ${tag ? `<span class="popup-tag">${tag}</span>` : ''}
   </div>
-  <div class="ctt-pop-time">${utc}</div>
-  <dl class="ctt-pop-grid">
+  <div class="popup-time">${utc}</div>
+  <dl class="popup-grid">
     ${cells.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}
   </dl>
 </div>`;
