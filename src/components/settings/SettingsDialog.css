@@ -4,7 +4,7 @@
   z-index: 1000;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--scrim);
 }
 .ctt-set {
   width: min(480px, calc(100vw - 32px));
@@ -12,9 +12,9 @@
   overflow: auto;
   border-radius: 14px;
   padding: 18px 20px 16px;
-  background: Canvas;
-  color: CanvasText;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-dialog);
 }
 .ctt-set-head {
   display: flex;
@@ -42,7 +42,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 9px 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
 }
 .ctt-set-row:last-child {
@@ -71,7 +71,7 @@
   height: 22px;
   margin: 0;
   border-radius: 11px;
-  background: color-mix(in srgb, currentColor 25%, transparent);
+  background: var(--border-strong);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -83,18 +83,18 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--color-app-surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  background: var(--contrast);
+  box-shadow: var(--shadow-switch);
   transition: transform 0.15s;
 }
 .ctt-switch:checked {
-  background: var(--color-action-primary);
+  background: var(--primary);
 }
 .ctt-switch:checked::after {
   transform: translateX(16px);
 }
 .ctt-switch:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .ctt-set-foot {
@@ -124,7 +124,7 @@
   align-items: center;
   gap: 6px;
   margin-top: 6px !important;
-  color: var(--color-danger);
+  color: var(--danger);
   opacity: 1 !important;
 }
 .ctt-set-actions {
@@ -136,14 +136,14 @@
   border: 0;
   border-radius: 8px;
   padding: 6px 12px;
-  background: var(--color-danger);
-  color: var(--color-app-surface);
+  background: var(--danger);
+  color: var(--contrast);
   font-weight: 600;
   cursor: pointer;
   font-size: 12px;
 }
 .ctt-set-danger:hover {
-  background: var(--color-danger-hover);
+  background: var(--danger-strong);
 }
 #set-view,
 #set-layout,

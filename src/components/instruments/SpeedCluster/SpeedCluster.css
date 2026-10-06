@@ -1,12 +1,5 @@
-/* Speed cluster: glossy automotive instrument panel. Clip colour (--c) is the glow accent. */
+/* Speed cluster: glossy automotive instrument panel. Clip colour (--clip-color) is the glow accent. */
 .ctt-gt {
-  --gt-bg: var(--color-gauge-bg);
-  --gt-panel: var(--color-gauge-panel);
-  --gt-border: var(--color-gauge-border);
-  --gt-track: var(--color-gauge-track);
-  --gt-ink: var(--color-gauge-text);
-  --gt-muted: var(--color-gauge-text-muted);
-  --gt-red: var(--color-gauge-danger);
   position: relative;
   container-type: size;
   flex: 1;
@@ -18,26 +11,21 @@
   padding: 10px 14px;
   overflow: hidden;
   border-radius: 14px;
-  border: 1px solid var(--color-gauge-border-panel);
+  border: 1px solid var(--gauge-track);
   background:
     radial-gradient(
       70% 90% at 50% 0%,
-      rgba(255, 255, 255, 0.05),
+      var(--highlight),
       transparent 70%
     ),
     linear-gradient(
       180deg,
-      var(--color-gauge-panel-top),
-      var(--color-gauge-panel-deep)
+      var(--gauge-panel),
+      var(--gauge-deep)
     );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  color: var(--gt-ink);
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
+  box-shadow: inset 0 1px 0 var(--highlight);
+  color: var(--gauge-text);
+  font-family: var(--font-sans);
 }
 .ctt-gt > * {
   position: relative;
@@ -53,12 +41,8 @@
   bottom: 12%;
   width: 34%;
   z-index: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(
-    180deg,
-    rgba(30, 30, 32, 0.7),
-    rgba(8, 8, 9, 0.2)
-  );
+  border: 1px solid var(--divider);
+  background: var(--gradient-wing);
   pointer-events: none;
 }
 .ctt-gt::before {
@@ -86,14 +70,14 @@
   aspect-ratio: 1;
   flex: 0 1 auto;
   min-width: 0;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.65));
+  filter: drop-shadow(var(--shadow-dial));
 }
 .ctt-gt-bezel {
   fill: none;
   stroke-width: 2.5;
 }
 .ctt-gt-face {
-  stroke: var(--color-gauge-panel-deep);
+  stroke: var(--gauge-deep);
   stroke-width: 1;
 }
 .ctt-gt-track,
@@ -104,32 +88,32 @@
   stroke-linecap: round;
 }
 .ctt-gt-track {
-  stroke: var(--gt-track);
+  stroke: var(--gauge-track);
 }
 .ctt-gt-red {
-  stroke: var(--gt-red);
+  stroke: var(--gauge-danger);
   stroke-linecap: butt;
   opacity: 0.9;
 }
 .ctt-gt-fill {
-  stroke: var(--c, var(--color-action-primary));
-  filter: drop-shadow(0 0 3px var(--c, var(--color-action-primary)));
+  stroke: var(--clip-color);
+  filter: drop-shadow(0 0 3px var(--clip-color));
 }
 .ctt-gt-dial line.maj {
-  stroke: var(--gt-ink);
+  stroke: var(--gauge-text);
   stroke-width: 1.5;
 }
 .ctt-gt-dial line.min {
-  stroke: var(--color-gauge-text-minor);
+  stroke: var(--gauge-text-minor);
   stroke-width: 0.8;
   opacity: 0.65;
 }
 .ctt-gt-dial line.red {
-  stroke: var(--gt-red);
+  stroke: var(--gauge-danger);
   opacity: 1;
 }
 .ctt-gt-lbl {
-  fill: var(--gt-ink);
+  fill: var(--gauge-text);
   font-size: 12px;
   font-weight: 600;
   text-anchor: middle;
@@ -138,7 +122,7 @@
 }
 .ctt-gt-cap,
 .ctt-gt-unit {
-  fill: var(--gt-muted);
+  fill: var(--gauge-text-muted);
   text-anchor: middle;
   font-weight: 500;
 }
@@ -152,19 +136,19 @@
 
 /* info pills (altitude / gear) */
 .ctt-gt-pill rect {
-  fill: rgba(14, 14, 15, 0.92);
-  stroke: var(--color-gauge-border-pill);
+  fill: var(--gauge-panel);
+  stroke: var(--gauge-border);
   stroke-width: 0.8;
 }
 .ctt-gt-pill-cap {
-  fill: var(--gt-muted);
+  fill: var(--gauge-text-muted);
   font-size: 5px;
   letter-spacing: 0.12em;
   text-anchor: middle;
   dominant-baseline: central;
 }
 .ctt-gt-pill-val {
-  fill: var(--gt-ink);
+  fill: var(--gauge-text);
   font-size: 9px;
   font-weight: 600;
   text-anchor: middle;
@@ -172,7 +156,7 @@
   font-variant-numeric: tabular-nums;
 }
 .ctt-gt-badge rect {
-  fill: var(--c, var(--color-action-primary));
+  fill: var(--clip-color);
   opacity: 0.85;
 }
 
@@ -180,19 +164,19 @@
 .ctt-gt-needle {
   transform-box: view-box;
   transform-origin: 50% 50%;
-  transform: rotate(calc(135deg + var(--f) * 270deg));
+  transform: rotate(calc(135deg + var(--fraction) * 270deg));
   transition: transform 0.14s linear;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(var(--shadow-needle));
 }
 .ctt-gt-needle polygon {
-  fill: var(--color-gauge-hub-light);
+  fill: var(--gauge-text);
 }
 .ctt-gt-hub {
-  stroke: var(--color-gauge-hub-stroke);
+  stroke: var(--gauge-text-minor);
   stroke-width: 1;
 }
 .ctt-gt-hub-dot {
-  fill: var(--color-gauge-hub-dot);
+  fill: var(--gauge-track);
 }
 
 /* centre console */
@@ -217,8 +201,8 @@
   clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.06),
-    rgba(255, 255, 255, 0) 85%
+    var(--highlight),
+    transparent 85%
   );
 }
 
@@ -234,25 +218,17 @@
   height: 8px;
   border-radius: 3px;
   transform: skewX(-22deg);
-  background: linear-gradient(
-    180deg,
-    var(--color-gauge-segment-top),
-    var(--color-gauge-segment-bottom)
-  );
-  border: 1px solid var(--color-gauge-border-segment);
+  background: var(--gradient-segment);
+  border: 1px solid var(--gauge-border);
 }
 .ctt-gt-seg i::after {
   content: '';
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(
-    180deg,
-    var(--color-gauge-accent-light),
-    var(--c, var(--color-action-primary))
-  );
-  box-shadow: 0 0 8px var(--c, var(--color-action-primary));
-  opacity: var(--on);
+  background: var(--gradient-lit), var(--clip-color);
+  box-shadow: 0 0 8px var(--clip-color);
+  opacity: var(--segment-opacity);
   transition: opacity 0.14s linear;
 }
 
@@ -266,13 +242,13 @@
   border-image: linear-gradient(
       90deg,
       transparent,
-      var(--c, var(--color-action-primary)),
+      var(--clip-color),
       transparent
     )
     1;
 }
 .ctt-gt-label {
-  color: var(--c, var(--color-action-primary));
+  color: var(--clip-color);
   font-size: 1.15em;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -290,10 +266,10 @@
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 14px rgba(255, 255, 255, 0.12);
+  text-shadow: 0 2px 14px var(--divider-strong);
 }
 .ctt-gt-read span {
-  color: var(--gt-muted);
+  color: var(--gauge-text-muted);
   font-size: 1.5em;
   font-weight: 400;
 }
@@ -309,14 +285,10 @@
   align-items: center;
   gap: 10px;
   padding: 6px 10px 6px 6px;
-  border: 1px solid var(--color-gauge-border-tile);
+  border: 1px solid var(--gauge-border);
   border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    rgba(50, 50, 54, 0.55),
-    rgba(16, 16, 18, 0.9)
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  background: var(--gradient-glass);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .ctt-gt-ico {
   display: grid;
@@ -325,13 +297,9 @@
   width: 2.9em;
   height: 2.9em;
   border-radius: 10px;
-  color: var(--c, var(--color-gauge-accent-fallback));
-  background: linear-gradient(
-    180deg,
-    var(--color-gauge-icon-top),
-    var(--color-gauge-panel)
-  );
-  border: 1px solid var(--color-gauge-border-icon);
+  color: var(--clip-color);
+  background: var(--gradient-icon);
+  border: 1px solid var(--gauge-border);
 }
 .ctt-gt-tx {
   display: flex;
@@ -340,7 +308,7 @@
 }
 .ctt-gt-tx em {
   font-style: normal;
-  color: var(--gt-muted);
+  color: var(--gauge-text-muted);
   font-size: 0.9em;
 }
 .ctt-gt-tx b {
@@ -354,8 +322,8 @@
 .ctt-gt-bar {
   height: 6px;
   border-radius: 3px;
-  background: var(--color-gauge-track-bar);
-  border: 1px solid var(--color-gauge-border-bar);
+  background: var(--gauge-track);
+  border: 1px solid var(--gauge-edge);
   overflow: hidden;
 }
 .ctt-gt-bar i {
@@ -364,16 +332,16 @@
   border-radius: inherit;
   background: linear-gradient(
     90deg,
-    var(--c, var(--color-app-surface)),
-    var(--color-app-surface)
+    var(--clip-color),
+    var(--contrast)
   );
-  box-shadow: 0 0 8px var(--c, var(--color-app-surface));
+  box-shadow: 0 0 8px var(--clip-color);
   transition: width 0.14s linear;
 }
 .ctt-gt-hint {
   margin: 0;
   text-align: center;
-  color: var(--gt-muted);
+  color: var(--gauge-text-muted);
   font-size: 0.9em;
 }
 

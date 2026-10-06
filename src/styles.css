@@ -1,112 +1,107 @@
 :root {
-  --color-app-bg: #f7f9fc;
-  --color-app-surface: #fff;
-  --color-app-text: #152033;
-  --color-app-text-muted: #64748b;
-  --color-app-border: #dfe5ed;
-  --color-app-border-strong: #c3ccd9;
-  --color-app-control: #eef1f6;
-  --color-app-control-hover: #e2e7ef;
+  /* ── app (light) ── */
+  --background: #f7f9fc;
+  --background-overlay: #f7f9fccc;
+  --surface: #fff;
+  --surface-overlay: #ffffffeb;
+  --contrast: var(--surface); /* text and strokes on colored or dark fills */
+  --text: #152033;
+  --text-muted: #64748b;
+  --border: #dfe5ed;
+  --border-strong: #c3ccd9;
+  --control: #eef1f6;
+  --control-hover: #e2e7ef;
 
-  --color-action-primary: #2878ff;
-  --color-action-primary-hover: #1f66e0;
-  --color-action-primary-strong: #1f5fd6;
-  --color-action-primary-soft: #eef4ff;
-  --color-focus-ring: var(--color-action-primary);
+  --primary: #2878ff;
+  --primary-strong: #1f5fd6;
+  --primary-soft: #eef4ff;
+  --focus: var(--primary);
+  --focus-halo: #2878ff2e;
 
-  --color-success: #14a44d;
-  --color-danger: #d92d2d;
-  --color-danger-hover: #b82020;
-  --color-danger-strong: #a12626;
-  --color-danger-surface: #fdecec;
-  --color-danger-surface-soft: #fdf3f3;
-  --color-danger-border: #f3c2c2;
-  --color-warning: #e8c990;
+  --success: #14a44d;
+  --danger: #d92d2d;
+  --danger-strong: #b82020;
+  --danger-surface: #fdecec;
+  --danger-border: #f3c2c2;
+  --warning: #e8c990;
 
-  --color-brand-blue: #2468f2;
-  --color-brand-pink: #f5388a;
-  --color-brand-orange: #ff7a1a;
-  --color-brand-white: #fff;
+  --brand-secondary: #f5388a;
+  --brand-tertiary: #ff7a1a;
 
-  --color-home-bg: #091016;
-  --color-home-bg-glow: #172b35;
-  --color-home-surface: #101920;
-  --color-home-surface-raised: #101a21cc;
-  --color-home-surface-drag: #13252a;
-  --color-home-accent: #87f4c2;
-  --color-home-accent-hover: #a0f8d0;
-  --color-home-accent-ink: #07110d;
-  --color-home-text: #e9eef4;
-  --color-home-text-muted: #aab7c1;
-  --color-home-text-subtle: #84939e;
-  --color-home-text-dim: #687984;
-  --color-home-border: #ffffff12;
-  --color-home-border-medium: #ffffff14;
-  --color-home-border-high: #ffffff1f;
-  --color-home-border-dashed: #ffffff35;
-  --color-home-border-card: #ffffff16;
-  --color-home-border-low: #ffffff0d;
-  --color-home-border-strong: #ffffff24;
-  --color-home-overlay-subtle: #ffffff08;
-  --color-home-overlay-chip: #ffffff0a;
-  --color-home-overlay: #ffffff10;
-  --color-home-text-secondary: #8d9ba6;
-  --color-home-text-note: #b8c5cd;
-  --color-home-text-disabled: #50606a;
-  --color-home-text-link: #9caab4;
-  --color-home-text-meta: #71818c;
-  --color-home-text-accent-muted: #8fa09e;
-  --color-home-text-strong: #dce5eb;
-  --color-home-text-row: #acbac3;
-  --color-home-text-control: #c5d0d6;
-  --color-home-text-footer: #53636d;
+  /* per-clip colour: the app sets all three inline on a clip, these are the defaults */
+  --clip-color: var(--primary);
+  --clip-faint: #2878ff1a;
+  --clip-glow: #2878ff4d;
+
+  /* ── home (dark) ── */
+  --home-background: #091016;
+  --home-glow: #172b35;
+  --home-surface: #101920;
+  --home-dragging: #13252a;
+  --home-accent: #87f4c2;
+  --home-accent-hover: #a0f8d0;
+  --home-accent-text: #07110d;
+  --home-accent-faint: #87f4c20f;
+  --home-accent-border: #87f4c23d;
+  --home-text: #e9eef4;
+  --home-text-muted: #aab7c1;
+  --home-text-subtle: #84939e;
+  --home-text-faint: #687984;
+
+  /* ── lines and fills on any dark surface ── */
+  --highlight: #ffffff0d;
+  --divider: #ffffff14;
+  --divider-strong: #ffffff24;
+  --divider-dashed: #ffffff35;
+
+  /* ── gauge (dark) ── */
+  --gauge-deep: #060607;
+  --gauge-background: #0a0a0b;
+  --gauge-panel: #141415;
+  --gauge-track: #202023;
+  --gauge-edge: #2c2c2f;
+  --gauge-border: #36363a;
+  --gauge-text: #f2f2f3;
+  --gauge-text-minor: #bdbdc2;
+  --gauge-text-muted: #9a9a9f;
+  --gauge-text-faint: #66666b;
+  --gauge-danger: #ff3b30;
+
+  /* ── overlays ── */
+  --video: #000;
+  --scrim: #09101680;
+  --scrim-video: #091016d1;
+  --scrim-media: #000000b3;
+
+  /* ── shadows ── */
+  --shadow-card: 0 1px 2px #1520330d;
+  --shadow-lift: 0 4px 14px #15203324;
+  --shadow-popover: 0 0 0 1px #1520330f, var(--shadow-lift);
+  --shadow-menu: 0 0 0 1px #1520330f, 0 10px 28px #15203333;
+  --shadow-dialog: 0 20px 60px #00000059;
   --shadow-home-card: 0 20px 50px #00000022;
+  --shadow-thumbnail: inset 0 0 0 1px #0000000f;
+  --shadow-switch: 0 1px 3px #00000066;
+  --shadow-dial: 0 6px 14px #000000a6;
+  --shadow-needle: 0 1px 2px #000000cc;
 
-  --color-gauge-bg: #0a0a0b;
-  --color-gauge-panel: #141415;
-  --color-gauge-panel-top: #101011;
-  --color-gauge-panel-deep: #050506;
-  --color-gauge-border: #2a2a2d;
-  --color-gauge-border-panel: #1c1c1e;
-  --color-gauge-border-pill: #343437;
-  --color-gauge-border-segment: #36363a;
-  --color-gauge-border-tile: #333336;
-  --color-gauge-border-icon: #39393d;
-  --color-gauge-border-bar: #2e2e31;
-  --color-gauge-track: #232326;
-  --color-gauge-track-bar: #1a1a1c;
-  --color-gauge-text: #f2f2f3;
-  --color-gauge-text-muted: #9a9a9f;
-  --color-gauge-text-minor: #bdbdc2;
-  --color-gauge-danger: #ff3b30;
-  --color-gauge-face-hotspot: #1f1f22;
-  --color-gauge-face-mid: #121214;
-  --color-gauge-face-deep: #060607;
-  --color-gauge-bezel-light: #9a9a9f;
-  --color-gauge-bezel-mid: #2c2c2f;
-  --color-gauge-bezel-dark: #161618;
-  --color-gauge-bezel-edge: #66666b;
-  --color-gauge-hub-light: #f5f5f6;
-  --color-gauge-hub-mid: #98989d;
-  --color-gauge-hub-dark: #2d2d30;
-  --color-gauge-hub-dot: #242426;
-  --color-gauge-icon-top: #242427;
-  --color-gauge-segment-top: #2b2b2e;
-  --color-gauge-segment-bottom: #161617;
-  --color-gauge-accent-light: #9cc2ff;
-  --color-gauge-accent-fallback: #6ea8ff;
-  --color-gauge-hub-stroke: #d0d0d4;
+  /* ── gradients ── */
+  --gradient-glass: linear-gradient(180deg, #2c2c2f8c, #141415e6);
+  --gradient-segment: linear-gradient(180deg, #2c2c2f, #141415);
+  --gradient-icon: linear-gradient(180deg, #202023, #141415);
+  --gradient-wing: linear-gradient(180deg, #202023b3, #06060733);
+  --gradient-lit: linear-gradient(180deg, #ffffff59, #ffffff00);
+  --gradient-thumbnail: linear-gradient(135deg, #8fa7c4, #3d5a80);
 
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
-  color: var(--color-home-text);
-  background: var(--color-home-bg);
+  /* ── type ── */
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  font-family: var(--font-sans);
+  color: var(--home-text);
+  background: var(--home-background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -120,10 +115,10 @@ body {
   background:
     radial-gradient(
       circle at 15% 0%,
-      var(--color-home-bg-glow) 0,
+      var(--home-glow) 0,
       transparent 33rem
     ),
-    var(--color-home-bg);
+    var(--home-background);
 }
 button,
 input {
@@ -150,13 +145,13 @@ h1 {
   pointer-events: none;
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--color-home-accent) 5%, transparent),
+    var(--home-accent-faint),
     transparent 55%
   );
 }
 .drop-zone.is-dragging {
-  border-color: var(--color-home-accent);
-  background: var(--color-home-surface-drag);
+  border-color: var(--home-accent);
+  background: var(--home-dragging);
   transform: translateY(-2px);
 }
 .drop-zone h2 {
@@ -168,7 +163,7 @@ h1 {
 .drop-zone > p {
   position: relative;
   margin: 0;
-  color: var(--color-home-text-secondary);
+  color: var(--home-text-subtle);
 }
 .drop-icon {
   position: relative;
@@ -177,16 +172,16 @@ h1 {
   width: 50px;
   height: 50px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--color-home-accent) 8%, transparent);
+  background: var(--home-accent-faint);
   border: 1px solid
-    color-mix(in srgb, var(--color-home-accent) 24%, transparent);
+    var(--home-accent-border);
 }
 .drop-icon::before,
 .drop-icon::after,
 .drop-icon span {
   content: '';
   position: absolute;
-  background: var(--color-home-accent);
+  background: var(--home-accent);
   border-radius: 2px;
 }
 .drop-icon::before {
@@ -222,19 +217,19 @@ h1 {
   font-weight: 600;
 }
 .button.primary {
-  color: var(--color-home-accent-ink);
-  background: var(--color-home-accent);
+  color: var(--home-accent-text);
+  background: var(--home-accent);
 }
 .button.primary:hover {
-  background: var(--color-home-accent-hover);
+  background: var(--home-accent-hover);
 }
 .button.secondary {
-  color: var(--color-home-text);
-  background: var(--color-home-overlay-subtle);
-  border-color: var(--color-home-border-strong);
+  color: var(--home-text);
+  background: var(--highlight);
+  border-color: var(--divider-strong);
 }
 .button.secondary:hover {
-  background: var(--color-home-overlay);
+  background: var(--divider);
 }
 .fallback-note {
   font-size: 12px;
@@ -255,20 +250,20 @@ h1 {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 16px;
-  color: var(--color-home-text-note);
+  color: var(--home-text-muted);
   font-size: 13px;
 }
 .scan-notes span {
   padding: 8px 11px;
   border-radius: 8px;
-  background: var(--color-home-overlay-chip);
-  border: 1px solid var(--color-home-border);
+  background: var(--highlight);
+  border: 1px solid var(--divider);
 }
 .empty-state {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   margin: 28px 0 88px;
-  border: 1px solid var(--color-home-border);
+  border: 1px solid var(--divider);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -277,17 +272,15 @@ h1 {
   gap: 12px;
   align-items: center;
   padding: 19px 22px;
-  color: var(--color-home-text-subtle);
+  color: var(--home-text-subtle);
   font-size: 13px;
 }
 .empty-state div + div {
-  border-left: 1px solid var(--color-home-border);
+  border-left: 1px solid var(--divider);
 }
 .empty-state strong {
-  color: var(--color-home-text-disabled);
-  font:
-    500 11px 'DM Mono',
-    monospace;
+  color: var(--home-text-faint);
+  font: 500 11px var(--font-mono);
 }
 .results {
   margin: 68px 0 100px;
@@ -310,10 +303,10 @@ h1 {
 }
 .text-button {
   padding: 0;
-  color: var(--color-home-text-link);
+  color: var(--home-text-muted);
   background: none;
   border: 0;
-  border-bottom: 1px solid var(--color-home-text-disabled);
+  border-bottom: 1px solid var(--home-text-faint);
 }
 .clip-grid {
   display: grid;
@@ -322,17 +315,15 @@ h1 {
 }
 .clip-card {
   padding: 26px;
-  border: 1px solid var(--color-home-border-card);
+  border: 1px solid var(--divider);
   border-radius: 18px;
-  background: var(--color-home-surface);
+  background: var(--home-surface);
   box-shadow: var(--shadow-home-card);
 }
 .clip-directory {
   margin: 0 0 6px;
-  color: var(--color-home-text-meta);
-  font:
-    400 11px 'DM Mono',
-    monospace;
+  color: var(--home-text-faint);
+  font: 400 11px var(--font-mono);
 }
 .clip-card h3 {
   margin: 0;
@@ -343,11 +334,9 @@ h1 {
   padding: 7px 9px;
   white-space: nowrap;
   border-radius: 7px;
-  color: var(--color-home-text-accent-muted);
-  background: color-mix(in srgb, var(--color-home-accent) 5%, transparent);
-  font:
-    400 11px 'DM Mono',
-    monospace;
+  color: var(--home-text-subtle);
+  background: var(--home-accent-faint);
+  font: 400 11px var(--font-mono);
 }
 .clip-details {
   display: grid;
@@ -358,12 +347,12 @@ h1 {
 .clip-details div {
   padding: 14px;
   border-radius: 10px;
-  background: var(--color-home-bg);
+  background: var(--home-background);
   min-width: 0;
 }
 .clip-details dt {
   margin-bottom: 6px;
-  color: var(--color-home-text-dim);
+  color: var(--home-text-faint);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -371,35 +360,31 @@ h1 {
 .clip-details dd {
   margin: 0;
   overflow: hidden;
-  color: var(--color-home-text-strong);
-  font:
-    500 12px 'DM Mono',
-    monospace;
+  color: var(--home-text);
+  font: 500 12px var(--font-mono);
   text-overflow: ellipsis;
 }
 .file-list {
-  border-top: 1px solid var(--color-home-border);
+  border-top: 1px solid var(--divider);
 }
 .file-list div {
   display: flex;
   justify-content: space-between;
   gap: 20px;
   padding: 11px 2px;
-  border-bottom: 1px solid var(--color-home-border-low);
-  color: var(--color-home-text-row);
-  font:
-    400 12px 'DM Mono',
-    monospace;
+  border-bottom: 1px solid var(--highlight);
+  color: var(--home-text-muted);
+  font: 400 12px var(--font-mono);
 }
 .file-list span:last-child {
-  color: var(--color-home-text-dim);
+  color: var(--home-text-faint);
   white-space: nowrap;
 }
 .warnings {
   margin: 16px 0 0;
   padding: 0;
   list-style: none;
-  color: var(--color-warning);
+  color: var(--warning);
   font-size: 12px;
 }
 .warnings li {
@@ -415,12 +400,12 @@ h1 {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--color-warning);
+  background: var(--warning);
 }
 .export-panel {
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid var(--color-home-border);
+  border-top: 1px solid var(--divider);
 }
 .export-heading {
   display: flex;
@@ -437,7 +422,7 @@ h1 {
 .export-note,
 .export-error {
   margin: 0;
-  color: var(--color-home-text-subtle);
+  color: var(--home-text-subtle);
   font-size: 12px;
 }
 .export-route,
@@ -450,7 +435,7 @@ h1 {
 .export-route legend,
 .export-columns legend {
   padding: 0 0 8px;
-  color: var(--color-home-text-dim);
+  color: var(--home-text-faint);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -466,7 +451,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-home-text-control);
+  color: var(--home-text-muted);
   font-size: 12px;
 }
 .export-actions {
@@ -477,22 +462,20 @@ h1 {
 }
 .export-error {
   margin-top: 10px;
-  color: var(--color-warning);
+  color: var(--warning);
 }
 footer {
   display: flex;
   justify-content: space-between;
   gap: 20px;
   padding: 25px clamp(24px, 5vw, 72px);
-  color: var(--color-home-text-footer);
-  border-top: 1px solid var(--color-home-overlay);
-  font:
-    400 11px 'DM Mono',
-    monospace;
+  color: var(--home-text-faint);
+  border-top: 1px solid var(--divider);
+  font: 400 11px var(--font-mono);
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid var(--color-home-accent);
+  outline: 3px solid var(--home-accent);
   outline-offset: 3px;
 }
 @media (max-width: 620px) {
@@ -514,7 +497,7 @@ a:focus-visible {
   }
   .empty-state div + div {
     border-left: 0;
-    border-top: 1px solid var(--color-home-border);
+    border-top: 1px solid var(--divider);
   }
   .clip-details {
     grid-template-columns: 1fr;

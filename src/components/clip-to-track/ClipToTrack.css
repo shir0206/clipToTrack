@@ -1,22 +1,12 @@
 .ctt-app {
-  --bg: var(--color-app-bg);
-  --card: var(--color-app-surface);
-  --text: var(--color-app-text);
-  --muted: var(--color-app-text-muted);
-  --border: var(--color-app-border);
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--background);
   color: var(--text);
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
+  font-family: var(--font-sans);
 }
 .ctt-app *,
 .ctt-app *::before,
@@ -32,7 +22,7 @@
   flex: none;
   height: 60px;
   padding: 0 20px;
-  background: var(--card);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 .ctt-brand {
@@ -63,14 +53,14 @@
   font-style: normal;
   font-weight: 500;
   font-size: 0.72em;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-logo-accent {
-  color: var(--color-brand-blue);
+  color: var(--primary);
 }
 .ctt-tagline {
   font-size: 11.5px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-header-actions {
   display: flex;
@@ -87,7 +77,7 @@
   cursor: pointer;
 }
 .ctt-header-actions button:hover {
-  background: var(--bg);
+  background: var(--background);
 }
 
 /* layout */
@@ -112,7 +102,7 @@
   font-size: 15px;
 }
 .ctt-panel-title span {
-  color: var(--muted);
+  color: var(--text-muted);
   font-weight: 500;
 }
 .ctt-list {
@@ -136,16 +126,15 @@
 
 /* card */
 .ctt-card {
-  --c: var(--color-action-primary);
   display: grid;
   grid-template-columns: 148px 1fr;
   gap: 12px;
   padding: 12px 12px 12px 16px;
   position: relative;
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgb(21 32 51 / 0.05);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
   outline: none;
   transition:
@@ -162,28 +151,28 @@
   bottom: 12px;
   width: 4px;
   border-radius: 0 4px 4px 0;
-  background: var(--c);
+  background: var(--clip-color);
 }
 .ctt-card:hover {
-  border-color: var(--color-app-border-strong);
-  box-shadow: 0 2px 6px rgb(21 32 51 / 0.08);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lift);
 }
 .ctt-card:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 40%, transparent);
+  box-shadow: 0 0 0 3px var(--clip-glow);
 }
 .ctt-card.is-selected {
-  border-color: var(--c);
+  border-color: var(--clip-color);
   box-shadow:
-    0 0 0 1px var(--c),
-    0 4px 12px rgb(21 32 51 / 0.1);
-  background: color-mix(in srgb, var(--c) 5%, var(--color-app-surface));
+    0 0 0 1px var(--clip-color),
+    var(--shadow-lift);
+  background: var(--clip-faint);
 }
 .ctt-thumb {
   position: relative;
   aspect-ratio: 16 / 9;
   align-self: start;
   border-radius: 10px;
-  background: linear-gradient(135deg, #8fa7c4, #3d5a80) center / cover;
+  background: var(--gradient-thumbnail) center / cover;
 }
 
 .ctt-card-body {
@@ -204,7 +193,7 @@
 .ctt-card-head p {
   margin: 4px 0;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-card-head-container {
   width: 100%;
@@ -213,7 +202,7 @@
   grid-column: 1 / -1;
   margin: -4px 0 0;
   font-size: 11px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-badge {
   flex: none;
@@ -222,8 +211,8 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--c);
-  color: var(--color-app-surface);
+  background: var(--clip-color);
+  color: var(--contrast);
   font-size: 10px;
   font-weight: 700;
 }
@@ -238,28 +227,28 @@
   border-radius: 50%;
   border: 0;
   cursor: pointer;
-  background: var(--color-app-control);
+  background: var(--control);
   color: var(--text);
   font-size: 12px;
 }
 .ctt-btn:hover {
-  background: var(--color-app-control-hover);
+  background: var(--control-hover);
 }
 .ctt-btn-primary {
-  background: var(--color-action-primary);
-  color: var(--color-app-surface);
+  background: var(--primary);
+  color: var(--contrast);
 }
 .ctt-btn-primary:hover {
-  background: var(--color-action-primary-hover);
+  background: var(--primary-strong);
 }
 .ctt-btn:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .ctt-playing {
   font-size: 12px;
   font-weight: 600;
-  color: var(--c);
+  color: var(--clip-color);
 }
 .ctt-stats {
   grid-column: 1 / -1;
@@ -269,11 +258,11 @@
   margin: 0;
   padding: 8px 10px;
   border-radius: 10px;
-  background: var(--bg);
+  background: var(--background);
 }
 .ctt-stats dt {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-stats dd {
   margin: 2px 0 0;
@@ -289,7 +278,7 @@
   align-items: center;
   text-align: center;
   padding: 16px;
-  border: 2px dashed var(--color-app-border-strong);
+  border: 2px dashed var(--border-strong);
   border-radius: 14px;
   cursor: pointer;
   outline: none;
@@ -299,13 +288,13 @@
 }
 .ctt-upload span {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-upload:hover,
 .ctt-upload:focus-visible,
 .ctt-upload.is-over {
-  border-color: var(--color-action-primary);
-  background: var(--color-action-primary-soft);
+  border-color: var(--primary);
+  background: var(--primary-soft);
 }
 
 /* error */
@@ -314,9 +303,9 @@
   padding: 8px 12px;
   border-radius: 10px;
   font-size: 12px;
-  background: var(--color-danger-surface);
-  color: var(--color-danger-strong);
-  border: 1px solid var(--color-danger-border);
+  background: var(--danger-surface);
+  color: var(--danger-strong);
+  border: 1px solid var(--danger-border);
 }
 
 /* empty */
@@ -326,7 +315,7 @@
   display: grid;
   place-content: center;
   text-align: center;
-  background: rgb(247 249 252 / 0.8);
+  background: var(--background-overlay);
   pointer-events: none;
 }
 .ctt-empty h2 {
@@ -334,7 +323,7 @@
 }
 .ctt-empty p {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -352,7 +341,7 @@
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
-  background: #000;
+  background: var(--video);
 }
 .ctt-btn:disabled {
   opacity: 0.4;
@@ -361,14 +350,14 @@
 .ctt-hint,
 .ctt-video-error {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-hint-pad {
   padding: 12px;
 }
 .ctt-video-error {
   margin: 6px 0 0;
-  color: var(--color-danger-strong);
+  color: var(--danger-strong);
 }
 .ctt-link {
   font: inherit;
@@ -377,7 +366,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--color-action-primary);
+  color: var(--primary);
   cursor: pointer;
 }
 .ctt-link:hover {
@@ -395,13 +384,10 @@
   border-radius: 12px;
   color: var(--text);
   font: inherit;
-  box-shadow:
-    0 0 0 1px rgb(21 32 51 / 0.06),
-    0 10px 28px rgb(21 32 51 / 0.2);
+  box-shadow: var(--shadow-menu);
 }
 .ctt-pop {
-  --c: var(--color-action-primary);
-  border-top: 3px solid var(--c);
+  border-top: 3px solid var(--clip-color);
 }
 .ctt-pop-head {
   display: flex;
@@ -413,8 +399,8 @@
 .ctt-pop-num {
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--c);
-  color: var(--color-app-surface);
+  background: var(--clip-color);
+  color: var(--contrast);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -423,15 +409,15 @@
   margin-left: auto;
   padding: 1px 8px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--c) 12%, var(--color-app-surface));
-  color: var(--c);
+  background: var(--clip-faint);
+  color: var(--clip-color);
   font-size: 11px;
   font-weight: 600;
 }
 .ctt-pop-time {
   padding: 4px 12px 10px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 .ctt-pop-grid {
@@ -444,7 +430,7 @@
 }
 .ctt-pop-grid dt {
   font-size: 10.5px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-pop-grid dd {
   margin: 1px 0 0;
@@ -484,7 +470,7 @@
 .ctt-resizer:hover::before,
 .ctt-resizer:focus-visible::before,
 .ctt-resizer.is-dragging::before {
-  background: var(--color-action-primary);
+  background: var(--primary);
 }
 .ctt-resizer::after {
   content: '';
@@ -515,16 +501,16 @@
   grid-template-columns: 168px 1fr;
 }
 .ctt-badge {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent);
+  box-shadow: 0 0 0 3px var(--clip-glow);
 }
 .ctt-card.is-playing {
   box-shadow:
-    0 0 0 1px var(--c),
-    0 6px 18px color-mix(in srgb, var(--c) 28%, transparent);
+    0 0 0 1px var(--clip-color),
+    0 6px 18px var(--clip-glow);
 }
 .ctt-thumb {
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  box-shadow: var(--shadow-thumbnail);
 }
 .ctt-card-head h3 {
   line-height: 1.2;
@@ -535,7 +521,7 @@
   gap: 5px;
   margin: 3px 0 0;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-controls {
   margin-top: 8px;
@@ -551,10 +537,10 @@
   transform: scale(0.93);
 }
 .ctt-btn-primary {
-  background: var(--c);
+  background: var(--clip-color);
 }
 .ctt-btn-primary:hover {
-  background: color-mix(in srgb, var(--c) 82%, #000);
+  filter: brightness(0.9);
 }
 .ctt-btn-spacer {
   margin-left: auto;
@@ -569,7 +555,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--c);
+  background: var(--clip-color);
   animation: ctt-pulse 1.2s infinite;
 }
 @keyframes ctt-pulse {
@@ -596,10 +582,10 @@
   min-width: 0;
   padding: 7px 9px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--c) 7%, var(--color-app-bg));
+  background: var(--clip-faint);
 }
 .ctt-stat > .ctt-icon {
-  color: var(--c);
+  color: var(--clip-color);
 }
 .ctt-stat dd {
   white-space: nowrap;
@@ -612,7 +598,7 @@
   margin: -2px 0 0;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--bg);
+  background: var(--background);
   border: 1px solid var(--border);
 }
 
@@ -629,7 +615,7 @@
   list-style: none;
   font-size: 12px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--text-muted);
   cursor: pointer;
 }
 .ctt-more > summary::-webkit-details-marker {
@@ -653,7 +639,7 @@
   font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--c);
+  color: var(--clip-color);
 }
 .ctt-more-group dl {
   display: grid;
@@ -663,7 +649,7 @@
   font-size: 12px;
 }
 .ctt-more-group dt {
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-more-group dd {
   margin: 0;
@@ -681,8 +667,8 @@
   height: 40px;
   margin-bottom: 2px;
   border-radius: 50%;
-  background: var(--color-action-primary-soft);
-  color: var(--color-action-primary);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 .ctt-upload strong {
   font-size: 14px;
@@ -709,21 +695,20 @@
   display: grid;
   place-items: center;
   padding: 3vh 3vw;
-  background: rgb(10 16 28 / 0.82);
+  background: var(--scrim-video);
   backdrop-filter: blur(4px);
 }
 .ctt-modal-box {
-  --c: var(--color-action-primary);
   display: flex;
   flex-direction: column;
   width: min(94vw, 1400px);
   max-height: 94vh;
   overflow: hidden;
   border-radius: 16px;
-  background: #0b111c;
-  color: var(--color-app-surface);
-  box-shadow: 0 24px 80px rgb(0 0 0 / 0.5);
-  border-top: 3px solid var(--c);
+  background: var(--home-background);
+  color: var(--contrast);
+  box-shadow: var(--shadow-dialog);
+  border-top: 3px solid var(--clip-color);
 }
 .ctt-modal-head {
   display: flex;
@@ -733,22 +718,22 @@
   font-size: 14px;
 }
 .ctt-modal-head small {
-  color: #94a3b8;
+  color: var(--home-text-subtle);
   font-size: 12px;
 }
 .ctt-modal-head .ctt-btn {
   margin-left: auto;
-  background: rgb(255 255 255 / 0.1);
-  color: var(--color-app-surface);
+  background: var(--divider-strong);
+  color: var(--contrast);
 }
 .ctt-modal-head .ctt-btn:hover {
-  background: rgb(255 255 255 / 0.2);
+  background: var(--divider-dashed);
 }
 .ctt-modal-video {
   display: block;
   width: 100%;
   max-height: calc(94vh - 56px);
-  background: #000;
+  background: var(--video);
   outline: none;
 }
 
@@ -787,11 +772,11 @@
   border-radius: 50%;
   font-size: 18px;
   line-height: 1;
-  color: var(--muted);
-  background: var(--color-app-control);
+  color: var(--text-muted);
+  background: var(--control);
 }
 .ctt-popup-pinned .maplibregl-popup-close-button:hover {
-  background: var(--color-app-control-hover);
+  background: var(--control-hover);
   color: var(--text);
 }
 
@@ -801,7 +786,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: var(--background);
 }
 .ctt-mapstage {
   position: relative;
@@ -821,7 +806,7 @@
   padding: 4px 9px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--card);
+  background: var(--surface);
   font: inherit;
   font-size: 12px;
   color: var(--text);
@@ -831,12 +816,12 @@
     border-color 0.15s;
 }
 .ctt-chip:hover:not(:disabled) {
-  background: var(--bg);
+  background: var(--background);
 }
 .ctt-chip.is-on {
-  background: var(--color-action-primary-soft);
-  border-color: var(--color-action-primary);
-  color: var(--color-action-primary-strong);
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary-strong);
   font-weight: 600;
 }
 .ctt-chip:disabled {
@@ -845,7 +830,7 @@
 }
 .ctt-chip:focus-visible,
 .ctt-coords:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -855,10 +840,8 @@
   position: absolute;
   z-index: 4;
   border-radius: 10px;
-  background: rgb(255 255 255 / 0.92);
-  box-shadow:
-    0 0 0 1px rgb(21 32 51 / 0.06),
-    0 4px 14px rgb(21 32 51 / 0.12);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-popover);
   font-size: 12px;
   color: var(--text);
 }
@@ -901,22 +884,21 @@
   font: inherit;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  color: var(--text-muted);
   cursor: copy;
 }
 
 /* elevation profile dock */
 .ctt-prof {
-  --c: var(--color-action-primary);
-  --h: 260px;
+  --height: 260px;
   position: relative;
   flex: none;
   display: flex;
   flex-direction: column;
-  height: var(--h);
+  height: var(--height);
   min-height: 170px;
   max-height: calc(100% - 200px); /* the map keeps room */
-  background: var(--card);
+  background: var(--surface);
   border-top: 1px solid var(--border);
 }
 .ctt-prof-grip {
@@ -943,7 +925,7 @@
 }
 .ctt-prof-grip:hover::after,
 .ctt-prof-grip:focus-visible::after {
-  background: var(--c);
+  background: var(--clip-color);
 }
 .ctt-prof-grip:focus-visible {
   outline: none;
@@ -983,7 +965,7 @@
   cursor: grabbing;
 }
 .ctt-tab.is-drop {
-  outline: 2px dashed var(--c);
+  outline: 2px dashed var(--clip-color);
   outline-offset: 1px;
 }
 .ctt-tab-split {
@@ -1012,7 +994,7 @@
   opacity: 1;
 }
 .ctt-tab-split button:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 
@@ -1042,7 +1024,7 @@
   gap: 8px;
   height: 28px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-prof-pane-head b {
   color: var(--text);
@@ -1050,7 +1032,7 @@
 }
 .ctt-prof-read {
   margin-right: auto;
-  color: var(--muted);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 .ctt-prof-plot {
@@ -1070,7 +1052,7 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--c);
+  background: var(--clip-color);
   opacity: 0.6;
   pointer-events: none;
 }
@@ -1080,8 +1062,8 @@
   height: 10px;
   margin: -5px 0 0 -5px;
   border-radius: 50%;
-  background: var(--color-app-surface);
-  border: 2.5px solid var(--c);
+  background: var(--surface);
+  border: 2.5px solid var(--clip-color);
   pointer-events: none;
 }
 
@@ -1093,7 +1075,7 @@
   display: flex;
   gap: 6px;
   padding: 6px;
-  background: color-mix(in srgb, var(--card) 75%, transparent);
+  background: var(--surface-overlay);
 }
 .ctt-prof-drop-half {
   flex: 1;
@@ -1103,15 +1085,15 @@
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--text-muted);
   transition:
     background 0.12s,
     border-color 0.12s,
     color 0.12s;
 }
 .ctt-prof-drop-half.is-over {
-  border-color: var(--c);
-  background: color-mix(in srgb, var(--c) 12%, transparent);
+  border-color: var(--clip-color);
+  background: var(--clip-faint);
   color: var(--text);
 }
 .ctt-prof-drop-half span {
@@ -1141,11 +1123,9 @@
   gap: 2px;
   padding: 3px;
   border-radius: 12px;
-  background: var(--card);
+  background: var(--surface);
   color: var(--text);
-  box-shadow:
-    0 0 0 1px rgb(21 32 51 / 0.06),
-    0 4px 14px rgb(21 32 51 / 0.14);
+  box-shadow: var(--shadow-popover);
 }
 .ctt-tb-btn {
   display: inline-flex;
@@ -1167,18 +1147,18 @@
     color 0.15s;
 }
 .ctt-tb-btn:hover:not(:disabled) {
-  background: var(--bg);
+  background: var(--background);
 }
 .ctt-tb-btn.is-on {
-  background: var(--color-action-primary-soft);
-  color: var(--color-action-primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 .ctt-tb-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 .ctt-tb-btn:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
 .ctt-tb-menu span {
@@ -1199,11 +1179,9 @@
   min-width: 190px;
   padding: 4px;
   border-radius: 12px;
-  background: var(--card);
+  background: var(--surface);
   color: var(--text);
-  box-shadow:
-    0 0 0 1px rgb(21 32 51 / 0.06),
-    0 10px 28px rgb(21 32 51 / 0.2);
+  box-shadow: var(--shadow-menu);
 }
 .ctt-dd > button {
   display: block;
@@ -1219,18 +1197,18 @@
   cursor: pointer;
 }
 .ctt-dd > button:hover {
-  background: var(--bg);
+  background: var(--background);
 }
 .ctt-dd > button.is-active {
-  background: var(--color-action-primary-soft);
-  color: var(--color-action-primary-strong);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
   font-weight: 600;
 }
 .ctt-dd-note {
   margin: 0;
   padding: 10px 12px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .ctt-search {
@@ -1240,7 +1218,7 @@
 }
 .ctt-search-ico {
   flex: none;
-  color: var(--muted);
+  color: var(--text-muted);
   margin-left: 4px;
 }
 .ctt-search input {
@@ -1257,8 +1235,8 @@
 }
 .ctt-search:focus-within {
   box-shadow:
-    0 0 0 2px var(--color-action-primary),
-    0 4px 14px rgb(21 32 51 / 0.14);
+    0 0 0 2px var(--primary),
+    var(--shadow-lift);
 }
 .ctt-search-clear {
   display: grid;
@@ -1267,8 +1245,8 @@
   height: 24px;
   border: 0;
   border-radius: 50%;
-  background: var(--bg);
-  color: var(--muted);
+  background: var(--background);
+  color: var(--text-muted);
   cursor: pointer;
 }
 .ctt-search-dd {
@@ -1294,14 +1272,14 @@
   cursor: pointer;
 }
 .ctt-search-dd li.is-active {
-  background: var(--color-action-primary-soft);
+  background: var(--primary-soft);
 }
 .ctt-search-dd li strong {
   font-size: 13px;
 }
 .ctt-search-dd li span {
   font-size: 11.5px;
-  color: var(--muted);
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1315,11 +1293,11 @@
   flex-wrap: wrap;
   margin-top: 8px;
   padding: 6px 8px;
-  border: 1px solid var(--color-danger-border);
+  border: 1px solid var(--danger-border);
   border-radius: 10px;
-  background: var(--color-danger-surface-soft);
+  background: var(--danger-surface);
   font-size: 12px;
-  color: var(--color-danger-strong);
+  color: var(--danger-strong);
 }
 .ctt-confirm span {
   flex: 1 1 100%;
@@ -1333,20 +1311,20 @@
 }
 .ctt-confirm-yes {
   border: 0;
-  background: var(--color-danger);
-  color: var(--color-app-surface);
+  background: var(--danger);
+  color: var(--contrast);
   font-weight: 600;
 }
 .ctt-confirm-yes:hover {
-  background: var(--color-danger-hover);
+  background: var(--danger-strong);
 }
 .ctt-confirm-no {
   border: 1px solid var(--border);
-  background: var(--card);
+  background: var(--surface);
   color: var(--text);
 }
 .ctt-confirm button:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -1362,13 +1340,13 @@
   margin-top: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e3e9f2;
+  background: var(--control-hover);
 }
 .ctt-bar > i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--color-action-primary);
+  background: var(--primary);
   transition: width 0.12s linear;
 }
 .ctt-bar > i.is-indeterminate {
@@ -1402,8 +1380,8 @@
   border-radius: 6px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: rgb(0 0 0 / 0.65);
-  color: var(--color-app-surface);
+  background: var(--scrim-media);
+  color: var(--contrast);
   font-size: 11px;
 }
 
@@ -1414,7 +1392,7 @@
   gap: 10px;
   padding: 4px 4px 4px 12px;
   border-radius: 12px;
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
 }
 .ctt-sort-label {
@@ -1423,7 +1401,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .ctt-sort-chips {
   display: flex;
@@ -1446,7 +1424,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: var(--muted);
+  color: var(--text-muted);
   font: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -1458,12 +1436,12 @@
     box-shadow 0.15s;
 }
 .ctt-sort-chip:hover:not(:disabled):not(.is-on) {
-  background: var(--bg);
+  background: var(--background);
   color: var(--text);
 }
 .ctt-sort-chip.is-on {
-  background: var(--color-action-primary);
-  color: var(--color-app-surface);
+  background: var(--primary);
+  color: var(--contrast);
   font-weight: 600;
 }
 .ctt-sort-chip:disabled {
@@ -1471,7 +1449,7 @@
   cursor: not-allowed;
 }
 .ctt-sort-chip:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 .ctt-sort-dir {
@@ -1491,13 +1469,13 @@
   transform: translate(-50%, -3px);
   padding: 5px 9px;
   border-radius: 8px;
-  background: var(--color-app-text);
-  color: var(--color-app-surface);
+  background: var(--text);
+  color: var(--contrast);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgb(21 32 51 / 0.25);
+  box-shadow: var(--shadow-lift);
   opacity: 0;
   pointer-events: none;
   transition:
@@ -1513,7 +1491,7 @@
   z-index: 20;
   width: 8px;
   height: 8px;
-  background: var(--color-app-text);
+  background: var(--text);
   transform: translate(-50%, -3px) rotate(45deg);
   opacity: 0;
   pointer-events: none;
@@ -1550,7 +1528,7 @@
   font-weight: 500;
   white-space: normal;
   line-height: 1.25;
-  background: rgb(0 0 0 / 0.72);
+  background: var(--scrim-media);
 }
 
 /* title + "Playing" indicator */
@@ -1578,7 +1556,7 @@
   width: 3px;
   height: 100%;
   border-radius: 2px;
-  background: var(--c);
+  background: var(--clip-color);
   transform-origin: bottom;
   animation: ctt-eq 0.9s ease-in-out infinite;
 }
@@ -1611,17 +1589,17 @@
   0%,
   100% {
     box-shadow:
-      0 0 0 1px var(--c),
-      0 6px 18px color-mix(in srgb, var(--c) 22%, transparent);
+      0 0 0 1px var(--clip-color),
+      0 6px 18px var(--clip-glow);
   }
   50% {
     box-shadow:
-      0 0 0 1px var(--c),
-      0 8px 26px color-mix(in srgb, var(--c) 45%, transparent);
+      0 0 0 1px var(--clip-color),
+      0 8px 26px var(--clip-glow);
   }
 }
 .ctt-card.is-playing .ctt-thumb {
-  outline: 2px solid var(--c);
+  outline: 2px solid var(--clip-color);
   outline-offset: -2px;
 }
 .ctt-card.is-playing .ctt-badge {
@@ -1630,10 +1608,10 @@
 @keyframes ctt-badge {
   0%,
   100% {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent);
+    box-shadow: 0 0 0 3px var(--clip-glow);
   }
   50% {
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--c) 10%, transparent);
+    box-shadow: 0 0 0 6px var(--clip-faint);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1670,7 +1648,7 @@
   margin-top: 2px;
   font-size: 14px;
   line-height: 1.25;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 /* ───────── altitude / speed pop-out windows ───────── */
@@ -1688,12 +1666,12 @@
   top: 4px;
   right: 16px;
   z-index: 2;
-  background: rgb(255 255 255 / 0.12);
-  color: var(--color-app-surface);
+  background: var(--divider-strong);
+  color: var(--contrast);
 }
 /* inside the popup the dock fills the whole window and has no toolbar */
 .ctt-pop {
-  background: var(--card);
+  background: var(--surface);
 }
 .ctt-pop .ctt-prof {
   flex: 1;

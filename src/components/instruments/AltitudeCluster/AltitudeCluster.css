@@ -6,10 +6,8 @@
  * below only adds or overrides what is specific to the altitude view.
  */
 .ctt-alt {
-  /* climb = the clip's own colour (--c, same as the speedometer glow); drop = the speedometer red */
-  --alt-climb: var(--c, var(--color-action-primary));
-  --alt-drop: var(--gt-red, var(--color-gauge-danger));
-  --alt-font-cap: 'Saira Condensed', 'Saira', system-ui, sans-serif;
+  /* climb = the clip's own colour; drop = the gauge red */
+  --font-condensed: 'Saira Condensed', 'Saira', system-ui, sans-serif;
   font-family:
     'Saira',
     system-ui,
@@ -24,8 +22,8 @@
   transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .ctt-alt .ctt-gt-fill.down {
-  stroke: var(--alt-drop);
-  filter: drop-shadow(0 0 3px var(--alt-drop));
+  stroke: var(--gauge-danger);
+  filter: drop-shadow(0 0 3px var(--gauge-danger));
 }
 .ctt-alt .ctt-gt-lbl {
   font-size: 11px;
@@ -33,10 +31,10 @@
 .ctt-alt .ctt-gt-bar i {
   background: linear-gradient(
     90deg,
-    var(--alt-climb),
-    var(--color-app-surface)
+    var(--clip-color),
+    var(--contrast)
   );
-  box-shadow: 0 0 8px var(--alt-climb);
+  box-shadow: 0 0 8px var(--clip-color);
 }
 
 /* not enough width: drop both dials, keep the centre console */
@@ -77,8 +75,8 @@
   clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%);
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.055),
-    rgba(255, 255, 255, 0) 85%
+    var(--highlight),
+    transparent 85%
   );
 }
 
@@ -95,25 +93,17 @@
   height: 8px;
   border-radius: 3px;
   transform: skewX(-22deg);
-  background: linear-gradient(
-    180deg,
-    var(--color-gauge-segment-top),
-    var(--color-gauge-segment-bottom)
-  );
-  border: 1px solid var(--color-gauge-border-segment);
+  background: var(--gradient-segment);
+  border: 1px solid var(--gauge-border);
 }
 .ctt-alt-seg i::after {
   content: '';
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--alt-climb) 40%, var(--color-app-surface)),
-    var(--alt-climb)
-  );
-  box-shadow: 0 0 8px var(--alt-climb);
-  opacity: var(--on, 0);
+  background: var(--gradient-lit), var(--clip-color);
+  box-shadow: 0 0 8px var(--clip-color);
+  opacity: var(--segment-opacity, 0);
   transition: opacity 0.2s linear;
 }
 
@@ -128,15 +118,15 @@
   border-image: linear-gradient(
       90deg,
       transparent,
-      var(--alt-climb),
+      var(--clip-color),
       transparent
     )
     1;
 }
 .ctt-alt-label {
   padding-left: 0.32em;
-  color: var(--alt-climb);
-  font: 600 14px/1 var(--alt-font-cap);
+  color: var(--clip-color);
+  font: 600 14px/1 var(--font-condensed);
   letter-spacing: 0.32em;
   text-transform: uppercase;
   filter: brightness(1.15);
@@ -154,7 +144,7 @@
   line-height: 1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 18px rgba(255, 255, 255, 0.14);
+  text-shadow: 0 2px 18px var(--divider-strong);
   transition: opacity 0.2s linear;
 }
 .ctt-alt-digits.idle {
@@ -178,7 +168,7 @@
   text-align: center;
 }
 .ctt-alt-unit {
-  color: var(--gt-muted);
+  color: var(--gauge-text-muted);
   font-size: clamp(20px, 9cqh, 56px);
   font-weight: 600;
   line-height: 1.15;
@@ -198,28 +188,28 @@
   height: 0;
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
-  border-bottom: 11px solid var(--alt-climb);
+  border-bottom: 11px solid var(--clip-color);
 }
 .ctt-alt-trend.down .arrow {
   border-bottom: 0;
-  border-top: 11px solid var(--alt-drop);
+  border-top: 11px solid var(--gauge-danger);
 }
 .ctt-alt-trend .v {
-  color: var(--alt-climb);
+  color: var(--clip-color);
   font-size: 22px;
 }
 .ctt-alt-trend.down .v {
-  color: var(--alt-drop);
+  color: var(--gauge-danger);
 }
 .ctt-alt-trend .w {
-  color: var(--gt-muted);
+  color: var(--gauge-text-muted);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.06em;
 }
 .ctt-alt-asl {
-  color: var(--gt-muted);
-  font: 500 11px/1 var(--alt-font-cap);
+  color: var(--gauge-text-muted);
+  font: 500 11px/1 var(--font-condensed);
   letter-spacing: 0.3em;
   text-transform: uppercase;
 }
@@ -229,14 +219,10 @@
   position: relative;
   flex: 1 1 0;
   min-height: 72px;
-  border: 1px solid var(--color-gauge-border);
+  border: 1px solid var(--gauge-edge);
   border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    rgba(40, 40, 44, 0.45),
-    rgba(10, 10, 11, 0.9)
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--gradient-glass);
+  box-shadow: inset 0 1px 0 var(--highlight);
 }
 .ctt-alt-plot {
   position: absolute;
@@ -247,40 +233,38 @@
   overflow: visible;
 }
 .ctt-alt-grid {
-  stroke: var(--color-app-surface);
-  stroke-opacity: 0.07;
+  stroke: var(--divider);
   stroke-width: 1;
 }
 .ctt-alt-tick {
-  fill: var(--gt-muted);
+  fill: var(--gauge-text-muted);
   font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .ctt-alt-ghost {
   fill: none;
-  stroke: var(--color-app-surface);
-  stroke-opacity: 0.16;
+  stroke: var(--gauge-border);
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
 .ctt-alt-line {
   fill: none;
-  stroke: var(--alt-climb);
+  stroke: var(--clip-color);
   stroke-width: 2.2;
   stroke-linejoin: round;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--alt-climb));
+  filter: drop-shadow(0 0 4px var(--clip-color));
 }
 .ctt-alt-dot {
-  fill: var(--alt-climb);
-  stroke: var(--color-app-surface);
+  fill: var(--clip-color);
+  stroke: var(--contrast);
   stroke-width: 2;
-  filter: drop-shadow(0 0 6px var(--alt-climb));
+  filter: drop-shadow(0 0 6px var(--clip-color));
 }
 .ctt-alt-pulse {
   fill: none;
-  stroke: var(--alt-climb);
+  stroke: var(--clip-color);
   stroke-width: 1.5;
   transform-box: fill-box;
   transform-origin: center;
@@ -297,7 +281,7 @@
   }
 }
 .ctt-alt-start {
-  stroke: var(--alt-drop);
+  stroke: var(--gauge-danger);
   stroke-width: 1;
   stroke-dasharray: 3 4;
   opacity: 0.7;
@@ -316,14 +300,10 @@
   gap: 9px;
   min-width: 0;
   padding: 6px 10px 6px 6px;
-  border: 1px solid var(--color-gauge-border-tile);
+  border: 1px solid var(--gauge-border);
   border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    rgba(50, 50, 54, 0.55),
-    rgba(16, 16, 18, 0.9)
-  );
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  background: var(--gradient-glass);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .ctt-alt-ico {
   display: grid;
@@ -332,13 +312,9 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  color: var(--alt-climb);
-  background: linear-gradient(
-    180deg,
-    var(--color-gauge-icon-top),
-    var(--color-gauge-panel)
-  );
-  border: 1px solid var(--color-gauge-border-icon);
+  color: var(--clip-color);
+  background: var(--gradient-icon);
+  border: 1px solid var(--gauge-border);
 }
 .ctt-alt-ico svg {
   width: 18px;
@@ -353,7 +329,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--gt-muted);
+  color: var(--gauge-text-muted);
   font-size: 11px;
   font-style: normal;
   letter-spacing: 0.04em;
@@ -365,7 +341,7 @@
   white-space: nowrap;
 }
 .ctt-alt-tx b small {
-  color: var(--gt-muted);
+  color: var(--gauge-text-muted);
   font-size: 11px;
   font-weight: 500;
 }

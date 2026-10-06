@@ -5,31 +5,31 @@
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(10, 12, 18, 0.5);
+  background: var(--scrim);
 }
 .ctt-ph {
   width: min(560px, 100%);
   max-height: 88vh;
   overflow: auto;
   padding: 20px 22px;
-  border: 1px solid var(--border, #e3e6ec);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--card, var(--color-app-surface));
-  color: var(--text, #1b1f27);
+  background: var(--surface);
+  color: var(--text);
   font-size: 13px;
   line-height: 1.5;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-dialog);
 }
 .ctt-ph header {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--color-action-primary-strong);
+  color: var(--primary-strong);
 }
 .ctt-ph h2 {
   margin: 0;
   font-size: 16px;
-  color: var(--text, #1b1f27);
+  color: var(--text);
 }
 .ctt-ph p {
   margin: 12px 0 0;
@@ -51,22 +51,22 @@
   width: 100%;
   margin-top: 4px;
   padding: 4px 8px;
-  border: 1px solid var(--border, #e3e6ec);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg, #f6f7f9);
+  background: var(--background);
   color: inherit;
   font: inherit;
   cursor: pointer;
 }
 .ctt-ph-copy span {
-  color: var(--color-action-primary-strong);
+  color: var(--primary-strong);
   font-weight: 600;
   font-size: 12px;
 }
 .ctt-ph-alt {
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--bg, #f6f7f9);
+  background: var(--background);
 }
 .ctt-ph footer {
   display: flex;
@@ -78,20 +78,20 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--muted, #6b7280);
+  color: var(--text-muted);
 }
 .ctt-ph-ok {
   padding: 7px 18px;
   border: 0;
   border-radius: 8px;
-  background: var(--color-action-primary);
-  color: var(--color-app-surface);
+  background: var(--primary);
+  color: var(--contrast);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
 }
 .ctt-ph-ok:focus-visible,
 .ctt-ph-copy:focus-visible {
-  outline: 2px solid var(--color-action-primary);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
