@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { loadOpts } from '../map/MapPanel';
 import SvgIcon from '../common/SvgIcon';
 import { setProjectMode, useProjectMode } from '../../hooks/useProjects';
+import { setSatelliteDefault, useSatelliteDefault } from '../mapDefault';
 import {
   setAllView,
   setView,
@@ -56,6 +57,7 @@ export default function SettingsDialog({
 }: Props) {
   const { view } = useSettings();
   const projectMode = useProjectMode();
+  const satellite = useSatelliteDefault();
   const [confirmClear, setConfirmClear] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   // the dialog mounts fresh each time it opens, so this is the current map colour mode
@@ -125,7 +127,7 @@ export default function SettingsDialog({
                 {exampleBusy
                   ? 'Adding the example clips…'
                   : exampleOn
-                    ? 'A sample project in Tyrol/Austria. It comes back on every visit, even if you delete it. Turn off to remove it for good'
+                    ? 'A sample project in Tyrol, Austria. It comes back on every visit, even if you delete it. Turn off to remove it for good'
                     : 'Adds a sample project with a few short clips'}
               </small>
             </span>
@@ -136,6 +138,32 @@ export default function SettingsDialog({
               disabled={exampleBusy}
               checked={exampleOn}
               onChange={(e) => onExampleChange(e.target.checked)}
+            />
+          </label>
+        </section>
+
+        <section
+          className="settings-section has-divider"
+          aria-labelledby="set-map"
+        >
+          <h3 className="settings-title" id="set-map">
+            Map
+          </h3>
+          <label className="settings-row">
+            <span>
+              <b className="settings-label">Satellite map by default</b>
+              <small className="settings-hint">
+                {satellite
+                  ? 'The map opens as satellite imagery'
+                  : 'The map opens as the street map'}
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="toggle-switch"
+              checked={satellite}
+              onChange={(e) => setSatelliteDefault(e.target.checked)}
             />
           </label>
         </section>

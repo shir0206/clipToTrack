@@ -27,7 +27,7 @@ type Args = {
   /** removes one clip everywhere (map, selection, storage) */
   removeClip: (id: string) => void;
   projects: Projects;
-  /** called once the example is in place, so the app can open it */
+  /** called whenever the example is in place (just added, or already there at start) so the app can open it */
   onAdded?: (projectId: string, clipIds: string[]) => void;
 };
 
@@ -35,6 +35,7 @@ type Args = {
  * Adds / removes the example project (see components/exampleProject.ts and PLAN.md).
  *  - on every start: if the Settings switch is on and the example is not in the library (never added, or the
  *    user deleted it), it is added again. Only the Settings switch (off) keeps it away for good
+ *  - the app is told (onAdded) on every start so it can open the example project
  *  - Settings switch on: added now; off: its clips (and the project, if nothing else is in it) are removed
  *  - after a reload the saved clips have lost their video URL (it is session-only), so the static
  *    video URLs are re-attached
@@ -59,7 +60,13 @@ export function useExampleProject({
     onAdded,
   });
   useEffect(() => {
-    latest.current = { addPrepared, attachVideo, removeClip, projects, onAdded };
+    latest.current = {
+      addPrepared,
+      attachVideo,
+      removeClip,
+      projects,
+      onAdded,
+    };
   });
 
   const install = useCallback(async () => {
@@ -150,9 +157,14 @@ export function useExampleProject({
       clipIds.length > 0 &&
       projects.views.some((v) => v.id === projectId) &&
       clipIds.every((id) => clips.some((c) => c.id === id));
-    if (!present) queueMicrotask(() => void install());
-    else if (clips.some((c) => clipIds.includes(c.id) && !c.videoUrl))
-      queueMicrotask(restore);
+    if (!present)
+      queueMicrotask(() => void install()); // onAdded opens it when done
+    else
+      queueMicrotask(() => {
+        if (clips.some((c) => clipIds.includes(c.id) && !c.videoUrl)) restore();
+        // already there: open it anyway, the example is where every visit starts
+        latest.current.onAdded?.(projectId!, clipIds);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

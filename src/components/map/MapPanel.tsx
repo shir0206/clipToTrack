@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SvgIcon, { type IconName } from '../common/SvgIcon';
 import { useSettings } from '../../lib/settings';
+import { satelliteDefault } from '../mapDefault';
 
 export type BaseKey = 'streets' | 'topo' | 'satellite';
 export const BASE_LABELS: Record<BaseKey, string> = {
@@ -31,20 +32,27 @@ export const DEFAULT_OPTS: MapOpts = {
   follow: false,
   profile: false,
 };
-const KEY = 'clip-to-track:map-opts:v3'; // bumped so a previously saved 'satellite' doesn't override the default
+const KEY = 'clip-to-track:map-opts:v4';
+/**
+ * The basemap is NOT saved with the other options: the map always opens as the Settings default
+ * (satellite unless the person switched "Satellite map by default" off, then streets as before).
+ * A saved `base` would otherwise win over the setting forever.
+ */
 export const loadOpts = (): MapOpts => {
+  const base: BaseKey = satelliteDefault() ? 'satellite' : 'streets';
   try {
     return {
       ...DEFAULT_OPTS,
       ...JSON.parse(localStorage.getItem(KEY) ?? '{}'),
+      base,
     };
   } catch {
-    return DEFAULT_OPTS;
+    return { ...DEFAULT_OPTS, base };
   }
 };
 export const saveOpts = (o: MapOpts) => {
   try {
-    localStorage.setItem(KEY, JSON.stringify(o));
+    localStorage.setItem(KEY, JSON.stringify({ ...o, base: undefined })); // undefined is dropped by JSON
   } catch {
     /* ignore */
   }

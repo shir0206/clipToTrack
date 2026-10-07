@@ -260,7 +260,11 @@ export function useClips() {
    */
   const addPrepared = useCallback(
     (
-      items: { metadata: ClipMetadata; thumbnail?: string; videoUrl?: string }[],
+      items: {
+        metadata: ClipMetadata;
+        thumbnail?: string;
+        videoUrl?: string;
+      }[],
     ): string[] => {
       const now = Date.now();
       const prepared: Added[] = items.map((i) => ({

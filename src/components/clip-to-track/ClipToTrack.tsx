@@ -21,6 +21,8 @@ import { probeDecode } from '../../lib/video/videoSupport';
 import { useClips } from '../../hooks/useClips';
 import { useProjectMode, useProjects } from '../../hooks/useProjects';
 import { useExampleProject } from '../../hooks/useExampleProject';
+import { useExampleUploadPrompt } from '../../hooks/useExampleUploadPrompt';
+import { exampleState } from '../exampleProject';
 import {
   ProjectBar,
   ProjectNotice,
@@ -117,6 +119,11 @@ export default function ClipToTrack() {
   const [sort, setSort] = useState(loadSort);
   const [playbackHelp, setPlaybackHelp] = useState(false); // browser can't draw the video's picture
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { ask: askExampleUpload, prompt: examplePrompt } =
+    useExampleUploadPrompt();
+  // after an 'auto' upload: the clip to jump to once the automatic grouping has placed it
+  const landOn = useRef<string | null>(null);
+  const [landTick, setLandTick] = useState(0);
   const mapApi = useRef<MapApi | null>(null);
 
   useEffect(() => {
@@ -201,18 +208,27 @@ export default function ClipToTrack() {
 
   /** `into`: a project chosen explicitly (the Projects dialog); otherwise the open project, if any */
   const handleFiles = async (files: File[], into?: string) => {
+    // an upload made while a project is open belongs to that project (not to the automatic grouping)
+    let target =
+      into ?? (projectMode && activeProject !== 'all' ? activeProject : null);
+    // looking at the example project? offer a project of their own first
+    const choice = await askExampleUpload(target);
+    if (choice === 'cancel') return;
+    if (choice === 'auto') target = null; // the automatic grouping places the clips
     // in parallel with the import: can this browser draw the picture? If not, explain (once) what to approve
     const video = files.find((f) => !/\.json$/i.test(f.name));
     if (video && !playbackHelpDismissed())
       void probeDecode(video).then(
         (r) => r === 'no-picture' && setPlaybackHelp(true),
       );
-    // an upload made while a project is open belongs to that project (not to the automatic grouping)
-    const target =
-      into ?? (projectMode && activeProject !== 'all' ? activeProject : null);
     const ids = await addFiles(files);
     if (!ids.length) return;
     if (target) projects.adopt(ids, target);
+    if (choice === 'auto') {
+      landOn.current = ids[0]; // opened by the effect below, once its project exists
+      setLandTick((t) => t + 1);
+      return;
+    }
     const firstId = ids[0];
     setSelectedClipId(firstId);
     setTimeout(() => select(firstId), 0); // scroll the new card into view after render
@@ -246,6 +262,18 @@ export default function ClipToTrack() {
     mapApi.current?.setPlayhead(id, null);
     remove(id); // -> map layers, pinned bubble and localStorage all follow from `clips`
   };
+
+  // 'auto' upload from the example: open the project the new clips landed in
+  useEffect(() => {
+    const id = landOn.current;
+    const p = id ? projects.projectOf.get(id) : undefined;
+    if (!id || !p) return;
+    landOn.current = null;
+
+    setProjectFilter(p);
+    setSelectedClipId(id);
+    setTimeout(() => select(id), 0);
+  }, [projects.projectOf, landTick]);
 
   // a project owns its clips: deleting it removes them too (the UI asks for confirmation first)
   const handleDeleteProject = (id: string) => {
@@ -382,7 +410,13 @@ export default function ClipToTrack() {
             <button
               onClick={() =>
                 setProjectsDialog({
-                  id: activeProject === 'all' ? undefined : activeProject,
+                  // no project open: start on the example (if it is switched on in Settings)
+                  id:
+                    activeProject !== 'all'
+                      ? activeProject
+                      : example.enabled
+                        ? (exampleState().projectId ?? undefined)
+                        : undefined,
                 })
               }
             >
@@ -538,6 +572,8 @@ export default function ClipToTrack() {
           }}
         />
       )}
+
+      {examplePrompt}
 
       {playbackHelp && <PlaybackHelp onClose={() => setPlaybackHelp(false)} />}
 
