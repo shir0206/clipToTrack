@@ -22,7 +22,7 @@ import { useClips } from '../../hooks/useClips';
 import { useProjectMode, useProjects } from '../../hooks/useProjects';
 import { useExampleProject } from '../../hooks/useExampleProject';
 import { useExampleUploadPrompt } from '../../hooks/useExampleUploadPrompt';
-import { exampleState } from '../exampleProject';
+import { exampleState, useExampleState } from '../exampleProject';
 import {
   ProjectBar,
   ProjectNotice,
@@ -96,19 +96,29 @@ export default function ClipToTrack() {
     projectMode && projects.views.some((v) => v.id === projectFilter)
       ? projectFilter
       : 'all';
+  // "All" leaves the example clips out as soon as the person has clips of their own
+  // (with only the example around, "All" shows it). The example stays reachable as a project.
+  const exampleClipIds = useExampleState().clipIds;
+  const hideExamples =
+    exampleClipIds.length > 0 &&
+    clips.some((c) => !exampleClipIds.includes(c.id));
   // clips not placed yet (a render-phase transient) stay visible
   const visible = useMemo(
     () =>
       activeProject === 'all'
-        ? clips
+        ? hideExamples
+          ? clips.filter((c) => !exampleClipIds.includes(c.id))
+          : clips
         : clips.filter((c) => {
             const p = projects.projectOf.get(c.id);
             return !p || p === activeProject;
           }),
-    [clips, activeProject, projects.projectOf],
+    [clips, activeProject, projects.projectOf, hideExamples, exampleClipIds],
   );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(
-    clips[0]?.id ?? null,
+    () =>
+      (clips.find((c) => !exampleState().clipIds.includes(c.id)) ?? clips[0])
+        ?.id ?? null,
   ); // single source of truth
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   const [playingClipId, setPlayingClipId] = useState<string | null>(null);
@@ -122,7 +132,7 @@ export default function ClipToTrack() {
   const { ask: askExampleUpload, prompt: examplePrompt } =
     useExampleUploadPrompt();
   // after an 'auto' upload: the clip to jump to once the automatic grouping has placed it
-  const landOn = useRef<string | null>(null);
+  const landOn = useRef<string[] | null>(null);
   const [landTick, setLandTick] = useState(0);
   const mapApi = useRef<MapApi | null>(null);
 
@@ -225,7 +235,7 @@ export default function ClipToTrack() {
     if (!ids.length) return;
     if (target) projects.adopt(ids, target);
     if (choice === 'auto') {
-      landOn.current = ids[0]; // opened by the effect below, once its project exists
+      landOn.current = ids; // handled by the effect below, once the automatic grouping has run
       setLandTick((t) => t + 1);
       return;
     }
@@ -265,14 +275,22 @@ export default function ClipToTrack() {
 
   // 'auto' upload from the example: open the project the new clips landed in
   useEffect(() => {
-    const id = landOn.current;
-    const p = id ? projects.projectOf.get(id) : undefined;
-    if (!id || !p) return;
+    const ids = landOn.current;
+    if (!ids?.length || !ids.every((i) => projects.projectOf.has(i))) return;
     landOn.current = null;
+    // the person chose "New Project": whatever the automatic grouping did, the clips must not stay in the example
+    const exampleId = exampleState().projectId;
+    const stuck = ids.filter((i) => projects.projectOf.get(i) === exampleId);
+    let dest = projects.projectOf.get(ids[0])!;
+    if (stuck.length) {
+      dest = projects.createProject();
+      projects.adopt(stuck, dest);
+    }
 
-    setProjectFilter(p);
-    setSelectedClipId(id);
-    setTimeout(() => select(id), 0);
+    setProjectFilter(dest);
+    setSelectedClipId(ids[0]);
+    setTimeout(() => select(ids[0]), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects.projectOf, landTick]);
 
   // a project owns its clips: deleting it removes them too (the UI asks for confirmation first)

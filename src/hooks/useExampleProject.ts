@@ -35,7 +35,8 @@ type Args = {
  * Adds / removes the example project (see components/exampleProject.ts and PLAN.md).
  *  - on every start: if the Settings switch is on and the example is not in the library (never added, or the
  *    user deleted it), it is added again. Only the Settings switch (off) keeps it away for good
- *  - the app is told (onAdded) on every start so it can open the example project
+ *  - the app is told (onAdded) on a start so it can open the example project, but only when the person has no clips
+ *    of their own: someone with their own clips starts on "All" (which leaves the example out, see ClipToTrack)
  *  - Settings switch on: added now; off: its clips (and the project, if nothing else is in it) are removed
  *  - after a reload the saved clips have lost their video URL (it is session-only), so the static
  *    video URLs are re-attached
@@ -69,7 +70,8 @@ export function useExampleProject({
     };
   });
 
-  const install = useCallback(async () => {
+  /** `open`: tell the app to open the example when done (always, except on a start where the person has their own clips) */
+  const install = useCallback(async (open = true) => {
     if (busy.current) return;
     busy.current = true;
     setExampleState({ enabled: true });
@@ -99,7 +101,7 @@ export function useExampleProject({
         if (url) videos[id] = url;
       });
       setExampleState({ projectId, clipIds: ids, videos });
-      latest.current.onAdded?.(projectId, ids);
+      if (open) latest.current.onAdded?.(projectId, ids);
       setStatus(
         missing.length
           ? {
@@ -157,13 +159,15 @@ export function useExampleProject({
       clipIds.length > 0 &&
       projects.views.some((v) => v.id === projectId) &&
       clipIds.every((id) => clips.some((c) => c.id === id));
+    // clips that are not part of the example = the person's own
+    const own = clips.some((c) => !clipIds.includes(c.id));
     if (!present)
-      queueMicrotask(() => void install()); // onAdded opens it when done
+      queueMicrotask(() => void install(!own)); // onAdded opens it when done (unless they have their own clips)
     else
       queueMicrotask(() => {
         if (clips.some((c) => clipIds.includes(c.id) && !c.videoUrl)) restore();
-        // already there: open it anyway, the example is where every visit starts
-        latest.current.onAdded?.(projectId!, clipIds);
+        // already there: with no clips of their own, the example is where the visit starts
+        if (!own) latest.current.onAdded?.(projectId!, clipIds);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -36,13 +36,12 @@ export default function ExampleUploadPrompt({ onChoose }: Props) {
         <header className="help-header">
           <SvgIcon name="info" size={18} />
           <h2 className="help-title" id="ctt-up-title">
-            Add your videos to a new project?
+            Where should your videos be added?
           </h2>
         </header>
         <p className="help-text">
-          You’re looking at the example project. Your own videos work best in a
-          project of their own: they’ll be grouped by date and place, like any
-          other upload, and the example stays as it is.
+          You’re viewing the example project. To keep your videos separate, add
+          them to a new project.
         </p>
         <footer className="help-footer">
           <button className="link-button" onClick={() => onChoose('cancel')}>
@@ -50,14 +49,14 @@ export default function ExampleUploadPrompt({ onChoose }: Props) {
           </button>
           <span className="settings-actions">
             <button className="link-button" onClick={() => onChoose('keep')}>
-              Add to the example
+              Example Project
             </button>
             <button
               ref={primary}
               className="help-confirm"
               onClick={() => onChoose('auto')}
             >
-              New project (recommended)
+              New Project
             </button>
           </span>
         </footer>
