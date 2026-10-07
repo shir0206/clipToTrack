@@ -17,6 +17,10 @@ type Props = {
   layoutIsDefault: boolean;
   onResetLayout: () => void;
   onClearClips: () => void;
+  /** the example project is in the library (or being added) */
+  exampleOn: boolean;
+  exampleBusy: boolean;
+  onExampleChange: (on: boolean) => void;
 };
 
 const VIEW_ITEMS: [keyof ViewSettings, string, string][] = [
@@ -46,6 +50,9 @@ export default function SettingsDialog({
   layoutIsDefault,
   onResetLayout,
   onClearClips,
+  exampleOn,
+  exampleBusy,
+  onExampleChange,
 }: Props) {
   const { view } = useSettings();
   const projectMode = useProjectMode();
@@ -109,6 +116,26 @@ export default function SettingsDialog({
               className="toggle-switch"
               checked={projectMode}
               onChange={(e) => setProjectMode(e.target.checked)}
+            />
+          </label>
+          <label className={`ctt-set-row${exampleBusy ? ' is-disabled' : ''}`}>
+            <span>
+              <b>Example project</b>
+              <small>
+                {exampleBusy
+                  ? 'Adding the example clips…'
+                  : exampleOn
+                    ? 'A sample project in Tyrol, Austria. Turn off to remove it'
+                    : 'Adds a sample project with a few short clips'}
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="ctt-switch"
+              disabled={exampleBusy}
+              checked={exampleOn}
+              onChange={(e) => onExampleChange(e.target.checked)}
             />
           </label>
         </section>

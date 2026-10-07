@@ -66,6 +66,36 @@ function load(): Entry[] {
 const message = (e: unknown) =>
   e instanceof Error ? e.message : 'unknown error';
 
+/** .lrv has no MIME type; label it so <video> doesn't have to guess (wrapping a File in a Blob copies nothing) */
+const asVideoUrl = (f: File) =>
+  URL.createObjectURL(f.type ? f : new Blob([f], { type: 'video/mp4' }));
+
+type Added = Omit<Entry, 'slot'> & { id: string };
+
+/** Adds clips to the list. Same id (file name + GPS start) replaces in place; a new clip takes the lowest free colour slot. */
+function mergeEntries(prev: Entry[], added: Added[]): Entry[] {
+  const byId = new Map(prev.map((e) => [clipFromMetadata(e.metadata).id, e]));
+  const used = new Set(prev.map((e) => e.slot));
+  const freeSlot = () => {
+    let n = 1;
+    while (used.has(n)) n++;
+    used.add(n);
+    return n;
+  };
+  for (const { id, ...next } of added) {
+    const old = byId.get(id);
+    // keep an existing video/thumbnail if the new one has none; a re-added clip keeps its colour slot
+    byId.set(id, {
+      metadata: next.metadata,
+      thumbnail: next.thumbnail ?? old?.thumbnail,
+      videoUrl: next.videoUrl ?? old?.videoUrl,
+      addedAt: next.addedAt,
+      slot: old?.slot ?? freeSlot(),
+    });
+  }
+  return [...byId.values()];
+}
+
 export function useClips() {
   const [entries, setEntries] = useState<Entry[]>(load);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +161,7 @@ export function useClips() {
   /** Accepts GoPro .mp4 files (telemetry is extracted) or metadata .json. Resolves to the ids of every clip added (upload order). */
   const addFiles = useCallback(async (files: File[]): Promise<string[]> => {
     setBusy(true);
-    const added: (Omit<Entry, 'slot'> & { id: string })[] = [];
+    const added: Added[] = [];
     const errors: string[] = [];
     // clips without any GPS fix (tunnel…): placed afterwards, between the clips that do have one
     const unlocated: {
@@ -218,36 +248,32 @@ export function useClips() {
     }
 
     setError(errors.length ? errors.join(' · ') : null);
-    if (added.length)
-      setEntries((prev) => {
-        // same id (file name + GPS start) replaces in place; keep an existing video/thumbnail if the new one has none
-        const byId = new Map(
-          prev.map((e) => [clipFromMetadata(e.metadata).id, e]),
-        );
-        // a new clip takes the lowest colour slot nobody is using; a re-added clip keeps its own
-        const used = new Set(prev.map((e) => e.slot));
-        const freeSlot = () => {
-          let n = 1;
-          while (used.has(n)) n++;
-          used.add(n);
-          return n;
-        };
-        for (const { id, ...next } of added) {
-          const old = byId.get(id);
-          byId.set(id, {
-            metadata: next.metadata,
-            thumbnail: next.thumbnail ?? old?.thumbnail,
-            videoUrl: next.videoUrl ?? old?.videoUrl,
-            addedAt: next.addedAt,
-            slot: old?.slot ?? freeSlot(),
-          });
-        }
-        return [...byId.values()];
-      });
+    if (added.length) setEntries((prev) => mergeEntries(prev, added));
     setProgress(null);
     setBusy(false);
     return added.map((a) => a.id);
   }, []);
+
+  /**
+   * Adds clips from ready-made metadata (e.g. the example project): nothing is read or parsed.
+   * Throws if a metadata object is invalid. Returns the ids in input order.
+   */
+  const addPrepared = useCallback(
+    (
+      items: { metadata: ClipMetadata; thumbnail?: string; videoUrl?: string }[],
+    ): string[] => {
+      const now = Date.now();
+      const prepared: Added[] = items.map((i) => ({
+        ...i,
+        id: clipFromMetadata(i.metadata).id, // validates too
+        addedAt: now,
+      }));
+      setEntries((prev) => mergeEntries(prev, prepared));
+      setError(null);
+      return prepared.map((a) => a.id);
+    },
+    [],
+  );
 
   /** Removes one clip from state and (via the persist effect) from localStorage; its object URL is revoked too. */
   const remove = useCallback((id: string) => {
@@ -257,10 +283,32 @@ export function useClips() {
     setError(null);
   }, []);
 
+  /** Gives an already-saved clip its video back (videoUrl is session-only): a File, or a plain URL for static videos. */
+  const attachVideo = useCallback((id: string, src: File | string) => {
+    if (!entriesRef.current.some((e) => clipFromMetadata(e.metadata).id === id))
+      return;
+    const videoUrl = typeof src === 'string' ? src : asVideoUrl(src);
+    setEntries((prev) =>
+      prev.map((e) =>
+        clipFromMetadata(e.metadata).id === id ? { ...e, videoUrl } : e,
+      ),
+    );
+  }, []);
+
   const clear = useCallback(() => {
     setEntries([]);
     setError(null);
   }, []);
 
-  return { clips, error, busy, progress, addFiles, remove, clear };
+  return {
+    clips,
+    error,
+    busy,
+    progress,
+    addFiles,
+    addPrepared,
+    attachVideo,
+    remove,
+    clear,
+  };
 }

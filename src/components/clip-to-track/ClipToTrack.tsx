@@ -20,11 +20,13 @@ import PlaybackHelp, { playbackHelpDismissed } from '../playback/PlaybackHelp';
 import { probeDecode } from '../../lib/video/videoSupport';
 import { useClips } from '../../hooks/useClips';
 import { useProjectMode, useProjects } from '../../hooks/useProjects';
+import { useExampleProject } from '../../hooks/useExampleProject';
 import {
   ProjectBar,
   ProjectNotice,
   ProjectsDialog,
 } from '../projects/ProjectsUI';
+import ExampleStatus from '../ExampleStatus';
 import './ClipToTrack.css';
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
@@ -70,7 +72,8 @@ const clampW = (w: number) =>
   );
 
 export default function ClipToTrack() {
-  const { clips, error, busy, progress, addFiles, remove, clear } = useClips(); // clips persist in localStorage
+  const { clips, error, busy, progress, addFiles, attachVideo, remove, clear } =
+    useClips(); // clips persist in localStorage
   const projects = useProjects(clips); // every clip is placed in a project automatically
   const projectMode = useProjectMode(); // Settings → "Group clips into projects"; off = plain clip list
   const [projectFilter, setProjectFilter] = useState('all');
@@ -243,6 +246,20 @@ export default function ClipToTrack() {
     if (projectFilter === id) setProjectFilter('all');
   };
 
+  // the example project: added on the first visit, switched on / off in Settings
+  const example = useExampleProject({
+    clips,
+    addFiles,
+    attachVideo,
+    removeClip: handleDelete,
+    projects,
+    onAdded: (projectId, ids) => {
+      setProjectFilter(projectId);
+      setSelectedClipId(ids[0]);
+      setTimeout(() => select(ids[0]), 0);
+    },
+  });
+
   const handleClear = () => {
     setPlayingClipId(null);
     closeMax();
@@ -299,7 +316,7 @@ export default function ClipToTrack() {
                     <SvgIcon
                       name={asc ? 'arrowUp' : 'arrowDown'}
                       size={12}
-                      className="sort-direction"
+                      className="ctt-sort-dir"
                     />
                   )}
                 </button>
@@ -481,9 +498,18 @@ export default function ClipToTrack() {
         />
       )}
 
+      <ExampleStatus
+        status={example.status}
+        onRetry={() => example.setEnabled(true)}
+        onDismiss={example.dismiss}
+      />
+
       {settingsOpen && (
         <SettingsDialog
           clipCount={clips.length}
+          exampleOn={example.enabled}
+          exampleBusy={example.busy}
+          onExampleChange={example.setEnabled}
           layoutIsDefault={
             panelW === clampW(window.innerWidth * 0.33) &&
             [null, '260'].includes(localStorage.getItem(PROFILE_HEIGHT_KEY)) // 260 = ElevationProfile's DEFAULT_H
