@@ -33,7 +33,8 @@ type Args = {
 
 /**
  * Adds / removes the example project (see components/exampleProject.ts and PLAN.md).
- *  - first visit with an empty library: added automatically (unless the Settings switch is off)
+ *  - on every start: if the Settings switch is on and the example is not in the library (never added, or the
+ *    user deleted it), it is added again. Only the Settings switch (off) keeps it away for good
  *  - Settings switch on: added now; off: its clips (and the project, if nothing else is in it) are removed
  *  - after a reload the saved clips have lost their video URL (it is session-only), so the static
  *    video URLs are re-attached
@@ -76,6 +77,12 @@ export function useExampleProject({
 
       // these updates are queued in order, so the project exists by the time it is renamed and filled
       const p = latest.current.projects;
+      // a half-deleted earlier example (e.g. its clips were deleted but the project stayed) is replaced, not duplicated
+      const prev = exampleState();
+      const strangers = p.views
+        .find((v) => v.id === prev.projectId)
+        ?.clipIds.filter((id) => !prev.clipIds.includes(id));
+      if (prev.projectId && !strangers?.length) p.removeProject(prev.projectId);
       const projectId = p.createProject();
       p.rename(projectId, randomExampleName());
       p.adopt(ids, projectId);
@@ -134,27 +141,25 @@ export function useExampleProject({
     });
   }, []);
 
-  // once, on mount
+  // once, on every start: bring the example back if it is switched on in Settings but not in the library
   useEffect(() => {
     const { enabled, projectId, clipIds } = exampleState();
-    if (enabled && !projectId && clips.length === 0) {
-      queueMicrotask(() => void install());
-    } else if (
-      projectId &&
-      clips.some((c) => clipIds.includes(c.id) && !c.videoUrl)
-    ) {
+    if (!enabled) return;
+    const present =
+      !!projectId &&
+      clipIds.length > 0 &&
+      projects.views.some((v) => v.id === projectId) &&
+      clipIds.every((id) => clips.some((c) => c.id === id));
+    if (!present) queueMicrotask(() => void install());
+    else if (clips.some((c) => clipIds.includes(c.id) && !c.videoUrl))
       queueMicrotask(restore);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const working = status.phase === 'importing';
-  // the switch shows what is really there: deleting the project by hand turns it off
-  const present =
-    !!saved.projectId && projects.views.some((v) => v.id === saved.projectId);
-
   return {
-    enabled: present || working,
+    // the switch is the Settings preference: deleting the project by hand does not turn it off
+    enabled: saved.enabled || working,
     busy: working,
     status,
     setEnabled: (on: boolean) => (on ? void install() : uninstall()),

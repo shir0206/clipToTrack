@@ -72,8 +72,17 @@ const clampW = (w: number) =>
   );
 
 export default function ClipToTrack() {
-  const { clips, error, busy, progress, addFiles, attachVideo, remove, clear } =
-    useClips(); // clips persist in localStorage
+  const {
+    clips,
+    error,
+    busy,
+    progress,
+    addFiles,
+    addPrepared,
+    attachVideo,
+    remove,
+    clear,
+  } = useClips(); // clips persist in localStorage
   const projects = useProjects(clips); // every clip is placed in a project automatically
   const projectMode = useProjectMode(); // Settings → "Group clips into projects"; off = plain clip list
   const [projectFilter, setProjectFilter] = useState('all');
@@ -249,7 +258,7 @@ export default function ClipToTrack() {
   // the example project: added on the first visit, switched on / off in Settings
   const example = useExampleProject({
     clips,
-    addFiles,
+    addPrepared,
     attachVideo,
     removeClip: handleDelete,
     projects,

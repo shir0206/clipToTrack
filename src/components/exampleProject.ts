@@ -21,7 +21,7 @@ export type ExampleClip = {
 };
 export type ExampleLoad = { clips: ExampleClip[]; missing: string[] };
 
-const EXAMPLE_PLACE = 'Tyrol, Austria';
+const EXAMPLE_PLACE = 'Tyrol/Austria';
 const EXAMPLE_TRIPS = [
   'ride',
   'drive',
@@ -34,7 +34,7 @@ const EXAMPLE_TRIPS = [
   'sunday drive',
   'adventure',
 ];
-/** e.g. "Example scenic route in Tyrol, Austria" */
+/** e.g. "Example scenic route in Tyrol/Austria" */
 export const randomExampleName = () =>
   `Example ${EXAMPLE_TRIPS[Math.floor(Math.random() * EXAMPLE_TRIPS.length)]} in ${EXAMPLE_PLACE}`;
 
@@ -109,16 +109,18 @@ export async function loadExampleClips(): Promise<ExampleLoad> {
         .split('/')
         .pop()!
         .replace(/\.json$/i, '');
-      const videoUrl = `${ASSET_DIR}${name}.mp4`;
+      const metadata = await META_FILES[path]();
+      const videoFileName = metadata.source?.fileName ?? `${name}.mp4`;
+      const videoUrl = `${ASSET_DIR}${videoFileName}`;
       const thumbUrl = `${ASSET_DIR}${name}.jpg`;
       const [hasVideo, hasThumb] = await Promise.all([
         exists(videoUrl, 'video/'),
         exists(thumbUrl, 'image/'),
       ]);
-      if (!hasVideo) missing.push(`public/assets/example/${name}.mp4`);
+      if (!hasVideo) missing.push(`public/assets/example/${videoFileName}`);
       if (!hasThumb) missing.push(`public/assets/example/${name}.jpg`);
       return {
-        metadata: await META_FILES[path](),
+        metadata,
         videoUrl: hasVideo ? videoUrl : undefined,
         thumbnail: hasThumb ? thumbUrl : undefined,
       };

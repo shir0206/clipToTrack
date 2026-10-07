@@ -125,7 +125,7 @@ export default function SettingsDialog({
                 {exampleBusy
                   ? 'Adding the example clips…'
                   : exampleOn
-                    ? 'A sample project in Tyrol, Austria. Turn off to remove it'
+                    ? 'A sample project in Tyrol/Austria. It comes back on every visit, even if you delete it. Turn off to remove it for good'
                     : 'Adds a sample project with a few short clips'}
               </small>
             </span>

@@ -39,6 +39,7 @@ export async function exportExampleMetadata(files: File[]) {
       );
       const dataUrl = await captureThumbnail(url);
       URL.revokeObjectURL(url);
+      if (!dataUrl) throw new Error('Could not capture a thumbnail');
       save(await (await fetch(dataUrl)).blob(), `${name}.jpg`);
       console.info(`[example] ${name}: json + jpg downloaded`);
     } catch (e) {

@@ -45,9 +45,14 @@ The base name must match across the three files **and** the MP4 file name used w
 4. Move `.json` -> `src/data/example/`, `.jpg` + `.mp4` -> `public/assets/examples/`.
    (The helper only exists when `import.meta.env.DEV`.)
 
-## Settings
+## Settings / persistence
 
-Existing switch kept. On = install; off = removes only the example's clips (and the project if nothing else is in it).
+- The switch (`enabled` in example state) is the only thing that keeps the example away.
+- **On every start**, if `enabled` and the example is not in the library (never added, project deleted, or any of its clips deleted), it is added again with a new random name. Other clips in the library don't matter.
+- Deleting the project/clips by hand does **not** turn the switch off; the switch always shows the preference.
+- Off = removes only the example's clips (and the project if nothing else is in it) and stops it coming back.
+- A leftover project from a half-deleted example is replaced, not duplicated.
+- Side effect: "Remove all clips" in Settings also removes the example, and it returns on the next refresh unless the switch is off.
 
 ## Code changes
 
