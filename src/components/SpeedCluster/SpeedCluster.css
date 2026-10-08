@@ -1,0 +1,339 @@
+/* Speed cluster: glossy automotive instrument panel. Clip colour (--clip-color) is the glow accent. */
+.gauge-cluster {
+  position: relative;
+  container-type: size;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2cqw, 28px);
+  padding: 10px 14px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--gauge-track);
+  background:
+    radial-gradient(70% 90% at 50% 0%, var(--highlight), transparent 70%),
+    linear-gradient(180deg, var(--gauge-panel), var(--gauge-deep));
+  box-shadow: inset 0 1px 0 var(--highlight);
+  color: var(--gauge-text);
+  font-family: var(--font-sans);
+}
+.gauge-cluster > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* curved side "wings" behind the dials */
+.gauge-cluster::before,
+.gauge-cluster::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  width: 34%;
+  z-index: 0;
+  border: 1px solid var(--divider);
+  background: var(--gradient-wing);
+  pointer-events: none;
+}
+.gauge-cluster::before {
+  left: -6%;
+  border-radius: 0 60% 60% 0 / 0 50% 50% 0;
+  border-left: 0;
+}
+.gauge-cluster::after {
+  right: -6%;
+  border-radius: 60% 0 0 60% / 50% 0 0 50%;
+  border-right: 0;
+}
+
+/* not enough width (side-by-side pane): drop the tachometer */
+@container (max-width: 600px) {
+  .gauge-tachometer {
+    display: none;
+  }
+}
+
+/* dials (SVG) */
+.gauge-dial {
+  height: 100%;
+  width: auto;
+  aspect-ratio: 1;
+  flex: 0 1 auto;
+  min-width: 0;
+  filter: drop-shadow(var(--shadow-dial));
+}
+.gauge-bezel {
+  fill: none;
+  stroke-width: 2.5;
+}
+.gauge-face {
+  stroke: var(--gauge-deep);
+  stroke-width: 1;
+}
+.gauge-track,
+.gauge-fill,
+.gauge-redline {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.gauge-track {
+  stroke: var(--gauge-track);
+}
+.gauge-redline {
+  stroke: var(--gauge-danger);
+  stroke-linecap: butt;
+  opacity: 0.9;
+}
+.gauge-fill {
+  stroke: var(--clip-color);
+  filter: drop-shadow(0 0 3px var(--clip-color));
+}
+.gauge-dial .major-tick {
+  stroke: var(--gauge-text);
+  stroke-width: 1.5;
+}
+.gauge-dial .minor-tick {
+  stroke: var(--gauge-text-minor);
+  stroke-width: 0.8;
+  opacity: 0.65;
+}
+.gauge-dial .redline-tick {
+  stroke: var(--gauge-danger);
+  opacity: 1;
+}
+.dial-label {
+  fill: var(--gauge-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
+}
+.gauge-caption,
+.gauge-unit {
+  fill: var(--gauge-text-muted);
+  text-anchor: middle;
+  font-weight: 500;
+}
+.gauge-caption {
+  font-size: 7px;
+  letter-spacing: 0.14em;
+}
+.gauge-unit {
+  font-size: 8px;
+}
+
+/* info pills (altitude / gear) */
+.gauge-pill rect {
+  fill: var(--gauge-panel);
+  stroke: var(--gauge-border);
+  stroke-width: 0.8;
+}
+.pill-caption {
+  fill: var(--gauge-text-muted);
+  font-size: 5px;
+  letter-spacing: 0.12em;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.pill-value {
+  fill: var(--gauge-text);
+  font-size: 9px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
+}
+.gauge-badge rect {
+  fill: var(--clip-color);
+  opacity: 0.85;
+}
+
+/* needle + chrome hub */
+.gauge-needle {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transform: rotate(calc(135deg + var(--fraction) * 270deg));
+  transition: transform 0.14s linear;
+  filter: drop-shadow(var(--shadow-needle));
+}
+.gauge-needle polygon {
+  fill: var(--gauge-text);
+}
+.gauge-hub {
+  stroke: var(--gauge-text-minor);
+  stroke-width: 1;
+}
+.hub-dot {
+  fill: var(--gauge-track);
+}
+
+/* centre console */
+.gauge-middle {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 280px;
+  max-width: 460px;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(6px, 4cqh, 12px);
+  font-size: clamp(10px, 5.5cqh, 13px);
+}
+/* trapezoid glass panel behind the readout */
+.gauge-middle::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 22% -4% 0;
+  clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, var(--highlight), transparent 85%);
+}
+
+/* skewed LED segments */
+.gauge-segment {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 5px;
+  padding: 0 6%;
+}
+.gauge-segment i {
+  position: relative;
+  height: 8px;
+  border-radius: 3px;
+  transform: skewX(-22deg);
+  background: var(--gradient-segment);
+  border: 1px solid var(--gauge-border);
+}
+.gauge-segment i::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: var(--gradient-lit), var(--clip-color);
+  box-shadow: 0 0 8px var(--clip-color);
+  opacity: var(--segment-opacity);
+  transition: opacity 0.14s linear;
+}
+
+.gauge-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--clip-color),
+      transparent
+    )
+    1;
+}
+.gauge-label {
+  color: var(--clip-color);
+  font-size: 1.15em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  filter: brightness(1.35);
+}
+.gauge-reading {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+.gauge-reading b {
+  font-size: clamp(36px, 28cqh, 84px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 14px var(--divider-strong);
+}
+.gauge-reading span {
+  color: var(--gauge-text-muted);
+  font-size: 1.5em;
+  font-weight: 400;
+}
+
+/* glass tiles with icon */
+.gauge-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.gauge-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--gauge-border);
+  border-radius: 12px;
+  background: var(--gradient-glass);
+  box-shadow: inset 0 1px 0 var(--divider);
+}
+.tile-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.9em;
+  height: 2.9em;
+  border-radius: 10px;
+  color: var(--clip-color);
+  background: var(--gradient-icon);
+  border: 1px solid var(--gauge-border);
+}
+.tile-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tile-text em {
+  font-style: normal;
+  color: var(--gauge-text-muted);
+  font-size: 0.9em;
+}
+.tile-text b {
+  font-size: 1.15em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* trip progress */
+.gauge-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--gauge-track);
+  border: 1px solid var(--gauge-edge);
+  overflow: hidden;
+}
+.gauge-bar i {
+  display: block;
+  height: 100%;
+  width: var(--progress);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--clip-color), var(--contrast));
+  box-shadow: 0 0 8px var(--clip-color);
+  transition: width 0.14s linear;
+}
+.gauge-hint {
+  margin: 0;
+  text-align: center;
+  color: var(--gauge-text-muted);
+  font-size: 0.9em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gauge-needle,
+  .gauge-segment i::after,
+  .gauge-bar i {
+    transition: none;
+  }
+}
