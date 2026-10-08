@@ -96,6 +96,20 @@ async function exists(url: string, type: 'video/' | 'image/') {
   }
 }
 
+function useuppercase(filename: string) {
+  return filename.replace(/\.(mp4|lrv)$/i, (extension) =>
+    extension.toLocaleLowerCase(),
+  );
+}
+
+async function firstExistingVideo(filename: string) {
+  const candidates = [...new Set([filename, useuppercase(filename)])];
+  for (const candidate of candidates) {
+    if (await exists(`${ASSET_DIR}${candidate}`, 'video/')) return candidate;
+  }
+  return null;
+}
+
 /** All example clips that can be built, plus a list of what is missing. Never throws for missing files. */
 export async function loadExampleClips(): Promise<ExampleLoad> {
   const paths = Object.keys(META_FILES).sort();
@@ -111,17 +125,17 @@ export async function loadExampleClips(): Promise<ExampleLoad> {
         .replace(/\.json$/i, '');
       const metadata = await META_FILES[path]();
       const videoFileName = metadata.source?.fileName ?? `${name}.mp4`;
-      const videoUrl = `${ASSET_DIR}${videoFileName}`;
+      const resolvedVideoFileName = await firstExistingVideo(videoFileName);
       const thumbUrl = `${ASSET_DIR}${name}.jpg`;
-      const [hasVideo, hasThumb] = await Promise.all([
-        exists(videoUrl, 'video/'),
-        exists(thumbUrl, 'image/'),
-      ]);
-      if (!hasVideo) missing.push(`public/assets/example/${videoFileName}`);
+      const hasThumb = await exists(thumbUrl, 'image/');
+      if (!resolvedVideoFileName)
+        missing.push(`public/assets/example/${videoFileName}`);
       if (!hasThumb) missing.push(`public/assets/example/${name}.jpg`);
       return {
         metadata,
-        videoUrl: hasVideo ? videoUrl : undefined,
+        videoUrl: resolvedVideoFileName
+          ? `${ASSET_DIR}${resolvedVideoFileName}`
+          : undefined,
         thumbnail: hasThumb ? thumbUrl : undefined,
       };
     }),

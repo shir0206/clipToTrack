@@ -10,17 +10,20 @@ describe('loadExampleClips', () => {
     vi.stubGlobal('window', {});
   });
 
-  it('uses the metadata source filename when checking bundled video assets', async () => {
+  it('falls back to lowercase bundled video assets', async () => {
     const requestedUrls: string[] = [];
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: URL | RequestInfo) => {
         requestedUrls.push(String(url));
+        const path = String(url);
         return {
-          ok: true,
+          ok: !path.endsWith('.MP4'),
           headers: {
             get: () =>
-              String(url).endsWith('.jpg') ? 'image/jpeg' : 'video/mp4',
+              path.endsWith('.jpg') || path.endsWith('.MP4')
+                ? 'image/jpeg'
+                : 'video/mp4',
           },
         };
       }),
@@ -35,8 +38,8 @@ describe('loadExampleClips', () => {
       true,
     );
     expect(requestedUrls.some((url) => url.endsWith('/GX010753.mp4'))).toBe(
-      false,
+      true,
     );
-    expect(clips[0].videoUrl).toMatch(/\.MP4$/);
+    expect(clips[0].videoUrl).toMatch(/\.mp4$/);
   });
 });
