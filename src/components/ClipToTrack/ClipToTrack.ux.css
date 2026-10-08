@@ -1,0 +1,97 @@
+/*
+ * Phone UX pass. Loaded after ClipToTrack.mobile.css, so it only refines what is already there.
+ * Everything is scoped to the phone layouts / touch screens: desktop is untouched.
+ * Untested against the other stylesheets (not provided): check each block on a real phone.
+ */
+
+/* ── Type: nothing smaller than 12px, inputs 16px (iOS zooms the page on anything smaller) ── */
+@media (pointer: coarse) {
+  .map-toolbar.is-compact input,
+  [data-layout^='mobile'] input[type='text'],
+  [data-layout^='mobile'] input[type='search'] {
+    font-size: 16px;
+  }
+  .altitude-cluster .dial-label,
+  .altitude-label,
+  .tile-text em,
+  .tile-text b small,
+  .trend-window,
+  .graph-tick {
+    font-size: 12px;
+  }
+  .tile-text b {
+    font-size: 18px;
+  }
+  .help-dialog {
+    font-size: 14px;
+  }
+}
+
+/* ── Buttons: 44px targets, visible labels, no cramped neighbours ── */
+@media (pointer: coarse) {
+  [data-layout^='mobile'] .toolbar-fab {
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 14px;
+  }
+  .map-toolbar.is-compact {
+    gap: 8px;
+  }
+  .toolbar-fab.is-on {
+    background: var(--primary);
+    color: var(--contrast);
+  }
+  .toolbar-fab:disabled {
+    opacity: 0.45;
+  }
+  [data-layout^='mobile'] .sheet-title .project-button,
+  [data-layout^='mobile'] .mobile-project {
+    min-height: 44px;
+    padding-inline: 14px;
+    font-size: 14px;
+  }
+  [data-layout^='mobile'] .profile-panel .map-chip,
+  [data-layout^='mobile'] .profile-panel .icon-button {
+    min-height: 40px;
+  }
+}
+
+/* ── Telemetry inside the sheet: it needs a real height (the desktop --h is not set in compact mode) ── */
+[data-layout^='mobile'] .profile-host {
+  flex: none;
+}
+[data-layout^='mobile'] .profile-panel.is-compact {
+  height: clamp(240px, 38dvh, 360px);
+  max-height: none;
+  min-height: 0;
+  margin: 8px 0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+/* a phone held sideways: the sheet is a side panel, give the dock the room it has */
+[data-layout='mobile-landscape'] .profile-panel.is-compact {
+  height: clamp(200px, 60dvh, 320px);
+}
+/* the gauge clusters adapt to their pane size; keep a graph from being squashed under 190px */
+[data-layout^='mobile'] .profile-panel.is-compact .profile-body {
+  min-height: 0;
+  height: 100%;
+}
+
+/* ── Video: full width, 16:9, never taller than a third of the screen while you also watch the map ── */
+[data-layout='mobile'] {
+  --video-max-h: 34dvh;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  [data-layout^='mobile'] {
+    --video-max-h: 62dvh;
+  }
+}
+[data-layout^='mobile'] .clip-card.is-stacked .thumbnail,
+[data-layout^='mobile'] .clip-card.is-stacked video {
+  aspect-ratio: 16 / 9;
+  max-height: var(--video-max-h);
+  width: 100%;
+  object-fit: contain; /* letterbox instead of cropping the picture */
+  background: #000;
+}

@@ -39,6 +39,7 @@ import {
 import ExampleStatus from '../ExampleProject/ExampleStatus';
 import './ClipToTrack.css';
 import './ClipToTrack.mobile.css'; // after the desktop rules: it only overrides under [data-layout^='mobile'] / pointer: coarse
+import './ClipToTrack.ux.css'; // phone type scale, tap sizes, video and telemetry heights
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
 const PROFILE_HEIGHT_KEY = 'clip-to-track:profile-height'; // owned by ElevationProfile

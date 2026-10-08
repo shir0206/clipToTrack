@@ -645,6 +645,17 @@ export default function MapPanel({
           {view.search && (
             <PlaceSearch compact onGo={onGo} onFocusChange={onSearchFocus} />
           )}
+          {view.layers && (
+            <button
+              className={`toolbar-fab${opts.profile ? ' is-on' : ''}`}
+              aria-label="Telemetry: speed and altitude"
+              aria-pressed={opts.profile}
+              disabled={!hasSelected}
+              onClick={() => set({ profile: !opts.profile })}
+            >
+              <Icon name="chart" size={18} />
+            </button>
+          )}
           {hasMenu && (
             <button
               className="toolbar-fab"

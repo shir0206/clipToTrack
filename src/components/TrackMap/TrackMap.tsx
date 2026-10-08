@@ -21,6 +21,8 @@ import MapPanel, {
 } from '../MapPanel/MapPanel';
 import ElevationProfile from '../ElevationProfile/ElevationProfile';
 import Icon from '../Icon/Icon';
+import { COPYRIGHT_OWNER } from '../../config/copyright';
+import './TrackMap.css';
 import { useSettings } from '../../lib/settings';
 import { clipToGeoJson, clipToGpx, download } from '../../lib/exportTrack';
 
@@ -319,13 +321,14 @@ export default function TrackMap({
 
   const { view } = useSettings();
   const [opts, setOpts] = useState<MapOpts>(loadOpts);
-  // Phone: the telemetry dock is on for every selection until the person closes it (then it stays closed
-  // until they switch it back on in the menu). Kept apart from `opts` so it never reaches the desktop settings.
-  const [phoneProfileOff, setPhoneProfileOff] = useState(false);
-  const profileOn = compact ? !phoneProfileOff : opts.profile;
+  // Phone: telemetry is off until the person taps the telemetry button on the map (it is never read from the
+  // desktop setting, and never saved into it).
+  const [phoneProfile, setPhoneProfile] = useState(false);
+  const profileOn = compact ? phoneProfile : opts.profile;
+  const [creditsOpen, setCreditsOpen] = useState(false);
   const set = (p: Partial<MapOpts>) => {
     const { profile, ...rest } = p;
-    if (profile !== undefined && compact) setPhoneProfileOff(!profile);
+    if (profile !== undefined && compact) setPhoneProfile(profile);
     setOpts((o) => ({
       ...o,
       ...rest,
@@ -361,6 +364,23 @@ export default function TrackMap({
     measuringRef.current = measuring;
   }, [measuring]);
   useEffect(() => {
+    if (!creditsOpen) return;
+    const close = (e: Event) => {
+      if (
+        e instanceof KeyboardEvent
+          ? e.key === 'Escape'
+          : !(e.target as Element).closest('.map-credits')
+      )
+        setCreditsOpen(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [creditsOpen]);
+  useEffect(() => {
     // The probe belongs to the previous selection/profile overlay, so clear it when either changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProbe(null);
@@ -384,6 +404,7 @@ export default function TrackMap({
       style: STYLE,
       center: [0, 20], // placeholder; fitted to the data once clips load
       zoom: 1,
+      attributionControl: false, // replaced by the © button (see MapCredits), same credits, closed by default
       // lets "PNG export" read the canvas; phones skip it (expensive) and export on the next render
       canvasContextAttributes: { preserveDrawingBuffer: !compactRef.current },
     } as maplibregl.MapOptions);
@@ -1145,6 +1166,32 @@ export default function TrackMap({
             )}
           </div>
         )}
+
+        <div
+          className="map-credits"
+          style={compact ? { bottom: insetBottom + 8 } : undefined}
+        >
+          {creditsOpen && (
+            <div
+              className="map-credits-pop"
+              id="map-credits-pop"
+              role="dialog"
+              aria-label="Map credits"
+            >
+              <p>{BASEMAPS[opts.base].attribution}</p>
+              {opts.relief && <p>Terrain: Mapzen / AWS Open Data</p>}
+              <p>Map engine: MapLibre GL JS</p>
+            </div>
+          )}
+          <button
+            className="map-credit-button"
+            aria-expanded={creditsOpen}
+            aria-controls="map-credits-pop"
+            onClick={() => setCreditsOpen((v) => !v)}
+          >
+            © {COPYRIGHT_OWNER} {new Date().getFullYear()}
+          </button>
+        </div>
 
         {view.coords && (
           <button
