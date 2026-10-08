@@ -524,7 +524,10 @@ export default function ClipToTrack() {
       style={{ '--sheet-visible': `${sheet.visiblePx}px` } as CSSProperties}
     >
       <header className="app-header">
-        <Logo tagline="GoPro clips. Mapped to your adventures." />
+        <Logo
+          compact={isMobile}
+          tagline="GoPro clips. Mapped to your adventures."
+        />
         {isMobile && (
           <button
             className="mobile-project"

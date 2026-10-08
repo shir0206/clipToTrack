@@ -308,7 +308,6 @@ export default function TrackMap({
   const cb = useRef({ onSelect, onHover, onBackgroundTap });
   const compactRef = useRef(compact);
   const lastHead = useRef(0);
-  const autoProfile = useRef(false);
   const data = useRef(clips); // latest clips for handlers registered once
   const coordEl = useRef<HTMLButtonElement>(null);
   const lastCoord = useRef('');
@@ -320,7 +319,19 @@ export default function TrackMap({
 
   const { view } = useSettings();
   const [opts, setOpts] = useState<MapOpts>(loadOpts);
-  const set = (p: Partial<MapOpts>) => setOpts((o) => ({ ...o, ...p }));
+  // Phone: the telemetry dock is on for every selection until the person closes it (then it stays closed
+  // until they switch it back on in the menu). Kept apart from `opts` so it never reaches the desktop settings.
+  const [phoneProfileOff, setPhoneProfileOff] = useState(false);
+  const profileOn = compact ? !phoneProfileOff : opts.profile;
+  const set = (p: Partial<MapOpts>) => {
+    const { profile, ...rest } = p;
+    if (profile !== undefined && compact) setPhoneProfileOff(!profile);
+    setOpts((o) => ({
+      ...o,
+      ...rest,
+      ...(profile !== undefined && !compact ? { profile } : {}),
+    }));
+  };
   const followRef = useRef(opts.follow);
   const [probe, setProbe] = useState<number | null>(null);
   const [measuring, setMeasuring] = useState(false);
@@ -328,13 +339,6 @@ export default function TrackMap({
   const [meas, setMeas] = useState<[number, number][]>([]);
 
   const sel = clips.find((c) => c.id === selectedId);
-  // phone: telemetry is the point of the app, so it starts on with the first selection
-  useEffect(() => {
-    if (!compact || !sel || autoProfile.current) return;
-    autoProfile.current = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOpts((o) => ({ ...o, profile: true }));
-  }, [compact, sel]);
   const selIdRef = useRef(selectedId);
   useEffect(() => {
     selIdRef.current = selectedId;
@@ -360,7 +364,7 @@ export default function TrackMap({
     // The probe belongs to the previous selection/profile overlay, so clear it when either changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProbe(null);
-  }, [selectedId, opts.profile]);
+  }, [selectedId, profileOn]);
 
   // value range for metric colouring (+ legend)
   const range = useMemo(() => {
@@ -1051,8 +1055,9 @@ export default function TrackMap({
   };
 
   const profile =
-    opts.profile && sel ? (
+    profileOn && sel ? (
       <ElevationProfile
+        compact={compact}
         clip={sel}
         probe={probe}
         onProbe={setProbe}
@@ -1068,7 +1073,7 @@ export default function TrackMap({
       <div className="map-stage">
         <div ref={el} className="map-canvas" />
         <MapPanel
-          opts={opts}
+          opts={{ ...opts, profile: profileOn }}
           set={set}
           hasClips={clips.length > 0}
           hasSelected={!!sel}

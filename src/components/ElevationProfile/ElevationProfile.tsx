@@ -20,6 +20,8 @@ type Props = {
   probe: number | null;
   onProbe: (i: number | null) => void;
   onClose: () => void;
+  /** phone sheet: no resize grip, no pop-out windows, no drag-to-split, finger scrubbing */
+  compact?: boolean;
 };
 
 type Metric = 'alt' | 'speed';
@@ -54,9 +56,11 @@ function Pane({
   onProbe,
   mode,
   onPop,
+  compact = false,
 }: {
   clip: Clip;
   metric: Metric;
+  compact?: boolean;
   probe: number | null;
   onProbe: (i: number | null) => void;
   mode: ViewMode;
@@ -153,8 +157,11 @@ function Pane({
       ) : chart ? (
         <div
           className="profile-plot"
+          onPointerDown={compact ? onMove : undefined}
           onPointerMove={onMove}
-          onPointerLeave={() => onProbe(null)}
+          // a lifted finger must not blank the playhead marker that the video is driving
+          onPointerLeave={compact ? undefined : () => onProbe(null)}
+          style={compact ? { touchAction: 'pan-y' } : undefined}
         >
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
             <path d={chart.area} fill="var(--c)" opacity="0.15" />
@@ -326,6 +333,7 @@ export default function ElevationProfile({
   probe,
   onProbe,
   onClose,
+  compact = false,
 }: Props) {
   const [tab, setTab] = useState<Tab>('alt');
   const [single, setSingle] = useState<Metric>('alt'); // where "cancel" returns to
@@ -376,12 +384,13 @@ export default function ElevationProfile({
     () => Number(localStorage.getItem(HEIGHT_KEY)) || DEFAULT_H,
   );
   useEffect(() => {
+    if (compact) return; // the sheet sizes the dock; don't touch the desktop height
     try {
       localStorage.setItem(HEIGHT_KEY, String(height));
     } catch {
       /* ignore */
     }
-  }, [height]);
+  }, [height, compact]);
   const clampH = (h: number) => {
     const room =
       root.current?.parentElement?.clientHeight ?? window.innerHeight;
@@ -428,7 +437,10 @@ export default function ElevationProfile({
   const metrics: Metric[] =
     tab === 'split' && split ? split : [tab === 'split' ? single : tab];
 
-  const tabDrag = (k: Metric) => ({
+  const tabDrag = (k: Metric) =>
+    compact
+      ? {}
+      : {
     draggable: true,
     onDragStart: (e: DragEvent) => {
       e.dataTransfer.setData('text/plain', k); // Firefox needs data to start a drag
@@ -448,16 +460,20 @@ export default function ElevationProfile({
       if (drag && drag !== k) makeSplit(drag, 'right'); // dragged tab joins the one it was dropped on
       endDrag();
     },
-  });
+  };
 
   return (
     <div
       ref={root}
-      className="profile-panel"
+      className={`profile-panel${compact ? ' is-compact' : ''}`}
       style={
-        { ...clipColorVars(clip.color), '--h': `${height}px` } as CSSProperties
+        {
+          ...clipColorVars(clip.color),
+          ...(compact ? {} : { '--h': `${height}px` }),
+        } as CSSProperties
       }
     >
+      {!compact && (
       <div
         className="profile-grip"
         role="separator"
@@ -471,6 +487,7 @@ export default function ElevationProfile({
         onKeyDown={onGripKey}
         onDoubleClick={() => setHeight(clampH(DEFAULT_H))}
       />
+      )}
       <div className="profile-header">
         <Icon name="chart" size={14} />
         <strong>{clip.title}</strong>
@@ -481,7 +498,11 @@ export default function ElevationProfile({
               key={k}
               className={`map-chip profile-tab${tab === k ? ' is-on' : ''}${overTab === k ? ' is-drop' : ''}`}
               aria-pressed={tab === k}
-              title="Drag onto the other tab to view them side by side"
+              title={
+                compact
+                  ? undefined
+                  : 'Drag onto the other tab to view them side by side'
+              }
               onClick={() => pickSingle(k)}
               {...tabDrag(k)}
             >
@@ -554,11 +575,12 @@ export default function ElevationProfile({
             probe={probe}
             onProbe={onProbe}
             mode={modes[m]}
-            onPop={() => pop(m)}
+            onPop={compact ? undefined : () => pop(m)}
+            compact={compact}
           />
         ))}
 
-        {drag && (
+        {!compact && drag && (
           <div className="profile-dropzone" aria-hidden="true">
             {(['left', 'right'] as const).map((side) => (
               <div
