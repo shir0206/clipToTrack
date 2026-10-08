@@ -23,20 +23,20 @@ export type ExampleLoad = { clips: ExampleClip[]; missing: string[] };
 
 const EXAMPLE_PLACE = 'Tyrol/Austria';
 const EXAMPLE_TRIPS = [
-  'ride',
-  'drive',
-  'road trip',
-  'weekend',
-  'mountain loop',
-  'scenic route',
-  'valley tour',
-  'alpine pass',
-  'sunday drive',
-  'adventure',
+  'Ride',
+  'Drive',
+  'Road trip',
+  'Weekend',
+  'Mountain loop',
+  'Scenic route',
+  'Valley tour',
+  'Alpine pass',
+  'Sunday drive',
+  'Adventure',
 ];
-/** e.g. "Example scenic route in Tyrol/Austria" */
+/** e.g. "Scenic route in Tyrol/Austria". The word "Example" is not in the name: the UI shows an "Example" badge instead. */
 export const randomExampleName = () =>
-  `Example ${EXAMPLE_TRIPS[Math.floor(Math.random() * EXAMPLE_TRIPS.length)]} in ${EXAMPLE_PLACE}`;
+  `${EXAMPLE_TRIPS[Math.floor(Math.random() * EXAMPLE_TRIPS.length)]} in ${EXAMPLE_PLACE}`;
 
 // ───────── what the app remembers about the example ─────────
 type ExampleState = {

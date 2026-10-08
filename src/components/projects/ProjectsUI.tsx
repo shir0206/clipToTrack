@@ -17,9 +17,17 @@ import {
   type ProjectView,
 } from '../../lib/projects';
 import { clipColorVars } from '../../lib/clipColorStyle';
+import { useExampleState } from '../exampleProject';
 import './ProjectsUI.css';
 
 const TOAST_MS = 5000;
+
+/** "Example" badge shown after the name of the example project (and only there). */
+function ExampleBadge({ id }: { id: string }) {
+  const { projectId } = useExampleState();
+  if (!projectId || projectId !== id) return null;
+  return <span className="example-badge">Example</span>;
+}
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
@@ -248,6 +256,7 @@ function ProjectSelect({
         }}
       >
         <span className="select-label">{items[cur].label}</span>
+        <ExampleBadge id={items[cur].id} />
         <em>{items[cur].n}</em>
         <SvgIcon name="chevron" size={13} className="select-chevron" />
       </button>
@@ -269,6 +278,7 @@ function ProjectSelect({
                 className="select-icon"
               />
               <span>{it.label}</span>
+              <ExampleBadge id={it.id} />
               <em>{it.n}</em>
               {it.id === activeId && <SvgIcon name="check" size={13} />}
             </li>
@@ -314,6 +324,7 @@ function ProjectHead({
             <SvgIcon name="folder" size={15} />
           </span>
           <h2 title={v.name}>{v.name}</h2>
+          <ExampleBadge id={v.id} />
           <button
             className="icon-button"
             aria-label="Rename project"
@@ -728,6 +739,7 @@ export function ProjectsDialog({
                     </span>
                     <span className="item-text">
                       <b>{v.name}</b>
+                      <ExampleBadge id={v.id} />
                       <small>{v.range}</small>
                     </span>
                     <em>{v.clipIds.length}</em>
@@ -762,6 +774,7 @@ export function ProjectsDialog({
                       <SvgIcon name="folder" size={15} />
                     </span>
                     <h3 title={sel.name}>{sel.name}</h3>
+                    <ExampleBadge id={sel.id} />
                     <button
                       className="icon-button"
                       aria-label="Rename project"
