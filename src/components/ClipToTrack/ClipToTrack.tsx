@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -16,6 +17,9 @@ import VideoModal from '../VideoModal/VideoModal';
 import VideoWindow, { openVideoWindow } from '../VideoWindow/VideoWindow';
 import Icon, { type IconName } from '../Icon/Icon';
 import Settings from '../Settings/Settings';
+import { SheetPeek, OtherClips } from '../SheetPeek/SheetPeek';
+import { useLayoutMode } from '../../hooks/useLayoutMode';
+import { useBottomSheet } from '../../hooks/useBottomSheet';
 import PlaybackHelp, { playbackHelpDismissed } from '../playback/PlaybackHelp';
 import { probeDecode } from '../../lib/video/videoSupport';
 import { useClips } from '../../hooks/useClips';
@@ -29,10 +33,12 @@ import {
 import {
   ProjectBar,
   ProjectNotice,
+  ProjectPicker,
   ProjectsModal,
 } from '../ProjectsModal/ProjectsModal';
 import ExampleStatus from '../ExampleProject/ExampleStatus';
 import './ClipToTrack.css';
+import './ClipToTrack.mobile.css'; // after the desktop rules: it only overrides under [data-layout^='mobile'] / pointer: coarse
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
 const PROFILE_HEIGHT_KEY = 'clip-to-track:profile-height'; // owned by ElevationProfile
@@ -88,6 +94,14 @@ export default function ClipToTrack() {
     remove,
     clear,
   } = useClips(); // clips persist in localStorage
+  const layout = useLayoutMode();
+  const isMobile = layout !== 'desktop';
+  const sheetOn = layout === 'mobile'; // landscape phones use a plain side panel, no snap points
+  const sheet = useBottomSheet({
+    enabled: sheetOn,
+    lock: clips.length === 0 ? 'half' : undefined, // empty: the upload zone must stay reachable
+  });
+  const collapsed = sheetOn && sheet.snap === 'collapsed';
   const projects = useProjects(clips); // every clip is placed in a project automatically
   const projectMode = useProjectMode(); // Settings → "Group clips into projects"; off = plain clip list
   const [projectFilter, setProjectFilter] = useState('all');
@@ -138,6 +152,15 @@ export default function ClipToTrack() {
   const landOn = useRef<string[] | null>(null);
   const [landTick, setLandTick] = useState(0);
   const mapApi = useRef<MapApi | null>(null);
+  const [profileHost, setProfileHost] = useState<HTMLDivElement | null>(null); // telemetry portal target (phones)
+  const [picker, setPicker] = useState<
+    null | { kind: 'switch' } | { kind: 'move'; clipId: string }
+  >(null);
+  const [immersive, setImmersive] = useState(false); // phones: map only, no chrome
+  const peekBar = useRef<HTMLElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const addInput = useRef<HTMLInputElement>(null);
+  const beforeSearch = useRef<typeof sheet.snap | null>(null);
 
   useEffect(() => {
     try {
@@ -184,17 +207,19 @@ export default function ClipToTrack() {
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
+    if (isMobile) return; // a 390px phone would clamp to 320 and overwrite the saved desktop width
     try {
       localStorage.setItem(WIDTH_KEY, String(panelW));
     } catch {
       /* ignore */
     }
-  }, [panelW]);
+  }, [panelW, isMobile]);
   useEffect(() => {
+    if (isMobile) return;
     const onResize = () => setPanelW((w) => clampW(w));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [isMobile]);
 
   const onDragStart = (e: PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -212,11 +237,45 @@ export default function ClipToTrack() {
     e.preventDefault();
   };
 
-  const select = (id: string) => {
+  /**
+   * `fromMap`: a tap on a route / dot. On phones that opens the half sheet; a tap on a card that
+   * is already selected leaves the sheet alone.
+   */
+  const select = (id: string, fromMap = false) => {
+    if (sheetOn && (fromMap || id !== selectedClipId)) {
+      sheet.setSnap('half');
+      bodyRef.current?.scrollTo({ top: 0 });
+    }
     setSelectedClipId(id);
     document
       .getElementById(`ctt-${id}`)
       ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  const selectFromMap = (id: string) => select(id, true);
+  // tap on empty map: step the sheet down one snap
+  const onBackgroundTap = useCallback(() => {
+    if (!sheetOn || clips.length === 0) return;
+    sheet.setSnap(sheet.snap === 'expanded' ? 'half' : 'collapsed');
+  }, [sheetOn, clips.length, sheet]);
+  // the keyboard needs the room: collapse while searching, restore afterwards
+  const onSearchFocus = useCallback(
+    (focused: boolean) => {
+      if (!sheetOn || clips.length === 0) return;
+      if (focused) {
+        beforeSearch.current = sheet.snap;
+        sheet.setSnap('collapsed');
+      } else if (beforeSearch.current) {
+        sheet.setSnap(beforeSearch.current);
+        beforeSearch.current = null;
+      }
+    },
+    [sheetOn, clips.length, sheet],
+  );
+  /** playhead: map dot + the peek bar's progress line */
+  const onFrac = (clipId: string, f: number | null) => {
+    mapApi.current?.setPlayhead(clipId, f);
+    const bar = peekBar.current;
+    if (bar) bar.style.transform = `scaleX(${f ?? 0})`;
   };
 
   /** `into`: a project chosen explicitly (the Projects dialog); otherwise the open project, if any */
@@ -255,8 +314,9 @@ export default function ClipToTrack() {
   };
   const openMax = (clip: Clip) => {
     if (videoWin && !videoWin.closed) videoWin.close(); // replaces any popup already open
-    const win = openVideoWindow(clip.title); // must run synchronously inside the click
-    setVideoWin(win); // null (popup blocked) falls back to the modal
+    // phones: window.open gives a new tab, not null, so the modal must be forced
+    const win = isMobile ? null : openVideoWindow(clip.title); // must run synchronously inside the click
+    setVideoWin(win); // null (popup blocked / phone) falls back to the modal
     setPlayingClipId(null); // the large player takes over
     setSelectedClipId(clip.id);
     setMaxClipId(clip.id);
@@ -265,14 +325,17 @@ export default function ClipToTrack() {
   const handleDelete = (id: string) => {
     if (playingClipId === id) setPlayingClipId(null);
     if (maxClipId === id) closeMax();
-    if (selectedClipId === id) setSelectedClipId(null);
+    if (selectedClipId === id) {
+      setSelectedClipId(null);
+      if (sheetOn) sheet.setSnap(clips.length <= 1 ? 'collapsed' : 'expanded');
+    }
     setHoveredClipId(null); // the card unmounts, so its mouseleave will never fire
     setHiddenIds((s) => {
       const n = new Set(s);
       n.delete(id);
       return n;
     });
-    mapApi.current?.setPlayhead(id, null);
+    onFrac(id, null);
     remove(id); // -> map layers, pinned bubble and localStorage all follow from `clips`
   };
 
@@ -318,6 +381,11 @@ export default function ClipToTrack() {
     },
   });
 
+  // content that is off-screen must not be reachable by Tab or a screen reader
+  useEffect(() => {
+    bodyRef.current?.toggleAttribute('inert', collapsed);
+  }, [collapsed]);
+
   const handleClear = () => {
     setPlayingClipId(null);
     closeMax();
@@ -327,6 +395,23 @@ export default function ClipToTrack() {
   };
 
   const maxClip = clips.find((c) => c.id === maxClipId && c.videoUrl);
+  // peek bar: what you hear is what you see, so a playing clip wins over the selection
+  const peekClip =
+    clips.find((c) => c.id === playingClipId) ??
+    clips.find((c) => c.id === selectedClipId);
+  const projectLabel =
+    !projectMode || activeProject === 'all'
+      ? projectMode
+        ? 'All projects'
+        : `Clips · ${visible.length}`
+      : (projects.views.find((v) => v.id === activeProject)?.name ?? 'Project');
+  const addPicked = (list: FileList | null) => {
+    const files = Array.from(list ?? []).filter((x) =>
+      /\.(mp4|lrv|json)$/i.test(x.name),
+    );
+    if (files.length) void handleFiles(files);
+    if (addInput.current) addInput.current.value = '';
+  };
 
   const emptyProject =
     projectMode && activeProject !== 'all' && visible.length === 0;
@@ -374,7 +459,7 @@ export default function ClipToTrack() {
                     <Icon
                       name={asc ? 'arrowUp' : 'arrowDown'}
                       size={12}
-                      className="ctt-sort-dir"
+                      className="sort-direction"
                     />
                   )}
                 </button>
@@ -401,8 +486,16 @@ export default function ClipToTrack() {
               selected={clip.id === selectedClipId}
               playing={clip.id === playingClipId}
               nowPlaying={clip.id === maxClipId && maxPlaying}
+              layout={isMobile ? 'stacked' : 'row'}
               onSelect={() => select(clip.id)}
-              onHover={(h) => setHoveredClipId(h ? clip.id : null)}
+              // touch emulates mouse events and never sends mouseleave: a stuck highlight
+              onHover={(h) => !isMobile && setHoveredClipId(h ? clip.id : null)}
+              onMove={
+                isMobile
+                  ? () => setPicker({ kind: 'move', clipId: clip.id })
+                  : undefined
+              }
+              onHelp={isMobile ? () => setPlaybackHelp(true) : undefined}
               onTogglePlay={() => {
                 setSelectedClipId(clip.id);
                 setPlayingClipId((p) => (p === clip.id ? null : clip.id));
@@ -410,10 +503,10 @@ export default function ClipToTrack() {
               onStop={() => setPlayingClipId(null)}
               hidden={hiddenIds.has(clip.id)}
               onToggleHidden={() => toggleHidden(clip.id)}
-              onProgress={(f) => mapApi.current?.setPlayhead(clip.id, f)}
+              onProgress={(f) => onFrac(clip.id, f)}
               onDelete={() => handleDelete(clip.id)}
-              onDragStart={() => setDragClipId(clip.id)}
-              onDragEnd={() => setDragClipId(null)}
+              onDragStart={isMobile ? undefined : () => setDragClipId(clip.id)}
+              onDragEnd={isMobile ? undefined : () => setDragClipId(null)}
               onMaximize={() => openMax(clip)}
             />
           ))}
@@ -423,11 +516,28 @@ export default function ClipToTrack() {
   );
 
   return (
-    <div className={`app-shell${dragging ? ' is-resizing' : ''}`}>
+    <div
+      className={`app-shell${dragging ? ' is-resizing' : ''}${immersive ? ' is-immersive' : ''}`}
+      data-layout={layout}
+      data-snap={sheetOn ? sheet.snap : undefined}
+      data-empty={clips.length === 0 || undefined}
+      style={{ '--sheet-visible': `${sheet.visiblePx}px` } as CSSProperties}
+    >
       <header className="app-header">
         <Logo tagline="GoPro clips. Mapped to your adventures." />
+        {isMobile && (
+          <button
+            className="mobile-project"
+            disabled={!projectMode}
+            aria-haspopup={projectMode ? 'dialog' : undefined}
+            onClick={() => setPicker({ kind: 'switch' })}
+          >
+            <span>{projectLabel}</span>
+            {projectMode && <Icon name="chevron" size={13} />}
+          </button>
+        )}
         <div className="header-actions">
-          {projectMode && (
+          {projectMode && !isMobile && (
             <button
               onClick={() =>
                 setProjectsModal({
@@ -444,74 +554,172 @@ export default function ClipToTrack() {
               Projects
             </button>
           )}
-          <button onClick={() => setSettingsOpen(true)}>Settings</button>
+          <button aria-label="Settings" onClick={() => setSettingsOpen(true)}>
+            {isMobile ? <span aria-hidden="true">⚙</span> : 'Settings'}
+          </button>
         </div>
       </header>
 
       <main className="app-layout">
         <aside
-          className="side-panel"
-          style={{ '--panel-width': `${panelW}px` } as CSSProperties}
+          id="clip-sheet"
+          ref={sheet.ref}
+          className={`side-panel${sheetOn ? ' is-sheet' : ''}${sheet.dragging ? ' is-dragging' : ''}`}
+          role={sheetOn ? 'region' : undefined}
+          aria-label={sheetOn ? 'Clips' : undefined}
+          style={
+            isMobile
+              ? undefined
+              : ({ '--panel-width': `${panelW}px` } as CSSProperties)
+          }
         >
-          <div className="panel-title">
-            Clips{' '}
-            <span>
-              {clips.length > 0 && (
-                <button className="link-button" onClick={handleClear}>
-                  <Icon name="trash" size={13} />
-                  Clear all
-                </button>
+          {sheetOn && (
+            <div className="sheet-grab" {...sheet.handleProps}>
+              <button
+                className="sheet-handle"
+                aria-label="Clip panel"
+                aria-expanded={sheet.snap !== 'collapsed'}
+                aria-controls="clip-sheet"
+                disabled={clips.length === 0}
+                onClick={sheet.cycle}
+              >
+                <span />
+              </button>
+              {collapsed && (
+                <div
+                  className="sheet-peek-wrap"
+                  onClick={(e) => {
+                    if (!(e.target as Element).closest('[data-no-drag]'))
+                      sheet.setSnap('half');
+                  }}
+                >
+                  <SheetPeek
+                    clip={peekClip}
+                    place={peekClip && projects.clipPlace[peekClip.id]}
+                    playing={!!peekClip && peekClip.id === playingClipId}
+                    busy={busy}
+                    progress={progress}
+                    barRef={peekBar}
+                    onTogglePlay={() => {
+                      if (!peekClip) return;
+                      setSelectedClipId(peekClip.id);
+                      setPlayingClipId((p) =>
+                        p === peekClip.id ? null : peekClip.id,
+                      );
+                    }}
+                  />
+                </div>
               )}
-              {visible.length}
-            </span>
+            </div>
+          )}
+          <div className="sheet-body" ref={bodyRef}>
+            {sheetOn && (
+              <div className="sheet-title">
+                <span role="status">
+                  {visible.length} clip{visible.length === 1 ? '' : 's'} ·{' '}
+                  {projectLabel}
+                </span>
+                <button
+                  className="project-button is-primary"
+                  onClick={() => addInput.current?.click()}
+                >
+                  <Icon name="upload" size={14} /> Add clips
+                </button>
+                <input
+                  ref={addInput}
+                  type="file"
+                  multiple
+                  hidden
+                  accept=".mp4,.lrv,video/mp4,.json,application/json"
+                  onChange={(e) => addPicked(e.target.files)}
+                />
+              </div>
+            )}
+            {sheetOn && busy && !collapsed && (
+              <div className="sheet-busy" role="status">
+                <strong>{progress ? progress.name : 'Working…'}</strong>
+                <div className="progress-bar">
+                  <i
+                    className={progress?.frac == null ? 'is-indeterminate' : ''}
+                    style={
+                      progress?.frac == null
+                        ? undefined
+                        : { width: `${Math.round(progress.frac * 100)}%` }
+                    }
+                  />
+                </div>
+              </div>
+            )}
+            {isMobile && <div className="profile-host" ref={setProfileHost} />}
+            <div className="panel-title">
+              Clips{' '}
+              <span>
+                {clips.length > 0 && (
+                  <button className="link-button" onClick={handleClear}>
+                    <Icon name="trash" size={13} />
+                    Clear all
+                  </button>
+                )}
+                {visible.length}
+              </span>
+            </div>
+            {projectMode ? (
+              <ProjectBar
+                views={projects.views}
+                activeId={activeProject}
+                dragging={dragClipId !== null}
+                onChange={setProjectFilter}
+                onRename={projects.rename}
+                onManage={(id) => setProjectsModal({ id })}
+                onCreate={() => {
+                  const id = projects.createProject();
+                  setProjectFilter(id);
+                  return id;
+                }}
+                onDelete={handleDeleteProject}
+                onDropClip={(clipId, target) => {
+                  projects.moveClip(clipId, target);
+                  setDragClipId(null);
+                }}
+              >
+                {panelBody}
+              </ProjectBar>
+            ) : (
+              panelBody
+            )}
+            {error && (
+              <p className="error-message" role="alert">
+                Couldn’t load {error}
+              </p>
+            )}
+            {!emptyProject && upload}
+            {sheetOn && (
+              <OtherClips
+                clips={sorted}
+                selectedId={selectedClipId}
+                onSelect={(id) => select(id, true)}
+              />
+            )}
           </div>
-          {projectMode ? (
-            <ProjectBar
-              views={projects.views}
-              activeId={activeProject}
-              dragging={dragClipId !== null}
-              onChange={setProjectFilter}
-              onRename={projects.rename}
-              onManage={(id) => setProjectsModal({ id })}
-              onCreate={() => {
-                const id = projects.createProject();
-                setProjectFilter(id);
-                return id;
-              }}
-              onDelete={handleDeleteProject}
-              onDropClip={(clipId, target) => {
-                projects.moveClip(clipId, target);
-                setDragClipId(null);
-              }}
-            >
-              {panelBody}
-            </ProjectBar>
-          ) : (
-            panelBody
-          )}
-          {error && (
-            <p className="error-message" role="alert">
-              Couldn’t load {error}
-            </p>
-          )}
-          {!emptyProject && upload}
         </aside>
 
-        <div
-          className={`panel-resizer${dragging ? ' is-dragging' : ''}`}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize sidebar"
-          aria-valuenow={panelW}
-          aria-valuemin={MIN_W}
-          tabIndex={0}
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
-          onKeyDown={onResizerKey}
-          onDoubleClick={() => setPanelW(clampW(window.innerWidth * 0.33))}
-        />
+        {!isMobile && (
+          <div
+            className={`panel-resizer${dragging ? ' is-dragging' : ''}`}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            aria-valuenow={panelW}
+            aria-valuemin={MIN_W}
+            tabIndex={0}
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
+            onKeyDown={onResizerKey}
+            onDoubleClick={() => setPanelW(clampW(window.innerWidth * 0.33))}
+          />
+        )}
 
         <section className="map-frame">
           <TrackMap
@@ -519,9 +727,23 @@ export default function ClipToTrack() {
             apiRef={mapApi}
             selectedId={selectedClipId}
             hoveredId={hoveredClipId}
-            onSelect={select}
-            onHover={setHoveredClipId}
+            onSelect={selectFromMap}
+            onHover={isMobile ? () => {} : setHoveredClipId}
+            compact={isMobile}
+            insetBottom={sheetOn ? sheet.visiblePx : 0}
+            profileHost={isMobile ? profileHost : null}
+            onBackgroundTap={onBackgroundTap}
+            onImmersive={() => setImmersive(true)}
+            onSearchFocus={onSearchFocus}
           />
+          {immersive && (
+            <button
+              className="immersive-exit"
+              onClick={() => setImmersive(false)}
+            >
+              Exit map view
+            </button>
+          )}
           {clips.length === 0 && (
             <div className="empty-state">
               <h2>No tracks yet</h2>
@@ -562,6 +784,39 @@ export default function ClipToTrack() {
         />
       )}
 
+      {picker && (
+        <ProjectPicker
+          views={projects.views}
+          mode={picker.kind}
+          activeId={
+            picker.kind === 'move'
+              ? projects.projectOf.get(picker.clipId)
+              : activeProject
+          }
+          onPick={(id) => {
+            if (picker.kind === 'move') projects.moveClip(picker.clipId, id);
+            else setProjectFilter(id);
+            setPicker(null);
+          }}
+          onNew={() => {
+            if (picker.kind === 'move') projects.moveClip(picker.clipId, 'new');
+            else setProjectFilter(projects.createProject());
+            setPicker(null);
+          }}
+          onManage={
+            picker.kind === 'switch'
+              ? () => {
+                  setPicker(null);
+                  setProjectsModal({
+                    id: activeProject !== 'all' ? activeProject : undefined,
+                  });
+                }
+              : undefined
+          }
+          onClose={() => setPicker(null)}
+        />
+      )}
+
       <ExampleStatus
         status={example.status}
         onRetry={() => example.setEnabled(true)}
@@ -574,6 +829,7 @@ export default function ClipToTrack() {
           exampleOn={example.enabled}
           exampleBusy={example.busy}
           onExampleChange={example.setEnabled}
+          hideLayout={isMobile}
           layoutIsDefault={
             panelW === clampW(window.innerWidth * 0.33) &&
             [null, '260'].includes(localStorage.getItem(PROFILE_HEIGHT_KEY)) // 260 = ElevationProfile's DEFAULT_H
@@ -606,14 +862,15 @@ export default function ClipToTrack() {
             win={videoWin}
             onClose={closeMax}
             onPlayingChange={setMaxPlaying}
-            onProgress={(f) => mapApi.current?.setPlayhead(maxClip.id, f)}
+            onProgress={(f) => onFrac(maxClip.id, f)}
           />
         ) : (
           <VideoModal
             clip={maxClip}
+            layout={isMobile ? 'mobile' : 'desktop'}
             onClose={closeMax}
             onPlayingChange={setMaxPlaying}
-            onProgress={(f) => mapApi.current?.setPlayhead(maxClip.id, f)}
+            onProgress={(f) => onFrac(maxClip.id, f)}
           />
         ))}
     </div>

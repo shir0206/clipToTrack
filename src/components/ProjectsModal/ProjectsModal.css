@@ -1,4 +1,4 @@
-/* Projects UI: built on the app tokens (--card / --border / --muted / --bg / --text) and the
+/* Projects UI: built on the app tokens (--surface / --border / --text-muted / --background / --text) and the
    same shapes as the clip cards, sort bar and toolbar, so it reads as one design. */
 
 /* ── sidebar: switcher + project header ── */
@@ -98,9 +98,13 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.select-button:hover:not(:disabled),
 .select-button.is-open {
   background: var(--background);
+}
+@media (hover: hover) {
+  .select-button:hover:not(:disabled) {
+    background: var(--background);
+  }
 }
 .select-button:disabled {
   opacity: 0.5;
@@ -203,8 +207,11 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.project-create:hover {
-  background: var(--primary-strong);
+
+@media (hover: hover) {
+  .project-create:hover {
+    background: var(--primary-strong);
+  }
 }
 
 .project-header {
@@ -470,6 +477,7 @@
   flex-direction: column;
   width: min(900px, calc(100vw - 32px));
   height: min(620px, calc(100vh - 48px));
+  height: min(620px, calc(100dvh - 48px));
   border-radius: 14px;
   background: var(--surface);
   color: var(--text);
@@ -546,8 +554,11 @@
     background 0.15s,
     border-color 0.15s;
 }
-.project-item:hover {
-  background: var(--surface);
+
+@media (hover: hover) {
+  .project-item:hover {
+    background: var(--surface);
+  }
 }
 .project-item.is-on {
   background: var(--surface);
@@ -675,8 +686,11 @@
     background 0.15s,
     border-color 0.15s;
 }
-.project-button:hover:not(:disabled) {
-  background: var(--background);
+
+@media (hover: hover) {
+  .project-button:hover:not(:disabled) {
+    background: var(--background);
+  }
 }
 .project-button.is-primary {
   background: var(--primary);
@@ -684,8 +698,11 @@
   color: var(--contrast);
   font-weight: 600;
 }
-.project-button.is-primary:hover:not(:disabled) {
-  background: var(--primary-strong);
+
+@media (hover: hover) {
+  .project-button.is-primary:hover:not(:disabled) {
+    background: var(--primary-strong);
+  }
 }
 .project-button[aria-pressed='true'] {
   background: var(--primary-soft);
@@ -739,8 +756,11 @@
   border-radius: 12px;
   cursor: grab;
 }
-.clip-picker li:hover {
-  background: var(--background);
+
+@media (hover: hover) {
+  .clip-picker li:hover {
+    background: var(--background);
+  }
 }
 .clip-picker li.is-dragging {
   opacity: 0.4;

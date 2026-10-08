@@ -25,6 +25,8 @@ type Props = {
   exampleOn: boolean;
   exampleBusy: boolean;
   onExampleChange: (on: boolean) => void;
+  /** mobile layouts: panel sizes do not exist, so the Layout section is left out */
+  hideLayout?: boolean;
 };
 
 const VIEW_ITEMS: [keyof ViewSettings, string, string][] = [
@@ -57,6 +59,7 @@ export default function Settings({
   exampleOn,
   exampleBusy,
   onExampleChange,
+  hideLayout = false,
 }: Props) {
   const { view } = useSettings();
   const projectMode = useProjectMode();
@@ -123,10 +126,10 @@ export default function Settings({
               onChange={(e) => setProjectMode(e.target.checked)}
             />
           </label>
-          <label className={`ctt-set-row${exampleBusy ? ' is-disabled' : ''}`}>
+          <label className={`settings-row${exampleBusy ? ' is-disabled' : ''}`}>
             <span>
-              <b>Example project</b>
-              <small>
+              <b className="settings-label">Example project</b>
+              <small className="settings-hint">
                 {exampleBusy
                   ? 'Adding the example clips…'
                   : exampleOn
@@ -137,7 +140,7 @@ export default function Settings({
             <input
               type="checkbox"
               role="switch"
-              className="ctt-switch"
+              className="toggle-switch"
               disabled={exampleBusy}
               checked={exampleOn}
               onChange={(e) => onExampleChange(e.target.checked)}
@@ -159,6 +162,11 @@ export default function Settings({
                 {satellite
                   ? 'The map opens as satellite imagery'
                   : 'The map opens as the street map'}
+              </small>
+              <small className="settings-hint">
+                Map credits: © OpenStreetMap contributors · © OpenTopoMap
+                (CC-BY-SA) · Tiles © Esri, Maxar, Earthstar Geographics ·
+                Terrain: Mapzen / AWS Open Data
               </small>
             </span>
             <input
@@ -221,33 +229,35 @@ export default function Settings({
           </div>
         </section>
 
-        <section
-          className="settings-section has-divider"
-          aria-labelledby="set-layout"
-        >
-          <h3 className="settings-title" id="set-layout">
-            Layout
-          </h3>
-          <div
-            className={`settings-row${layoutIsDefault ? ' is-disabled' : ''}`}
+        {!hideLayout && (
+          <section
+            className="settings-section has-divider"
+            aria-labelledby="set-layout"
           >
-            <span>
-              <b className="settings-label">Reset panel sizes</b>
-              <small className="settings-hint">
-                {layoutIsDefault
-                  ? 'Already at the default sizes'
-                  : 'Clip list width and elevation dock height'}
-              </small>
-            </span>
-            <button
-              className="link-button"
-              disabled={layoutIsDefault}
-              onClick={onResetLayout}
+            <h3 className="settings-title" id="set-layout">
+              Layout
+            </h3>
+            <div
+              className={`settings-row${layoutIsDefault ? ' is-disabled' : ''}`}
             >
-              Reset
-            </button>
-          </div>
-        </section>
+              <span>
+                <b className="settings-label">Reset panel sizes</b>
+                <small className="settings-hint">
+                  {layoutIsDefault
+                    ? 'Already at the default sizes'
+                    : 'Clip list width and elevation dock height'}
+                </small>
+              </span>
+              <button
+                className="link-button"
+                disabled={layoutIsDefault}
+                onClick={onResetLayout}
+              >
+                Reset
+              </button>
+            </div>
+          </section>
+        )}
 
         <section
           className="settings-section has-divider"

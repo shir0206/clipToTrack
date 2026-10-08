@@ -27,6 +27,14 @@ type Props = {
   /** the card can be dragged onto a project (see ProjectBar) */
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  /** 'stacked' = phone layout (thumbnail on top). Default 'row' = desktop. */
+  layout?: 'row' | 'stacked';
+  /** phone: opens the "move to project" picker (replaces drag and drop) */
+  onMove?: () => void;
+  /** phone: opens the playback help dialog from the error message */
+  onHelp?: () => void;
+  /** phone: lets the person pick the video file again after a reload */
+  onReAddVideo?: (file: File) => void;
 };
 
 const UNPLAYABLE =
@@ -49,8 +57,15 @@ export default function ClipCard({
   onDelete,
   onDragStart,
   onDragEnd,
+  layout = 'row',
+  onMove,
+  onHelp,
+  onReAddVideo,
 }: Props) {
+  const stacked = layout === 'stacked';
   const [confirming, setConfirming] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const pick = useRef<HTMLInputElement>(null);
   const stop = (fn: () => void) => (e: React.MouseEvent) => {
     e.stopPropagation();
     fn();
@@ -58,6 +73,11 @@ export default function ClipCard({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
+  // phones cap concurrent decoders: only the selected / playing card mounts a <video>
+  const mountVideo =
+    !!clip.videoUrl &&
+    !videoError &&
+    (!stacked || playing || selected || nowPlaying);
   const onStopRef = useRef(onStop);
   useEffect(() => {
     onStopRef.current = onStop;
@@ -72,7 +92,7 @@ export default function ClipCard({
       setVideoError(UNPLAYABLE);
       onStopRef.current();
     });
-  }, [clip.videoUrl, videoError]);
+  }, [clip.videoUrl, videoError, mountVideo]);
 
   const onProgressRef = useRef(onProgress);
   useEffect(() => {
@@ -88,7 +108,7 @@ export default function ClipCard({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing]);
+  }, [playing, mountVideo]);
 
   // `playing` (owned by the parent) is the single source of truth; the <video> just follows it
   useEffect(() => {
@@ -103,7 +123,7 @@ export default function ClipCard({
     } else {
       v.pause();
     }
-  }, [playing]);
+  }, [playing, mountVideo]);
 
   const active = playing || nowPlaying; // visuals only; `playing` alone controls the inline <video>
   const canPlay = !!clip.videoUrl && !videoError;
@@ -135,10 +155,10 @@ export default function ClipCard({
       aria-selected={selected}
       tabIndex={0}
       aria-label={`Select track ${clip.index} ${clip.title}${place ? ` - ${place}` : ''}`}
-      className={`clip-card${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
+      className={`clip-card is-${layout}${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
       style={clipColorVars(clip.color) as CSSProperties}
       onClick={onSelect}
-      draggable={!!onDragStart}
+      draggable={!!onDragStart && !stacked}
       onDragStart={(e) => {
         e.dataTransfer.setData(CLIP_MIME, clip.id);
         e.dataTransfer.setData('text/plain', clip.title);
@@ -172,7 +192,7 @@ export default function ClipCard({
             : undefined
         }
       >
-        {clip.videoUrl && !videoError && (
+        {mountVideo && (
           <video
             ref={videoRef}
             className="video-frame"
@@ -191,13 +211,38 @@ export default function ClipCard({
             }}
           />
         )}
-        {!clip.videoUrl && (
-          <span
-            className="thumbnail-hint"
-            title="The video file isn't kept after a reload — add it again to play"
-          >
-            Re-add video to play
-          </span>
+        {!clip.videoUrl &&
+          (onReAddVideo ? (
+            <button
+              className="thumbnail-hint is-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                pick.current?.click();
+              }}
+            >
+              The video isn’t kept after a reload. Tap to add it again
+            </button>
+          ) : (
+            <span
+              className="thumbnail-hint"
+              title="The video file isn't kept after a reload — add it again to play"
+            >
+              Re-add video to play
+            </span>
+          ))}
+        {onReAddVideo && (
+          <input
+            ref={pick}
+            type="file"
+            accept=".mp4,.lrv,video/mp4"
+            hidden
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onReAddVideo(f);
+              e.target.value = '';
+            }}
+          />
         )}
       </div>
 
@@ -227,7 +272,55 @@ export default function ClipCard({
               >
                 <Icon name="trash" size={14} />
               </button>
+              {stacked && onMove && (
+                <button
+                  className="icon-button"
+                  aria-label={`More actions for ${clip.title}`}
+                  aria-haspopup="menu"
+                  aria-expanded={menu}
+                  onClick={stop(() => setMenu((m) => !m))}
+                >
+                  <span aria-hidden="true">⋯</span>
+                </button>
+              )}
             </div>
+            {menu && (
+              <div
+                className="card-actions"
+                role="menu"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  role="menuitem"
+                  onClick={stop(() => {
+                    setMenu(false);
+                    onMove?.();
+                  })}
+                >
+                  <Icon name="folder" size={14} /> Move to project…
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={stop(() => {
+                    setMenu(false);
+                    onToggleHidden();
+                  })}
+                >
+                  <Icon name={hidden ? 'eye' : 'eyeOff'} size={14} />
+                  {hidden ? 'Show on map' : 'Hide on map'}
+                </button>
+                <button
+                  role="menuitem"
+                  className="is-danger"
+                  onClick={stop(() => {
+                    setMenu(false);
+                    setConfirming(true);
+                  })}
+                >
+                  <Icon name="trash" size={14} /> Delete…
+                </button>
+              </div>
+            )}
             {place && (
               <p className="card-meta">
                 <Icon name="mapPin" size={14} />
@@ -313,6 +406,14 @@ export default function ClipCard({
         {videoError && (
           <p className="video-error" role="status">
             {videoError}
+            {onHelp && (
+              <>
+                {' '}
+                <button className="link-button" onClick={stop(onHelp)}>
+                  How to fix
+                </button>
+              </>
+            )}
           </p>
         )}
       </div>

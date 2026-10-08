@@ -5,6 +5,7 @@ import {
   useState,
   type MutableRefObject,
 } from 'react';
+import { createPortal } from 'react-dom';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Clip } from '../../types';
 import * as maplibregl from 'maplibre-gl';
@@ -38,6 +39,17 @@ type Props = {
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
   apiRef?: MutableRefObject<MapApi | null>;
+  /** phone layouts: compact toolbar, touch hit areas, no hover popups */
+  compact?: boolean;
+  /** px of the map covered at the bottom by the sheet (camera padding) */
+  insetBottom?: number;
+  /** phone: the elevation / speed dock is portalled into the sheet instead of sitting under the map */
+  profileHost?: HTMLElement | null;
+  /** tap on empty map (not on a route / dot) */
+  onBackgroundTap?: () => void;
+  /** phone: replaces the Fullscreen API, which iOS only offers for <video> */
+  onImmersive?: () => void;
+  onSearchFocus?: (focused: boolean) => void;
 };
 
 // ───────── basemaps (all key-free). Every one is a hidden raster layer; switching = toggle visibility ─────────
@@ -192,8 +204,13 @@ const dotFeature = (
 
 // ───────── constants / helpers ─────────
 const POINT_LAYERS = ['points-selected', 'points', 'points-all', 'ends'];
-const AUTO_MAX_ZOOM = 17; // automatic fits never zoom closer than this (zoom in by hand if you want)
-const HIT_PX = 8; // forgiving hover radius around a dot
+const AUTO_MAX_ZOOM = 17;
+const BASE_PAD = 48; // phones: padding on top of the sheet inset
+const isTouch = () =>
+  typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches; // automatic fits never zoom closer than this (zoom in by hand if you want)
+const HIT_MOUSE = 8; // forgiving hover radius around a dot
+const HIT_TOUCH = 20; // a fingertip is ~24px wide
+const PLAYHEAD_MS = 50; // phones: ~20 updates per second are plenty
 const METRIC_RAMP = {
   low: '#2563eb',
   midLow: '#22c55e',
@@ -278,11 +295,20 @@ export default function TrackMap({
   onSelect,
   onHover,
   apiRef,
+  compact = false,
+  insetBottom = 0,
+  profileHost = null,
+  onBackgroundTap,
+  onImmersive,
+  onSearchFocus,
 }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [ready, setReady] = useState(false);
-  const cb = useRef({ onSelect, onHover });
+  const cb = useRef({ onSelect, onHover, onBackgroundTap });
+  const compactRef = useRef(compact);
+  const lastHead = useRef(0);
+  const autoProfile = useRef(false);
   const data = useRef(clips); // latest clips for handlers registered once
   const coordEl = useRef<HTMLButtonElement>(null);
   const lastCoord = useRef('');
@@ -302,21 +328,31 @@ export default function TrackMap({
   const [meas, setMeas] = useState<[number, number][]>([]);
 
   const sel = clips.find((c) => c.id === selectedId);
+  // phone: telemetry is the point of the app, so it starts on with the first selection
+  useEffect(() => {
+    if (!compact || !sel || autoProfile.current) return;
+    autoProfile.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpts((o) => ({ ...o, profile: true }));
+  }, [compact, sel]);
   const selIdRef = useRef(selectedId);
   useEffect(() => {
     selIdRef.current = selectedId;
   }, [selectedId]);
 
   useEffect(() => {
-    cb.current = { onSelect, onHover };
-  }, [onSelect, onHover]);
+    cb.current = { onSelect, onHover, onBackgroundTap };
+  }, [onSelect, onHover, onBackgroundTap]);
+  useEffect(() => {
+    compactRef.current = compact;
+  }, [compact]);
   useEffect(() => {
     data.current = clips;
   }, [clips]);
   useEffect(() => {
     followRef.current = opts.follow;
-    saveOpts(opts);
-  }, [opts]);
+    if (!compact) saveOpts(opts); // phone-only defaults must not leak into the desktop settings
+  }, [opts, compact]);
   useEffect(() => {
     measuringRef.current = measuring;
   }, [measuring]);
@@ -344,7 +380,8 @@ export default function TrackMap({
       style: STYLE,
       center: [0, 20], // placeholder; fitted to the data once clips load
       zoom: 1,
-      canvasContextAttributes: { preserveDrawingBuffer: true }, // lets "PNG export" read the canvas
+      // lets "PNG export" read the canvas; phones skip it (expensive) and export on the next render
+      canvasContextAttributes: { preserveDrawingBuffer: !compactRef.current },
     } as maplibregl.MapOptions);
     map.current = m;
     const ro = new ResizeObserver(() => m.resize()); // sidebar drag / profile panel / fullscreen
@@ -353,6 +390,7 @@ export default function TrackMap({
     m.addControl(
       new maplibregl.NavigationControl({
         showCompass: true,
+        showZoom: !isTouch(), // pinch / double-tap zoom is native on touch
         visualizePitch: true,
       }),
       'top-right',
@@ -375,6 +413,12 @@ export default function TrackMap({
         coordEl.current.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)} · z${m.getZoom().toFixed(1)}`;
     };
     m.on('mousemove', (e) => showCoords(e.lngLat.lng, e.lngLat.lat));
+    // touch has no pointer position: show the map centre instead
+    m.on('moveend', () => {
+      if (!compactRef.current) return;
+      const c = m.getCenter();
+      showCoords(c.lng, c.lat);
+    });
     m.on('zoom', () => {
       const c = m.getCenter();
       if (!lastCoord.current) showCoords(c.lng, c.lat);
@@ -470,6 +514,14 @@ export default function TrackMap({
             4,
           ],
         },
+      });
+      // invisible, wide copy of the route: a 4px line is not tappable with a finger
+      m.addLayer({
+        id: 'tracks-hit',
+        type: 'line',
+        source: 'tracks',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 24 },
       });
       // coloured-by-metric overlay (hidden in "Route" mode)
       m.addLayer({
@@ -642,10 +694,11 @@ export default function TrackMap({
       };
 
       const nearest = (x: number, y: number) => {
+        const px = isTouch() ? HIT_TOUCH : HIT_MOUSE;
         const hits = m.queryRenderedFeatures(
           [
-            [x - HIT_PX, y - HIT_PX],
-            [x + HIT_PX, y + HIT_PX],
+            [x - px, y - px],
+            [x + px, y + px],
           ],
           { layers: POINT_LAYERS },
         );
@@ -690,7 +743,13 @@ export default function TrackMap({
           return;
         }
         const h = nearest(e.point.x, e.point.y);
-        if (!h) return;
+        if (!h) {
+          const onRoute = m.queryRenderedFeatures(e.point, {
+            layers: ['tracks-hit', 'tracks-line'],
+          }).length;
+          if (!onRoute) cb.current.onBackgroundTap?.();
+          return;
+        }
         if (h.clip.id === selIdRef.current) setProbe(h.i);
         cb.current.onSelect(h.clip.id);
         pinned = h.key;
@@ -702,7 +761,7 @@ export default function TrackMap({
           .addTo(m);
         setSrc('pin', dotFeature(h.coord, h.clip.color));
       });
-      m.on('click', 'tracks-line', (e) => {
+      m.on('click', 'tracks-hit', (e) => {
         if (measuringRef.current) return;
         const id = e.features?.[0]?.properties?.clipId;
         if (id) cb.current.onSelect(id);
@@ -732,6 +791,11 @@ export default function TrackMap({
         const m = map.current;
         const src = m?.getSource('playhead') as GeoJSONSource | undefined;
         if (!m || !src) return;
+        if (frac !== null && compactRef.current) {
+          const now = performance.now();
+          if (now - lastHead.current < PLAYHEAD_MS) return; // throttle on phones
+          lastHead.current = now;
+        }
         if (frac === null) {
           if (playheadClip.current === clipId) {
             playheadClip.current = null;
@@ -774,7 +838,7 @@ export default function TrackMap({
     prevIds.current = new Set(clips.map((c) => c.id));
     if (clips.length && isNew)
       m.fitBounds(boundsOf(clips.flatMap((c) => c.coordinates)), {
-        padding: 100,
+        padding: compactRef.current ? BASE_PAD : 100,
         maxZoom: AUTO_MAX_ZOOM,
         duration: 0,
       });
@@ -812,7 +876,6 @@ export default function TrackMap({
     );
   }, [ready, range, opts.color, clips]);
 
-  // interaction state + display options -> feature-state / layer props
   // interaction state + display options -> feature-state / layer props
   useEffect(() => {
     const m = map.current;
@@ -873,13 +936,23 @@ export default function TrackMap({
     );
   }, [clips, selectedId, hoveredId, ready, opts, range]);
 
+  // the sheet covers the bottom of the map: pad the camera so fits and "follow" use the visible part
+  useEffect(() => {
+    const m = map.current;
+    if (!ready || !m) return;
+    const h = m.getContainer().clientHeight;
+    const bottom = compact ? Math.min(insetBottom, h * 0.55) : 0;
+    m.setPadding({ top: 0, left: 0, right: 0, bottom });
+  }, [insetBottom, compact, ready]);
+
   // camera only moves on intentional selection
   useEffect(() => {
     const m = map.current;
     const clip = clips.find((c) => c.id === selectedId);
     if (!ready || !m || !clip) return;
+    const pad = compact ? BASE_PAD : 120;
     m.fitBounds(boundsOf(clip.coordinates), {
-      padding: { top: 120, bottom: 120, left: 120, right: 120 },
+      padding: { top: pad, bottom: pad, left: pad, right: pad },
       duration: 600,
       maxZoom: AUTO_MAX_ZOOM,
     });
@@ -929,7 +1002,7 @@ export default function TrackMap({
   const fitAll = () => {
     if (clips.length)
       map.current?.fitBounds(boundsOf(clips.flatMap((c) => c.coordinates)), {
-        padding: 100,
+        padding: compact ? BASE_PAD : 100,
         maxZoom: AUTO_MAX_ZOOM,
         duration: 500,
       });
@@ -937,34 +1010,55 @@ export default function TrackMap({
   const fitSelected = () => {
     if (sel)
       map.current?.fitBounds(boundsOf(sel.coordinates), {
-        padding: 120,
+        padding: compact ? BASE_PAD : 120,
         maxZoom: AUTO_MAX_ZOOM,
         duration: 500,
       });
   };
   const fullscreen = () => {
+    if (compact && onImmersive) return onImmersive();
     const box = el.current?.closest('.map-column');
     if (document.fullscreenElement) void document.exitFullscreen();
     else void box?.requestFullscreen?.();
   };
   const exportAs = (kind: 'gpx' | 'geojson' | 'png') => {
+    const save = (blob: Blob, name: string) => {
+      // iOS only previews a plain download: hand the file to the share sheet when it can take files
+      const file = new File([blob], name, { type: blob.type });
+      if (compact && navigator.canShare?.({ files: [file] }))
+        navigator.share({ files: [file] }).catch(() => {});
+      else download(blob, name);
+    };
     if (kind === 'png') {
-      try {
-        map.current
-          ?.getCanvas()
-          .toBlob((b) => b && download(b, 'clip-to-track-map.png'));
-      } catch {
-        /* tainted canvas (a tile server without CORS) */
-      }
+      const m = map.current;
+      if (!m) return;
+      // no preserveDrawingBuffer on phones: read the canvas right after a fresh render
+      m.once('render', () => {
+        try {
+          m.getCanvas().toBlob((b) => b && save(b, 'clip-to-track-map.png'));
+        } catch {
+          /* tainted canvas (a tile server without CORS) */
+        }
+      });
+      m.triggerRepaint();
     } else if (sel) {
       const body = kind === 'gpx' ? clipToGpx(sel) : clipToGeoJson(sel);
-      download(
+      save(
         new Blob([body], { type: 'application/octet-stream' }),
         `${sel.title}.${kind === 'gpx' ? 'gpx' : 'geojson'}`,
       );
     }
   };
 
+  const profile =
+    opts.profile && sel ? (
+      <ElevationProfile
+        clip={sel}
+        probe={probe}
+        onProbe={setProbe}
+        onClose={() => set({ profile: false })}
+      />
+    ) : null;
   const unit = opts.color === 'speed' ? 'km/h' : 'm';
 
   return (
@@ -984,6 +1078,8 @@ export default function TrackMap({
           onFitSelected={fitSelected}
           onFullscreen={fullscreen}
           onExport={exportAs}
+          compact={compact}
+          onSearchFocus={onSearchFocus}
           onGo={(b) =>
             map.current?.fitBounds(b, {
               padding: 40,
@@ -1014,7 +1110,11 @@ export default function TrackMap({
           <div className="measure-bar">
             <Icon name="ruler" size={14} />
             <strong>
-              {meas.length > 1 ? fmtLen(measured) : 'Click the map to measure'}
+              {meas.length > 1
+                ? fmtLen(measured)
+                : compact
+                  ? 'Tap the map to measure'
+                  : 'Click the map to measure'}
             </strong>
             <button
               className="link-button"
@@ -1056,14 +1156,12 @@ export default function TrackMap({
         )}
       </div>
 
-      {opts.profile && sel && (
-        <ElevationProfile
-          clip={sel}
-          probe={probe}
-          onProbe={setProbe}
-          onClose={() => set({ profile: false })}
-        />
-      )}
+      {/* phones: portalled into the sheet (state and probe wiring stay here); never under the map */}
+      {profileHost
+        ? createPortal(profile, profileHost)
+        : compact
+          ? null
+          : profile}
     </div>
   );
 }

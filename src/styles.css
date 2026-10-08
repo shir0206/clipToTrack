@@ -93,6 +93,17 @@
   --gradient-lit: linear-gradient(180deg, #ffffff59, #ffffff00);
   --gradient-thumbnail: linear-gradient(135deg, #8fa7c4, #3d5a80);
 
+  /* ── mobile layout ── */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --tap: 44px; /* minimum touch target */
+  --header-h: 60px; /* desktop; the mobile layout overrides it */
+  --sheet-visible: 0px; /* set from JS: how much of the map the bottom sheet covers */
+  --sheet-radius: 20px;
+  --shadow-sheet: 0 -8px 30px #15203329;
+
   /* ── type ── */
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
@@ -112,6 +123,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at 15% 0%, var(--home-glow) 0, transparent 33rem),
     var(--home-background);

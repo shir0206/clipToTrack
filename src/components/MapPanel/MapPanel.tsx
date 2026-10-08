@@ -70,13 +70,25 @@ type Props = {
   onFullscreen: () => void;
   onExport: (kind: 'gpx' | 'geojson' | 'png') => void;
   onGo: (bbox: [number, number, number, number]) => void; // [w, s, e, n]
+  /** phone layout: one search pill + one Layers menu instead of ~17 loose controls */
+  compact?: boolean;
+  /** phone layout: the sheet gets out of the way while the keyboard is up */
+  onSearchFocus?: (focused: boolean) => void;
 };
 
 // ───────── place search: type-ahead from the 4th character ─────────
 const MIN_CHARS = 4;
 type Hit = { place_id: number; display_name: string; boundingbox: string[] };
 
-function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
+function PlaceSearch({
+  onGo,
+  onFocusChange,
+  compact,
+}: {
+  onGo: Props['onGo'];
+  onFocusChange?: (focused: boolean) => void;
+  compact?: boolean;
+}) {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>(
@@ -171,8 +183,16 @@ function PlaceSearch({ onGo }: { onGo: Props['onGo'] }) {
         autoComplete="off"
         spellCheck={false}
         onChange={(e) => setQ(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        inputMode={compact ? 'search' : undefined}
+        enterKeyHint={compact ? 'search' : undefined}
+        onFocus={() => {
+          setFocused(true);
+          onFocusChange?.(true);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          onFocusChange?.(false);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown' && hits.length) {
             e.preventDefault();
@@ -346,11 +366,234 @@ const POINTS: Item<MapOpts['points']>[] = [
   { value: 'auto', label: 'Points auto' },
   { value: 'all', label: 'Every sample' },
 ];
-const EXPORTS: Item<'gpx' | 'geojson' | 'png'>[] = [
+export const EXPORTS: Item<'gpx' | 'geojson' | 'png'>[] = [
   { value: 'gpx', label: 'GPX (selected clip)' },
   { value: 'geojson', label: 'GeoJSON (selected clip)' },
   { value: 'png', label: 'Map image (PNG)' },
 ];
+
+// ───────── phone: segmented choice + switch rows inside one menu sheet ─────────
+function Segmented<T extends string>({
+  label,
+  items,
+  current,
+  onPick,
+}: {
+  label: string;
+  items: Item<T>[];
+  current: T;
+  onPick: (v: T) => void;
+}) {
+  return (
+    <div className="menu-block">
+      <h3 className="menu-title">{label}</h3>
+      <div className="segmented" role="radiogroup" aria-label={label}>
+        {items.map((i) => (
+          <button
+            key={i.value}
+            role="radio"
+            aria-checked={i.value === current}
+            className={i.value === current ? 'is-on' : ''}
+            onClick={() => onPick(i.value)}
+          >
+            {i.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MenuRow({
+  icon,
+  label,
+  on,
+  disabled,
+  onClick,
+}: {
+  icon: IconName;
+  label: string;
+  on?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const toggle = on !== undefined;
+  return (
+    <button
+      className={`menu-row${on ? ' is-on' : ''}`}
+      role={toggle ? 'switch' : undefined}
+      aria-checked={toggle ? on : undefined}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <Icon name={icon} size={18} />
+      <span>{label}</span>
+      {toggle && <i className="menu-switch" aria-hidden="true" />}
+    </button>
+  );
+}
+
+/** Map menu for phones: every desktop control, grouped, with a visible text label (no tooltips on touch). */
+function MapMenu({
+  opts,
+  set,
+  hasClips,
+  hasSelected,
+  measuring,
+  onMeasure,
+  onFitAll,
+  onFitSelected,
+  onFullscreen,
+  onExport,
+  onClose,
+}: Omit<Props, 'onGo' | 'compact' | 'onSearchFocus'> & {
+  onClose: () => void;
+}) {
+  const { view } = useSettings();
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    box.current?.querySelector<HTMLElement>('button')?.focus();
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('keydown', key);
+      prev?.focus();
+    };
+  }, [onClose]);
+  const act = (fn: () => void) => () => {
+    fn();
+    onClose();
+  };
+  return (
+    <div
+      className="map-menu-backdrop"
+      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        ref={box}
+        className="map-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Map options"
+      >
+        <div className="map-menu-header">
+          <h2>Map</h2>
+          <button
+            className="icon-button"
+            aria-label="Close map options"
+            onClick={onClose}
+          >
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+        <div className="map-menu-scroll">
+          {view.mapStyle && (
+            <>
+              <Segmented
+                label="Basemap"
+                items={BASES}
+                current={opts.base}
+                onPick={(base) => set({ base })}
+              />
+              <Segmented
+                label="Colour by"
+                items={COLORS}
+                current={opts.color}
+                onPick={(color) => set({ color })}
+              />
+              <Segmented
+                label="Points"
+                items={POINTS}
+                current={opts.points}
+                onPick={(points) => set({ points })}
+              />
+            </>
+          )}
+          {view.layers && (
+            <div className="menu-block">
+              <h3 className="menu-title">Layers</h3>
+              <MenuRow
+                icon="gps"
+                label="Start / end markers"
+                on={opts.ends}
+                onClick={() => set({ ends: !opts.ends })}
+              />
+              <MenuRow
+                icon="arrowUp"
+                label="Direction arrows"
+                on={opts.arrows}
+                onClick={() => set({ arrows: !opts.arrows })}
+              />
+              <MenuRow
+                icon="mountain"
+                label="Hillshade relief"
+                on={opts.relief}
+                onClick={() => set({ relief: !opts.relief })}
+              />
+              <MenuRow
+                icon="eye"
+                label="Focus selected clip"
+                on={opts.focus}
+                onClick={() => set({ focus: !opts.focus })}
+              />
+              <MenuRow
+                icon="play"
+                label="Follow playhead"
+                on={opts.follow}
+                onClick={() => set({ follow: !opts.follow })}
+              />
+              <MenuRow
+                icon="chart"
+                label="Telemetry (speed, altitude)"
+                on={opts.profile}
+                disabled={!hasSelected}
+                onClick={() => set({ profile: !opts.profile })}
+              />
+            </div>
+          )}
+          {view.tools && (
+            <div className="menu-block">
+              <h3 className="menu-title">Tools</h3>
+              <MenuRow
+                icon="ruler"
+                label={measuring ? 'Stop measuring' : 'Measure distance'}
+                on={measuring}
+                onClick={act(onMeasure)}
+              />
+              <MenuRow
+                icon="fit"
+                label="Fit all clips"
+                disabled={!hasClips}
+                onClick={act(onFitAll)}
+              />
+              <MenuRow
+                icon="route"
+                label="Fit selected clip"
+                disabled={!hasSelected}
+                onClick={act(onFitSelected)}
+              />
+              <MenuRow
+                icon="maximize"
+                label="Immersive map"
+                onClick={act(onFullscreen)}
+              />
+              {EXPORTS.map((x) => (
+                <MenuRow
+                  key={x.value}
+                  icon="download"
+                  label={`Export: ${x.label}`}
+                  disabled={x.value !== 'png' && !hasSelected}
+                  onClick={act(() => onExport(x.value))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** Toolbar docked along the top of the map. */
 export default function MapPanel({
@@ -365,8 +608,11 @@ export default function MapPanel({
   onFullscreen,
   onExport,
   onGo,
+  compact = false,
+  onSearchFocus,
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const bar = useRef<HTMLDivElement>(null);
   const { view } = useSettings();
 
@@ -387,6 +633,48 @@ export default function MapPanel({
   const dd = { openId, setOpenId };
   if (!view.search && !view.mapStyle && !view.layers && !view.tools)
     return null;
+  if (compact) {
+    const hasMenu = view.mapStyle || view.layers || view.tools;
+    return (
+      <>
+        <div
+          className="map-toolbar is-compact"
+          role="toolbar"
+          aria-label="Map tools"
+        >
+          {view.search && (
+            <PlaceSearch compact onGo={onGo} onFocusChange={onSearchFocus} />
+          )}
+          {hasMenu && (
+            <button
+              className="toolbar-fab"
+              aria-label="Map options"
+              aria-haspopup="dialog"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+            >
+              <Icon name="layers" size={18} />
+            </button>
+          )}
+        </div>
+        {menuOpen && (
+          <MapMenu
+            opts={opts}
+            set={set}
+            hasClips={hasClips}
+            hasSelected={hasSelected}
+            measuring={measuring}
+            onMeasure={onMeasure}
+            onFitAll={onFitAll}
+            onFitSelected={onFitSelected}
+            onFullscreen={onFullscreen}
+            onExport={onExport}
+            onClose={() => setMenuOpen(false)}
+          />
+        )}
+      </>
+    );
+  }
   return (
     <div
       className="map-toolbar"

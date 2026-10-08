@@ -18,6 +18,8 @@ import {
 } from '../../lib/projects';
 import { clipColorVars } from '../../lib/clipColorStyle';
 import { useExampleState } from '../ExampleProject/exampleProject';
+// the dialog backdrop (.settings-backdrop) is defined here: import it so this dialog never depends on Settings being mounted first
+import '../Settings/Settings.css';
 import './ProjectsModal.css';
 
 const TOAST_MS = 5000;
@@ -468,6 +470,111 @@ export function ProjectBar({
   );
 }
 
+/**
+ * Phone project picker: the same items as the sidebar <ProjectSelect>, as a bottom sheet with
+ * 48px rows. `mode="move"` is the touch replacement for dragging a clip card onto a project.
+ */
+export function ProjectPicker({
+  views,
+  activeId,
+  mode = 'switch',
+  title,
+  onPick,
+  onNew,
+  onManage,
+  onClose,
+}: {
+  views: ProjectView[];
+  activeId?: string;
+  mode?: 'switch' | 'move';
+  title?: string;
+  /** a project id, or 'all' (switch mode only) */
+  onPick: (id: string) => void;
+  onNew: () => void;
+  onManage?: () => void;
+  onClose: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    box.current
+      ?.querySelector<HTMLElement>('[aria-selected="true"], button')
+      ?.focus();
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('keydown', key);
+      prev?.focus();
+    };
+  }, [onClose]);
+
+  const items = [
+    ...(mode === 'switch'
+      ? [{ id: 'all', label: 'All projects', n: views.length }]
+      : []),
+    ...views.map((v) => ({ id: v.id, label: v.name, n: v.clipIds.length })),
+  ];
+  return (
+    <div
+      className="picker-backdrop"
+      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        ref={box}
+        className="picker-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title ?? (mode === 'move' ? 'Move to project' : 'Projects')}
+      >
+        <div className="picker-header">
+          <h2>{title ?? (mode === 'move' ? 'Move to project' : 'Projects')}</h2>
+          <button className="icon-button" aria-label="Close" onClick={onClose}>
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+        <ul className="picker-list" role="listbox">
+          {items.map((it) => (
+            <li
+              key={it.id}
+              role="option"
+              aria-selected={it.id === activeId}
+              tabIndex={0}
+              className={it.id === activeId ? 'is-on' : ''}
+              onClick={() => onPick(it.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onPick(it.id);
+                }
+              }}
+            >
+              <Icon
+                name={it.id === 'all' ? 'layers' : 'folder'}
+                size={16}
+                className="select-icon"
+              />
+              <span>{it.label}</span>
+              <ExampleBadge id={it.id} />
+              <em>{it.n}</em>
+              {it.id === activeId && <Icon name="check" size={14} />}
+            </li>
+          ))}
+        </ul>
+        <div className="picker-actions">
+          <button className="project-button" onClick={onNew}>
+            <Icon name="plus" size={14} /> New project
+          </button>
+          {mode === 'switch' && onManage && (
+            <button className="project-button" onClick={onManage}>
+              Manage projects…
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Toast shown for a few seconds after an upload: where the clips went. Hovering pauses the timer. */
 export function ProjectNotice({
   items,
@@ -607,6 +714,8 @@ export function ProjectsModal({
   onClose: () => void;
 }) {
   const [selId, setSelId] = useState(initialId ?? views[0]?.id);
+  // narrow screens show the list OR the detail (CSS); opening a specific project goes straight to it
+  const [showDetail, setShowDetail] = useState(!!initialId);
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -634,6 +743,7 @@ export function ProjectsModal({
     : [];
   const choose = (id: string) => {
     setSelId(id);
+    setShowDetail(true);
     setEditing(false);
     setAdding(false);
     setAsking(false);
@@ -712,7 +822,7 @@ export function ProjectsModal({
             automatically.
           </p>
         ) : (
-          <div className="detail-body">
+          <div className={`detail-body${showDetail ? ' is-detail' : ''}`}>
             <ul className="project-list" aria-label="Projects">
               {views.map((v) => {
                 const cs = clipsOf(v);
@@ -758,6 +868,12 @@ export function ProjectsModal({
             </ul>
 
             <section className="project-detail" aria-label={sel.name}>
+              <button
+                className="link-button detail-back"
+                onClick={() => setShowDetail(false)}
+              >
+                ← All projects
+              </button>
               <header>
                 {editing ? (
                   <RenameField
@@ -875,8 +991,14 @@ export function ProjectsModal({
               {selClips.length ? (
                 <>
                   <p className="detail-legend">
-                    Border colour = route on the map · drag a clip onto a
-                    project to move it
+                    Border colour = route on the map
+                    <span className="only-fine">
+                      {' '}
+                      · drag a clip onto a project to move it
+                    </span>
+                  </p>
+                  <p className="detail-legend only-coarse">
+                    To move a clip, open the other project and use “Add clips”.
                   </p>
                   <ul className="clip-picker">
                     {selClips.map((c) => (
