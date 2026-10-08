@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import SvgIcon from '../common/SvgIcon';
+import Icon from '../Icon/Icon';
 import { detectBrowser, type BrowserInfo } from '../../lib/video/videoSupport';
 import './PlaybackHelp.css';
 
@@ -127,7 +127,7 @@ export default function PlaybackHelp({ onClose }: { onClose: () => void }) {
         aria-labelledby="ctt-ph-title"
       >
         <header className="help-header">
-          <SvgIcon name="info" size={18} />
+          <Icon name="info" size={18} />
           <h2 className="help-title" id="ctt-ph-title">
             Your browser needs your OK to show this video
           </h2>

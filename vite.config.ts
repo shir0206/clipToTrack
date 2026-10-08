@@ -8,5 +8,5 @@ export default defineConfig({
       deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/asset/**'],
     },
   },
-  test: { include: ['src/**/*.test.ts'], environment: 'node' },
+  test: { include: ['src/**/*.test.{ts,tsx}'], environment: 'node' },
 });
