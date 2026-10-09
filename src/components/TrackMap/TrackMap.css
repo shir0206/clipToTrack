@@ -2,31 +2,78 @@
 .map-credits {
   position: absolute;
   left: 8px;
+  right: 96px;
   bottom: 8px;
   z-index: 5;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
-  max-width: calc(100% - 16px);
+  min-width: 0;
+  max-width: calc(100% - 104px);
 }
-.map-credit-button {
-  padding: 3px 8px;
+.map-credits .map-coordinates {
+  position: static;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.map-credit-button,
+.map-credits .map-coordinates,
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale {
+  --map-chip-pad-x: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 var(--map-chip-pad-x);
   border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  box-shadow: var(--shadow-popover);
   color: var(--text-muted);
-  font: inherit;
+  font-family: var(--font-sans);
   font-size: 11px;
+  font-weight: 600;
   line-height: 1.4;
-  cursor: pointer;
+  opacity: 1;
   backdrop-filter: blur(4px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.map-credit-button {
+  flex: 0 1 auto;
+  cursor: pointer;
+}
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale {
+  --map-chip-pad-x: 16px;
+  flex: none;
+  min-width: 0;
+  border: 0;
+  box-sizing: content-box;
+  position: relative;
+  cursor: default;
+}
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale::after {
+  content: '';
+  position: absolute;
+  right: auto;
+  bottom: 7px;
+  left: var(--map-chip-pad-x);
+  width: calc(100% - (2 * var(--map-chip-pad-x)));
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  pointer-events: none;
 }
 .map-credit-button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 .map-credits-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -43,8 +90,13 @@
   margin-top: 4px;
 }
 @media (pointer: coarse) {
-  .map-credit-button {
-    min-height: 28px;
-    padding: 5px 10px;
+  .map-credit-button,
+  .map-credits .map-coordinates,
+  .maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale {
+    --map-chip-pad-x: 12px;
+    min-height: var(--tap);
+  }
+  .maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale {
+    --map-chip-pad-x: 16px;
   }
 }

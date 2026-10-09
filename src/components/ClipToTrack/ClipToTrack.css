@@ -923,7 +923,6 @@
   color: var(--text-muted);
   cursor: copy;
 }
-
 /* elevation profile dock */
 .profile-panel {
   --height: 260px;

@@ -86,6 +86,73 @@ test.describe('mobile QA regressions', () => {
     await expect(coordinates).toBeVisible();
     const coordBox = await coordinates.boundingBox();
     expect(coordBox!.height).toBeGreaterThanOrEqual(44);
+
+    const credits = page.locator('.map-credit-button');
+    const scale = page.locator('.maplibregl-ctrl-scale');
+    await expect(credits).toHaveCount(1);
+    await expect(credits.first()).toHaveText(
+      '© Shir Zabolotny | © OpenStreetMap',
+    );
+    await expect(scale).toBeVisible();
+
+    const creditBox = await credits.first().boundingBox();
+    const scaleBox = await scale.boundingBox();
+    expect(creditBox).toBeTruthy();
+    expect(scaleBox).toBeTruthy();
+    const rowCenters = [
+      creditBox!.y + creditBox!.height / 2,
+      coordBox!.y + coordBox!.height / 2,
+      scaleBox!.y + scaleBox!.height / 2,
+    ];
+    expect(Math.max(...rowCenters) - Math.min(...rowCenters)).toBeLessThan(3);
+
+    const chipStyles = await Promise.all(
+      [credits.first(), coordinates, scale].map((locator) =>
+        locator.evaluate((el) => {
+          const style = getComputedStyle(el);
+          return {
+            backgroundColor: style.backgroundColor,
+            borderRadius: style.borderRadius,
+            boxShadow: style.boxShadow,
+            color: style.color,
+            fontFamily: style.fontFamily,
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            opacity: style.opacity,
+          };
+        }),
+      ),
+    );
+    expect(new Set(chipStyles.map((style) => JSON.stringify(style))).size).toBe(
+      1,
+    );
+    await expect
+      .poll(() =>
+        coordinates.evaluate((el) => getComputedStyle(el).flexGrow),
+      )
+      .toBe('0');
+    const scaleDetails = await scale.evaluate((el) => {
+      const rulerStyle = getComputedStyle(el, '::after');
+      return {
+        borderBottomWidth: rulerStyle.borderBottomWidth,
+        borderLeftWidth: rulerStyle.borderLeftWidth,
+        borderRightWidth: rulerStyle.borderRightWidth,
+        inlineWidth: (el as HTMLElement).style.width,
+        outerWidth: el.getBoundingClientRect().width,
+        rulerWidth: rulerStyle.width,
+      };
+    });
+    expect(scaleDetails.inlineWidth).toMatch(/px$/);
+    expect(parseFloat(scaleDetails.rulerWidth)).toBeCloseTo(
+      parseFloat(scaleDetails.inlineWidth),
+      0,
+    );
+    expect(
+      scaleDetails.outerWidth - parseFloat(scaleDetails.rulerWidth),
+    ).toBeGreaterThanOrEqual(31.5);
+    expect(scaleDetails.borderBottomWidth).toBe('2px');
+    expect(scaleDetails.borderLeftWidth).toBe('2px');
+    expect(scaleDetails.borderRightWidth).toBe('2px');
   });
 
   test('landscape uses compact clip cards and touch-sized map controls', async ({

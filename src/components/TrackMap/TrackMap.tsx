@@ -1189,23 +1189,23 @@ export default function TrackMap({
             aria-controls="map-credits-pop"
             onClick={() => setCreditsOpen((v) => !v)}
           >
-            © {COPYRIGHT_OWNER} {new Date().getFullYear()}
+            © {COPYRIGHT_OWNER} | © OpenStreetMap
           </button>
-        </div>
 
-        {view.coords && (
-          <button
-            ref={coordEl}
-            className="map-coordinates"
-            title="Click to copy coordinates"
-            onClick={() =>
-              lastCoord.current &&
-              void navigator.clipboard?.writeText(lastCoord.current)
-            }
-          >
-            lat, lon
-          </button>
-        )}
+          {view.coords && (
+            <button
+              ref={coordEl}
+              className="map-coordinates"
+              title="Click to copy coordinates"
+              onClick={() =>
+                lastCoord.current &&
+                void navigator.clipboard?.writeText(lastCoord.current)
+              }
+            >
+              lat, lon
+            </button>
+          )}
+        </div>
       </div>
 
       {/* phones: portalled into the sheet (state and probe wiring stay here); never under the map */}
