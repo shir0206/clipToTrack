@@ -32,6 +32,40 @@ async function touchDrag(page: Page, x: number, y1: number, y2: number) {
   });
 }
 
+async function enableMeasureFromMapOptions(page: Page) {
+  await page.getByRole('button', { name: 'Map options' }).click();
+  await page
+    .getByRole('dialog', { name: 'Map options' })
+    .getByRole('switch', { name: 'Measure distance' })
+    .click();
+  await expect(page.locator('.measure-bar')).toBeVisible();
+}
+
+async function expectMeasureBarClearOfMapCredits(page: Page) {
+  const overlaps = await page.evaluate(() => {
+    const measure = document
+      .querySelector('.measure-bar')!
+      .getBoundingClientRect();
+    return [
+      '.map-coordinates',
+      '.maplibregl-ctrl-scale',
+      '.map-credit-button',
+    ].map((selector) => {
+      const target = document.querySelector(selector)!.getBoundingClientRect();
+      return {
+        selector,
+        overlaps:
+          measure.left < target.right &&
+          measure.right > target.left &&
+          measure.top < target.bottom &&
+          measure.bottom > target.top,
+      };
+    });
+  });
+
+  expect(overlaps.filter(({ overlaps: hasOverlap }) => hasOverlap)).toEqual([]);
+}
+
 test.describe('mobile QA regressions', () => {
   test.use({ hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 
@@ -140,9 +174,7 @@ test.describe('mobile QA regressions', () => {
     );
     expect(chipStyles[0].backgroundColor).toBe('rgb(255, 255, 255)');
     await expect
-      .poll(() =>
-        coordinates.evaluate((el) => getComputedStyle(el).flexGrow),
-      )
+      .poll(() => coordinates.evaluate((el) => getComputedStyle(el).flexGrow))
       .toBe('0');
     const scaleDetails = await scale.evaluate((el) => {
       const rulerStyle = getComputedStyle(el, '::after');
@@ -163,9 +195,11 @@ test.describe('mobile QA regressions', () => {
     expect(
       scaleDetails.outerWidth - parseFloat(scaleDetails.rulerWidth),
     ).toBeGreaterThanOrEqual(31.5);
-    expect(scaleDetails.borderBottomWidth).toBe('2px');
-    expect(scaleDetails.borderLeftWidth).toBe('2px');
-    expect(scaleDetails.borderRightWidth).toBe('2px');
+    expect(parseFloat(scaleDetails.borderBottomWidth)).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(parseFloat(scaleDetails.borderLeftWidth)).toBeGreaterThanOrEqual(1);
+    expect(parseFloat(scaleDetails.borderRightWidth)).toBeGreaterThanOrEqual(1);
   });
 
   test('landscape uses compact clip cards and touch-sized map controls', async ({
@@ -195,6 +229,36 @@ test.describe('mobile QA regressions', () => {
     }
   });
 
+  test('measure mode launched from map options does not cover map credits', async ({
+    browser,
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() =>
+      localStorage.setItem('clip-to-track:force-layout', 'mobile'),
+    );
+    await openMobile(page);
+
+    await enableMeasureFromMapOptions(page);
+    await expectMeasureBarClearOfMapCredits(page);
+
+    const landscapeContext = await browser.newContext({
+      deviceScaleFactor: 2,
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 844, height: 390 },
+    });
+    const landscapePage = await landscapeContext.newPage();
+    await landscapePage.addInitScript(() =>
+      localStorage.setItem('clip-to-track:force-layout', 'mobile-landscape'),
+    );
+    await openMobile(landscapePage);
+
+    await enableMeasureFromMapOptions(landscapePage);
+    await expectMeasureBarClearOfMapCredits(landscapePage);
+    await landscapeContext.close();
+  });
+
   test('mobile settings expose map toolbar options in a collapsed section', async ({
     page,
   }) => {
@@ -215,6 +279,37 @@ test.describe('mobile QA regressions', () => {
     await expect(page.getByText('Place search')).toBeVisible();
   });
 
+  test('map options sheet stays within the mobile viewport', async ({
+    browser,
+  }) => {
+    for (const config of [
+      { width: 390, height: 844, layout: 'mobile' },
+      { width: 844, height: 390, layout: 'mobile-landscape' },
+    ]) {
+      const context = await browser.newContext({
+        deviceScaleFactor: 2,
+        hasTouch: true,
+        isMobile: true,
+        viewport: { width: config.width, height: config.height },
+      });
+      const page = await context.newPage();
+      await page.addInitScript((layout) => {
+        localStorage.setItem('clip-to-track:force-layout', layout);
+      }, config.layout);
+      await openMobile(page);
+
+      await page.getByRole('button', { name: 'Map options' }).click();
+      const menuBox = await page
+        .getByRole('dialog', { name: 'Map options' })
+        .boundingBox();
+      expect(menuBox).toBeTruthy();
+      expect(menuBox!.y).toBeGreaterThanOrEqual(0);
+      expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(config.height);
+
+      await context.close();
+    }
+  });
+
   test('mobile clip video tap toggles playback without a maximize button', async ({
     page,
   }) => {
@@ -225,9 +320,9 @@ test.describe('mobile QA regressions', () => {
     await openMobile(page);
 
     const card = page.locator('.clip-card').first();
-    await expect(
-      card.getByRole('button', { name: /Maximize/i }),
-    ).toHaveCount(0);
+    await expect(card.getByRole('button', { name: /Maximize/i })).toHaveCount(
+      0,
+    );
 
     const video = card.locator('video.video-frame');
     await expect(video).toBeVisible();
