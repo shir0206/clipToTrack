@@ -8,6 +8,9 @@ type Props = {
   progress?: UploadProgress | null;
 };
 
+const coarse = () =>
+  typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
 const LABEL = {
   index: 'Reading file index…',
   telemetry: 'Reading telemetry',
@@ -59,7 +62,9 @@ export default function UploadZone({ onFiles, busy, progress }: Props) {
           ? progress
             ? `${LABEL[progress.phase]}${pct !== null ? ` ${pct}%` : ''}`
             : 'Working…'
-          : 'Drag & drop GoPro videos'}
+          : coarse()
+            ? 'Tap to add GoPro videos'
+            : 'Drag & drop GoPro videos'}
       </strong>
       {busy && progress ? (
         <>
@@ -83,7 +88,10 @@ export default function UploadZone({ onFiles, busy, progress }: Props) {
         </>
       ) : (
         <span>
-          or click to browse · MP4 / LRV or metadata JSON · Processed locally
+          {coarse()
+            ? 'MP4 / LRV or metadata JSON'
+            : 'or click to browse · MP4 / LRV or metadata JSON'}{' '}
+          · Processed locally
         </span>
       )}
       <input

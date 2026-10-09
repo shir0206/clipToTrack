@@ -25,6 +25,8 @@ type Props = {
   exampleOn: boolean;
   exampleBusy: boolean;
   onExampleChange: (on: boolean) => void;
+  /** mobile layouts: panel sizes do not exist, so the Layout section is left out */
+  hideLayout?: boolean;
 };
 
 const VIEW_ITEMS: [keyof ViewSettings, string, string][] = [
@@ -44,7 +46,7 @@ const VIEW_ITEMS: [keyof ViewSettings, string, string][] = [
   ['coords', 'Coordinates', 'Lat / lon readout in the map corner'],
   ['zoom', 'Zoom & compass', 'Zoom in / out buttons and the compass'],
   ['gps', 'My location (GPS)', 'Button that shows where you are'],
-  ['terrain', '3D terrain', 'Button that tilts the map into 3D relief'],
+  ['terrain', 'Terrain button', 'Show the map terrain toggle'],
   ['scale', 'Scale bar', 'Distance scale in the map corner'],
 ];
 
@@ -57,6 +59,7 @@ export default function Settings({
   exampleOn,
   exampleBusy,
   onExampleChange,
+  hideLayout = false,
 }: Props) {
   const { view } = useSettings();
   const projectMode = useProjectMode();
@@ -123,10 +126,10 @@ export default function Settings({
               onChange={(e) => setProjectMode(e.target.checked)}
             />
           </label>
-          <label className={`ctt-set-row${exampleBusy ? ' is-disabled' : ''}`}>
+          <label className={`settings-row${exampleBusy ? ' is-disabled' : ''}`}>
             <span>
-              <b>Example project</b>
-              <small>
+              <b className="settings-label">Example project</b>
+              <small className="settings-hint">
                 {exampleBusy
                   ? 'Adding the example clips…'
                   : exampleOn
@@ -137,7 +140,7 @@ export default function Settings({
             <input
               type="checkbox"
               role="switch"
-              className="ctt-switch"
+              className="toggle-switch"
               disabled={exampleBusy}
               checked={exampleOn}
               onChange={(e) => onExampleChange(e.target.checked)}
@@ -160,6 +163,11 @@ export default function Settings({
                   ? 'The map opens as satellite imagery'
                   : 'The map opens as the street map'}
               </small>
+              <small className="settings-hint">
+                Map credits: © OpenStreetMap contributors · © OpenTopoMap
+                (CC-BY-SA) · Tiles © Esri, Maxar, Earthstar Geographics ·
+                Terrain: Mapzen / AWS Open Data
+              </small>
             </span>
             <input
               type="checkbox"
@@ -171,13 +179,23 @@ export default function Settings({
           </label>
         </section>
 
-        <section
-          className="settings-section has-divider"
+        <details
+          className="settings-section settings-disclosure has-divider"
+          role="group"
           aria-labelledby="set-view"
         >
-          <h3 className="settings-title" id="set-view">
-            View · map toolbars
-          </h3>
+          <summary className="settings-summary">
+            <span>
+              <span className="settings-title" id="set-view">
+                View and map toolbars
+              </span>
+              <small className="settings-hint">
+                Search, map style, layers, tools, coordinates, GPS, terrain
+                button, and scale controls
+              </small>
+            </span>
+            <Icon name="chevron" size={14} className="chevron-icon" />
+          </summary>
           {VIEW_ITEMS.map(([k, label, hint]) => {
             // the legend only exists while the map is coloured by speed / altitude
             const off = k === 'legend' && colorMode === 'route';
@@ -219,35 +237,37 @@ export default function Settings({
               Show all
             </button>
           </div>
-        </section>
+        </details>
 
-        <section
-          className="settings-section has-divider"
-          aria-labelledby="set-layout"
-        >
-          <h3 className="settings-title" id="set-layout">
-            Layout
-          </h3>
-          <div
-            className={`settings-row${layoutIsDefault ? ' is-disabled' : ''}`}
+        {!hideLayout && (
+          <section
+            className="settings-section has-divider"
+            aria-labelledby="set-layout"
           >
-            <span>
-              <b className="settings-label">Reset panel sizes</b>
-              <small className="settings-hint">
-                {layoutIsDefault
-                  ? 'Already at the default sizes'
-                  : 'Clip list width and elevation dock height'}
-              </small>
-            </span>
-            <button
-              className="link-button"
-              disabled={layoutIsDefault}
-              onClick={onResetLayout}
+            <h3 className="settings-title" id="set-layout">
+              Layout
+            </h3>
+            <div
+              className={`settings-row${layoutIsDefault ? ' is-disabled' : ''}`}
             >
-              Reset
-            </button>
-          </div>
-        </section>
+              <span>
+                <b className="settings-label">Reset panel sizes</b>
+                <small className="settings-hint">
+                  {layoutIsDefault
+                    ? 'Already at the default sizes'
+                    : 'Clip list width and elevation dock height'}
+                </small>
+              </span>
+              <button
+                className="link-button"
+                disabled={layoutIsDefault}
+                onClick={onResetLayout}
+              >
+                Reset
+              </button>
+            </div>
+          </section>
+        )}
 
         <section
           className="settings-section has-divider"

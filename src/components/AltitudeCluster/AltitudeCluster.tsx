@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { Clip, GpsPoint } from '../../types';
 import { Dial } from '../SpeedCluster/SpeedCluster';
+import Icon from '../Icon/Icon';
 import './AltitudeCluster.css';
 
 type Props = {
@@ -17,6 +18,11 @@ type Props = {
   probe: number | null;
   /** Optional measured weather. When absent, pressure and temperature are standard-atmosphere (ISA) values. */
   weather?: { pressureHpa?: number; tempC?: number };
+  playback?: {
+    playing: boolean;
+    onTogglePlay: () => void;
+    onStop: () => void;
+  };
 };
 
 const fin = (n: unknown): n is number =>
@@ -413,7 +419,12 @@ function Tile({
  * measured `weather` is passed. Like SpeedCluster it has no controls of its own: it shows the sample
  * picked by `probe`, so the route on the map (hover, click, or the video playhead) is the controller.
  */
-export default function AltitudeCluster({ clip, probe, weather }: Props) {
+export default function AltitudeCluster({
+  clip,
+  probe,
+  weather,
+  playback,
+}: Props) {
   const samples = clip.samples;
   const S = useMemo(() => buildSeries(samples), [samples]);
 
@@ -482,6 +493,27 @@ export default function AltitudeCluster({ clip, probe, weather }: Props) {
           : 'Altitude cluster'
       }
     >
+      {playback && (
+        <div className="gauge-playback-controls" aria-label="Altitude playback">
+          <button
+            className="gauge-playback-button"
+            aria-label={`${playback.playing ? 'Pause' : 'Play'} ${clip.title} altitude`}
+            onClick={playback.onTogglePlay}
+            disabled={!clip.videoUrl}
+          >
+            <Icon name={playback.playing ? 'pause' : 'play'} size={15} />
+          </button>
+          <button
+            className="gauge-playback-button"
+            aria-label={`Stop ${clip.title} altitude`}
+            onClick={playback.onStop}
+            disabled={!clip.videoUrl}
+          >
+            <Icon name="stop" size={15} />
+          </button>
+        </div>
+      )}
+
       <Dial
         className="altitude-dial"
         labels={rateLabels}

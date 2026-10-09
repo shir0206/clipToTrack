@@ -16,6 +16,24 @@ type Step = { text: string; copy?: string };
 
 /** Browser-specific one-time approvals. Web pages can't change browser settings or open chrome:// pages, so the user does it. */
 function stepsFor(b: BrowserInfo): Step[] {
+  if (b.os === 'ios')
+    return [
+      {
+        text: "Update iOS (Settings → General → Software Update). Every iPhone and iPad browser uses Apple's video engine, which plays HEVC itself, so switching browsers will not help.",
+      },
+      {
+        text: 'Very large clips (5.3K, high frame rate) can be too much for an older iPhone or iPad. The small .LRV file below plays on any of them.',
+      },
+    ];
+  if (b.os === 'android')
+    return [
+      {
+        text: `Update ${b.name} from Google Play, then reload this page.`,
+      },
+      {
+        text: "HEVC playback on Android depends on your phone's hardware decoder. Some budget or older phones do not have one, or cannot handle 5.3K. If you use another browser, try Chrome.",
+      },
+    ];
   const scheme = b.family === 'edge' ? 'edge' : 'chrome';
   if (b.family === 'chrome' || b.family === 'edge') {
     if (b.os === 'windows')
@@ -98,6 +116,7 @@ function CopyChip({ value }: { value: string }) {
 /** Explains (once) why the picture is black and what to approve in the browser. */
 export default function PlaybackHelp({ onClose }: { onClose: () => void }) {
   const browser = detectBrowser();
+  const phone = browser.os === 'ios' || browser.os === 'android';
   const [never, setNever] = useState(false);
   const ok = useRef<HTMLButtonElement>(null);
 
@@ -137,14 +156,20 @@ export default function PlaybackHelp({ onClose }: { onClose: () => void }) {
           The clip was added, but {browser.name} can't draw its picture (you'd
           see a black square with sound). GoPro records HEVC (H.265), 10-bit, up
           to 5.3K. Browsers don't ship their own HEVC decoder; they borrow the
-          one in your computer, and it has to be installed, switched on and
-          powerful enough for 5.3K.
+          one in your {phone ? 'phone' : 'computer'}, and it has to be
+          installed, switched on and powerful enough for 5.3K.
         </p>
         <p className="help-text">
-          This page can't switch that on for you: websites aren't allowed to
-          change browser settings or flags, or to open{' '}
-          <code className="help-code">chrome://</code> pages. It needs a
-          one-time approval from you:
+          {phone ? (
+            'This page cannot change that for you. Here is what to check:'
+          ) : (
+            <>
+              This page can't switch that on for you: websites aren't allowed to
+              change browser settings or flags, or to open{' '}
+              <code className="help-code">chrome://</code> pages. It needs a
+              one-time approval from you:
+            </>
+          )}
         </p>
 
         <ol className="help-steps">

@@ -36,7 +36,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     coords: true,
     zoom: true,
     gps: true,
-    terrain: true,
+    terrain: false,
     scale: true,
   },
 };

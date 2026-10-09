@@ -1,6 +1,8 @@
 .app-shell {
   position: fixed;
   inset: 0;
+  height: 100dvh;
+  overscroll-behavior: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -20,7 +22,7 @@
   align-items: center;
   justify-content: space-between;
   flex: none;
-  height: 60px;
+  height: var(--header-h);
   padding: 0 20px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -76,8 +78,11 @@
   color: var(--text);
   cursor: pointer;
 }
-.header-actions button:hover {
-  background: var(--background);
+
+@media (hover: hover) {
+  .header-actions button:hover {
+    background: var(--background);
+  }
 }
 
 /* layout */
@@ -153,9 +158,12 @@
   border-radius: 0 4px 4px 0;
   background: var(--clip-color);
 }
-.clip-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-lift);
+
+@media (hover: hover) {
+  .clip-card:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-lift);
+  }
 }
 .clip-card:focus-visible {
   box-shadow: 0 0 0 3px var(--clip-glow);
@@ -231,15 +239,21 @@
   color: var(--text);
   font-size: 12px;
 }
-.icon-button:hover {
-  background: var(--control-hover);
+
+@media (hover: hover) {
+  .icon-button:hover {
+    background: var(--control-hover);
+  }
 }
 .icon-button.is-primary {
   background: var(--primary);
   color: var(--contrast);
 }
-.icon-button.is-primary:hover {
-  background: var(--primary-strong);
+
+@media (hover: hover) {
+  .icon-button.is-primary:hover {
+    background: var(--primary-strong);
+  }
 }
 .icon-button:focus-visible {
   outline: 2px solid var(--focus);
@@ -290,11 +304,16 @@
   font-size: 12px;
   color: var(--text-muted);
 }
-.upload-zone:hover,
 .upload-zone:focus-visible,
 .upload-zone.is-over {
   border-color: var(--primary);
   background: var(--primary-soft);
+}
+@media (hover: hover) {
+  .upload-zone:hover {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+  }
 }
 
 /* error */
@@ -317,6 +336,19 @@
   text-align: center;
   background: var(--background-overlay);
   pointer-events: none;
+  height: 100vh;
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .empty-state-content {
+    display: flex;
+    gap: 8px;
+    position: absolute;
+    flex-direction: column;
+    top: var(--sheet-visible);
+    width: 100vw;
+    place-content: center;
+  }
 }
 .empty-state h2 {
   margin: 0 0 4px;
@@ -369,8 +401,11 @@
   color: var(--primary);
   cursor: pointer;
 }
-.link-button:hover {
-  text-decoration: underline;
+
+@media (hover: hover) {
+  .link-button:hover {
+    text-decoration: underline;
+  }
 }
 
 /* point hover bubble (MapLibre popup) */
@@ -467,10 +502,14 @@
   background: transparent;
   transition: background 0.15s;
 }
-.panel-resizer:hover::before,
 .panel-resizer:focus-visible::before,
 .panel-resizer.is-dragging::before {
   background: var(--primary);
+}
+@media (hover: hover) {
+  .panel-resizer:hover::before {
+    background: var(--primary);
+  }
 }
 .panel-resizer::after {
   content: '';
@@ -534,8 +573,11 @@
 .icon-button.is-primary {
   background: var(--clip-color);
 }
-.icon-button.is-primary:hover {
-  filter: brightness(0.9);
+
+@media (hover: hover) {
+  .icon-button.is-primary:hover {
+    filter: brightness(0.9);
+  }
 }
 .button-spacer {
   margin-left: auto;
@@ -601,8 +643,11 @@
 .more-menu > summary::-webkit-details-marker {
   display: none;
 }
-.more-menu > summary:hover {
-  color: var(--text);
+
+@media (hover: hover) {
+  .more-menu > summary:hover {
+    color: var(--text);
+  }
 }
 .chevron-icon {
   margin-left: auto;
@@ -683,6 +728,7 @@
   flex-direction: column;
   width: min(94vw, 1400px);
   max-height: 94vh;
+  max-height: 94dvh;
   overflow: hidden;
   border-radius: 16px;
   background: var(--home-background);
@@ -706,13 +752,17 @@
   background: var(--divider-strong);
   color: var(--contrast);
 }
-.modal-header .icon-button:hover {
-  background: var(--divider-dashed);
+
+@media (hover: hover) {
+  .modal-header .icon-button:hover {
+    background: var(--divider-dashed);
+  }
 }
 .modal-video {
   display: block;
   width: 100%;
   max-height: calc(94vh - 56px);
+  max-height: calc(94dvh - 56px);
   background: var(--video);
   outline: none;
 }
@@ -755,9 +805,12 @@
   color: var(--text-muted);
   background: var(--control);
 }
-.map-popup.is-pinned .maplibregl-popup-close-button:hover {
-  background: var(--control-hover);
-  color: var(--text);
+
+@media (hover: hover) {
+  .map-popup.is-pinned .maplibregl-popup-close-button:hover {
+    background: var(--control-hover);
+    color: var(--text);
+  }
 }
 
 /* map column (map + optional profile dock) */
@@ -795,8 +848,11 @@
     background 0.15s,
     border-color 0.15s;
 }
-.map-chip:hover:not(:disabled) {
-  background: var(--background);
+
+@media (hover: hover) {
+  .map-chip:hover:not(:disabled) {
+    background: var(--background);
+  }
 }
 .map-chip.is-on {
   background: var(--primary-soft);
@@ -867,7 +923,6 @@
   color: var(--text-muted);
   cursor: copy;
 }
-
 /* elevation profile dock */
 .profile-panel {
   --height: 260px;
@@ -903,9 +958,13 @@
   background: var(--border);
   transition: background 0.15s;
 }
-.profile-grip:hover::after,
 .profile-grip:focus-visible::after {
   background: var(--clip-color);
+}
+@media (hover: hover) {
+  .profile-grip:hover::after {
+    background: var(--clip-color);
+  }
 }
 .profile-grip:focus-visible {
   outline: none;
@@ -970,9 +1029,13 @@
   padding: 4px 7px 4px 5px;
   opacity: 0.6;
 }
-.split-close:hover,
 .split-close:focus-visible {
   opacity: 1;
+}
+@media (hover: hover) {
+  .split-close:hover {
+    opacity: 1;
+  }
 }
 .split-main:focus-visible,
 .split-close:focus-visible {
@@ -1131,8 +1194,11 @@
     background 0.15s,
     color 0.15s;
 }
-.toolbar-button:hover:not(:disabled) {
-  background: var(--background);
+
+@media (hover: hover) {
+  .toolbar-button:hover:not(:disabled) {
+    background: var(--background);
+  }
 }
 .toolbar-button.is-on {
   background: var(--primary-soft);
@@ -1181,8 +1247,11 @@
   color: inherit;
   cursor: pointer;
 }
-.dropdown-menu > button:hover {
-  background: var(--background);
+
+@media (hover: hover) {
+  .dropdown-menu > button:hover {
+    background: var(--background);
+  }
 }
 .dropdown-menu > button.is-active {
   background: var(--primary-soft);
@@ -1300,8 +1369,11 @@
   color: var(--contrast);
   font-weight: 600;
 }
-.confirm-accept:hover {
-  background: var(--danger-strong);
+
+@media (hover: hover) {
+  .confirm-accept:hover {
+    background: var(--danger-strong);
+  }
 }
 .confirm-cancel {
   border: 1px solid var(--border);
@@ -1420,9 +1492,12 @@
     color 0.15s,
     box-shadow 0.15s;
 }
-.sort-chip:hover:not(:disabled):not(.is-on) {
-  background: var(--background);
-  color: var(--text);
+
+@media (hover: hover) {
+  .sort-chip:hover:not(:disabled):not(.is-on) {
+    background: var(--background);
+    color: var(--text);
+  }
 }
 .sort-chip.is-on {
   background: var(--primary);
@@ -1484,17 +1559,29 @@
     opacity 0.12s,
     transform 0.12s;
 }
-.toolbar-button[data-tip]:hover::after,
 .toolbar-button[data-tip]:focus-visible::after {
   opacity: 1;
   transform: translate(-50%, 0);
   transition-delay: 0.3s;
 }
-.toolbar-button[data-tip]:hover::before,
+@media (hover: hover) {
+  .toolbar-button[data-tip]:hover::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    transition-delay: 0.3s;
+  }
+}
 .toolbar-button[data-tip]:focus-visible::before {
   opacity: 1;
   transform: translate(-50%, 0) rotate(45deg);
   transition-delay: 0.3s;
+}
+@media (hover: hover) {
+  .toolbar-button[data-tip]:hover::before {
+    opacity: 1;
+    transform: translate(-50%, 0) rotate(45deg);
+    transition-delay: 0.3s;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .toolbar-button[data-tip]::after,
@@ -1664,3 +1751,5 @@
 .modal-video {
   cursor: pointer;
 }
+
+/* controls hidden by Settings (coordinates readout stays opt-in on phones) */

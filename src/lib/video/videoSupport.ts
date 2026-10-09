@@ -91,20 +91,41 @@ export type BrowserInfo = {
   family: 'chrome' | 'edge' | 'firefox' | 'safari' | 'other';
   /** shown to the user, e.g. "Chrome", "Brave" */
   name: string;
-  os: 'windows' | 'mac' | 'linux' | 'other';
+  os: 'windows' | 'mac' | 'linux' | 'ios' | 'android' | 'other';
 };
 
 export function detectBrowser(): BrowserInfo {
   const ua = navigator.userAgent;
-  const os = /Windows/i.test(ua)
-    ? 'windows'
-    : /Mac OS X|Macintosh/i.test(ua)
-      ? 'mac'
-      : /Linux|X11|CrOS/i.test(ua)
-        ? 'linux'
-        : 'other';
-  if (/Edg\//.test(ua)) return { family: 'edge', name: 'Edge', os };
+  // iPadOS asks for the desktop site by default and reports itself as a Mac, so look for a touch screen
+  const ios =
+    /iPhone|iPad|iPod/i.test(ua) ||
+    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const os: BrowserInfo['os'] = ios
+    ? 'ios'
+    : /Android/i.test(ua)
+      ? 'android'
+      : /Windows/i.test(ua)
+        ? 'windows'
+        : /Mac OS X|Macintosh/i.test(ua)
+          ? 'mac'
+          : /Linux|X11|CrOS/i.test(ua)
+            ? 'linux'
+            : 'other';
+  if (ios) {
+    // every iOS browser is WebKit underneath, so they all share Safari's video support
+    const name = /EdgiOS\//.test(ua)
+      ? 'Edge'
+      : /CriOS\//.test(ua)
+        ? 'Chrome'
+        : /FxiOS\//.test(ua)
+          ? 'Firefox'
+          : 'Safari';
+    return { family: 'safari', name, os };
+  }
+  if (/Edg(e|A)?\//.test(ua)) return { family: 'edge', name: 'Edge', os };
   if (/Firefox\//.test(ua)) return { family: 'firefox', name: 'Firefox', os };
+  if (/SamsungBrowser\//.test(ua))
+    return { family: 'chrome', name: 'Samsung Internet', os };
   if ((navigator as { brave?: unknown }).brave)
     return { family: 'chrome', name: 'Brave', os };
   if (/OPR\//.test(ua)) return { family: 'chrome', name: 'Opera', os };

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700;800&family=Saira+Condensed:wght@500;600&display=swap');
+/* Saira / Saira Condensed are loaded from index.html (non-blocking <link>), not with a render-blocking @import */
 
 /*
  * Altitude cluster. Rendered with the `gauge-cluster altitude-cluster` classes, so it inherits the panel, side wings,

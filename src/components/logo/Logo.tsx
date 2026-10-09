@@ -3,15 +3,22 @@ type Props = {
   /** show the "clip to track" wordmark next to the mark */
   wordmark?: boolean;
   tagline?: string;
+  /** phone app bar: smaller mark, no tagline */
+  compact?: boolean;
 };
 
 /** App mark (play button + GPS route) with an optional wordmark. */
-export default function Logo({ size = 36, wordmark = true, tagline }: Props) {
+export default function Logo({
+  size = 36,
+  wordmark = true,
+  tagline,
+  compact = false,
+}: Props) {
   return (
-    <div className="app-brand">
+    <div className={`app-brand${compact ? ' is-compact' : ''}`}>
       <svg
-        width={size}
-        height={size}
+        width={compact ? Math.min(size, 30) : size}
+        height={compact ? Math.min(size, 30) : size}
         viewBox="0 0 383.92859 372.18396"
         fill="none"
         version="1.1"
@@ -128,7 +135,9 @@ export default function Logo({ size = 36, wordmark = true, tagline }: Props) {
             <i>to</i>
             <b className="logo-accent">Track</b>
           </span>
-          {tagline && <span className="brand-tagline">{tagline}</span>}
+          {tagline && !compact && (
+            <span className="brand-tagline">{tagline}</span>
+          )}
         </div>
       )}
     </div>

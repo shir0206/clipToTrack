@@ -1,0 +1,113 @@
+/* "© Name 2026" on the map; tap it for the basemap credits (replaces MapLibre's [i] button). */
+.map-credits {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  max-width: calc(100% - 16px);
+}
+.map-scale-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.map-scale-slot {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-width: 0;
+}
+.map-credits .map-coordinates {
+  position: static;
+  order: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.map-credit-button,
+.map-credits .map-coordinates,
+.map-scale-slot .maplibregl-ctrl-scale {
+  --map-chip-pad-x: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 var(--map-chip-pad-x);
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 1;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 640px) {
+  .map-credit-button,
+  .map-credits .map-coordinates,
+  .map-scale-slot .maplibregl-ctrl-scale {
+    font-size: 9px;
+    min-height: 24px;
+  }
+}
+.map-credit-button {
+  order: 1;
+  flex: 0 1 auto;
+  cursor: default;
+}
+.map-scale-slot .maplibregl-ctrl-scale {
+  --map-chip-pad-x: 16px;
+  flex: none;
+  min-width: 0;
+  border: 0;
+  box-sizing: content-box;
+  position: relative;
+  cursor: default;
+}
+.map-scale-slot .maplibregl-ctrl-scale::after {
+  content: '';
+  position: absolute;
+  right: auto;
+  bottom: 7px;
+  left: var(--map-chip-pad-x);
+  width: calc(100% - (2 * var(--map-chip-pad-x)));
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  pointer-events: none;
+}
+@media (max-width: 640px) {
+  .map-scale-slot .maplibregl-ctrl-scale::after {
+    border-right: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+    border-left: 1px solid currentColor;
+    bottom: 6px;
+  }
+}
+.map-credit-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .map-credit-button,
+  .map-credits .map-coordinates,
+  .map-scale-slot .maplibregl-ctrl-scale {
+    --map-chip-pad-x: 12px;
+    min-height: var(--tap);
+  }
+  .map-scale-slot .maplibregl-ctrl-scale {
+    --map-chip-pad-x: 16px;
+  }
+}

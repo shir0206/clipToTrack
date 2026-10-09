@@ -23,6 +23,33 @@
   position: relative;
   z-index: 1;
 }
+.gauge-playback-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+}
+.gauge-playback-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gauge-panel) 86%, transparent);
+  color: var(--gauge-text);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(6px);
+}
+.gauge-playback-button:disabled {
+  opacity: 0.45;
+}
+.gauge-playback-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 
 /* curved side "wings" behind the dials */
 .gauge-cluster::before,
