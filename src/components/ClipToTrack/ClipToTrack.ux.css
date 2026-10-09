@@ -95,3 +95,50 @@
   object-fit: contain; /* letterbox instead of cropping the picture */
   background: #000;
 }
+
+/* ══ Sheet scrolling ══════════════════════════════════════════════════════════════
+ * The sheet is as tall as its largest snap and is slid down with a transform, so at 'half' the lower part of
+ * the scroller sits below the screen: it scrolls, but the last cards can never be reached. Make the scroller
+ * only as tall as the part you can see (--sheet-visible is set on .app-shell from useBottomSheet).
+ */
+[data-layout='mobile'] .side-panel.is-sheet {
+  display: flex;
+  flex-direction: column;
+  --sheet-grab-h: 36px;
+}
+[data-layout='mobile'] .side-panel.is-sheet .sheet-grab {
+  flex: none;
+}
+[data-layout='mobile'] .side-panel.is-sheet .sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: max(0px, calc(var(--sheet-visible, 52dvh) - var(--sheet-grab-h)));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* the page / browser bar must not take over the swipe */
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-top: 64px;
+}
+/* one scroller only: a list that scrolls inside the scroller traps the finger */
+[data-layout='mobile'] .side-panel.is-sheet .plain-list {
+  overflow: visible;
+  max-height: none;
+  flex: none;
+}
+/* "N clips · project" + Add clips stay in reach while you scroll */
+[data-layout='mobile'] .sheet-title {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding-block: 8px;
+  background: var(--background);
+}
+[data-layout='mobile'] .sheet-title .project-button {
+  margin-left: auto;
+}
+/* in the full list the "other clips" strip only repeats it */
+[data-layout='mobile'][data-snap='expanded'] .other-clips {
+  display: none;
+}

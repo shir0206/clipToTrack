@@ -559,7 +559,7 @@ export default function ClipToTrack() {
             </button>
           )}
           <button aria-label="Settings" onClick={() => setSettingsOpen(true)}>
-            {isMobile ? <span aria-hidden="true">⚙</span> : 'Settings'}
+            {isMobile ? <Icon name="settings" size={20} /> : 'Settings'}
           </button>
         </div>
       </header>
@@ -655,18 +655,20 @@ export default function ClipToTrack() {
               </div>
             )}
             {isMobile && <div className="profile-host" ref={setProfileHost} />}
-            <div className="panel-title">
-              Clips{' '}
-              <span>
-                {clips.length > 0 && (
-                  <button className="link-button" onClick={handleClear}>
-                    <Icon name="trash" size={13} />
-                    Clear all
-                  </button>
-                )}
-                {visible.length}
-              </span>
-            </div>
+            {!sheetOn && (
+              <div className="panel-title">
+                Clips{' '}
+                <span>
+                  {clips.length > 0 && (
+                    <button className="link-button" onClick={handleClear}>
+                      <Icon name="trash" size={13} />
+                      Clear all
+                    </button>
+                  )}
+                  {visible.length}
+                </span>
+              </div>
+            )}
             {projectMode ? (
               <ProjectBar
                 views={projects.views}
