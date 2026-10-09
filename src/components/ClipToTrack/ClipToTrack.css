@@ -336,6 +336,19 @@
   text-align: center;
   background: var(--background-overlay);
   pointer-events: none;
+  height: 100vh;
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .empty-state-content {
+    display: flex;
+    gap: 8px;
+    position: absolute;
+    flex-direction: column;
+    top: var(--sheet-visible);
+    width: 100vw;
+    place-content: center;
+  }
 }
 .empty-state h2 {
   margin: 0 0 4px;

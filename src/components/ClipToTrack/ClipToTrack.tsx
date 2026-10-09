@@ -19,7 +19,7 @@ import Icon, { type IconName } from '../Icon/Icon';
 import Settings from '../Settings/Settings';
 import { SheetPeek, OtherClips } from '../SheetPeek/SheetPeek';
 import { useLayoutMode } from '../../hooks/useLayoutMode';
-import { useBottomSheet } from '../../hooks/useBottomSheet';
+import { useBottomSheet, type Snap } from '../../hooks/useBottomSheet';
 import PlaybackHelp, { playbackHelpDismissed } from '../playback/PlaybackHelp';
 import { probeDecode } from '../../lib/video/videoSupport';
 import { useClips } from '../../hooks/useClips';
@@ -98,11 +98,19 @@ export default function ClipToTrack() {
   const layout = useLayoutMode();
   const isMobile = layout !== 'desktop';
   const sheetOn = layout === 'mobile'; // landscape phones use a plain side panel, no snap points
-  const sheet = useBottomSheet({
+  const {
+    ref: sheetRef,
+    snap,
+    setSnap,
+    cycle: cycleSheet,
+    visiblePx: sheetVisiblePx,
+    dragging: sheetDragging,
+    handleProps: sheetHandleProps,
+  } = useBottomSheet({
     enabled: sheetOn,
     lock: clips.length === 0 ? 'half' : undefined, // empty: the upload zone must stay reachable
   });
-  const collapsed = sheetOn && sheet.snap === 'collapsed';
+  const collapsed = sheetOn && snap === 'collapsed';
   const projects = useProjects(clips); // every clip is placed in a project automatically
   const projectMode = useProjectMode(); // Settings → "Group clips into projects"; off = plain clip list
   const [projectFilter, setProjectFilter] = useState('all');
@@ -161,7 +169,7 @@ export default function ClipToTrack() {
   const peekBar = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const addInput = useRef<HTMLInputElement>(null);
-  const beforeSearch = useRef<typeof sheet.snap | null>(null);
+  const beforeSearch = useRef<Snap | null>(null);
 
   useEffect(() => {
     try {
@@ -244,33 +252,50 @@ export default function ClipToTrack() {
    */
   const select = (id: string, fromMap = false) => {
     if (sheetOn && (fromMap || id !== selectedClipId)) {
-      sheet.setSnap('half');
+      setSnap('half');
       bodyRef.current?.scrollTo({ top: 0 });
     }
     setSelectedClipId(id);
-    document
-      .getElementById(`ctt-${id}`)
-      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const card = document.getElementById(`ctt-${id}`);
+    if (!card) return;
+    if (sheetOn) {
+      const scroller = bodyRef.current;
+      const layoutEl = scroller?.closest('.app-layout') as HTMLElement | null;
+      if (scroller) {
+        const cardRect = card.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        scroller.scrollTo({
+          top: Math.max(
+            0,
+            scroller.scrollTop + cardRect.top - scrollerRect.top - 8,
+          ),
+          behavior: 'smooth',
+        });
+      }
+      layoutEl?.scrollTo({ top: 0, left: 0 });
+      return;
+    }
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
   const selectFromMap = (id: string) => select(id, true);
   // tap on empty map: step the sheet down one snap
   const onBackgroundTap = useCallback(() => {
     if (!sheetOn || clips.length === 0) return;
-    sheet.setSnap(sheet.snap === 'expanded' ? 'half' : 'collapsed');
-  }, [sheetOn, clips.length, sheet]);
+    setSnap(snap === 'expanded' ? 'half' : 'collapsed');
+  }, [sheetOn, clips.length, snap, setSnap]);
   // the keyboard needs the room: collapse while searching, restore afterwards
   const onSearchFocus = useCallback(
     (focused: boolean) => {
       if (!sheetOn || clips.length === 0) return;
       if (focused) {
-        beforeSearch.current = sheet.snap;
-        sheet.setSnap('collapsed');
+        beforeSearch.current = snap;
+        setSnap('collapsed');
       } else if (beforeSearch.current) {
-        sheet.setSnap(beforeSearch.current);
+        setSnap(beforeSearch.current);
         beforeSearch.current = null;
       }
     },
-    [sheetOn, clips.length, sheet],
+    [sheetOn, clips.length, snap, setSnap],
   );
   /** playhead: map dot + the peek bar's progress line */
   const onFrac = (clipId: string, f: number | null) => {
@@ -328,7 +353,7 @@ export default function ClipToTrack() {
     if (maxClipId === id) closeMax();
     if (selectedClipId === id) {
       setSelectedClipId(null);
-      if (sheetOn) sheet.setSnap(clips.length <= 1 ? 'collapsed' : 'expanded');
+      if (sheetOn) setSnap(clips.length <= 1 ? 'collapsed' : 'expanded');
     }
     setHoveredClipId(null); // the card unmounts, so its mouseleave will never fire
     setHiddenIds((s) => {
@@ -520,9 +545,9 @@ export default function ClipToTrack() {
     <div
       className={`app-shell${dragging ? ' is-resizing' : ''}${immersive ? ' is-immersive' : ''}`}
       data-layout={layout}
-      data-snap={sheetOn ? sheet.snap : undefined}
+      data-snap={sheetOn ? snap : undefined}
       data-empty={clips.length === 0 || undefined}
-      style={{ '--sheet-visible': `${sheet.visiblePx}px` } as CSSProperties}
+      style={{ '--sheet-visible': `${sheetVisiblePx}px` } as CSSProperties}
     >
       <header className="app-header">
         <Logo
@@ -567,8 +592,8 @@ export default function ClipToTrack() {
       <main className="app-layout">
         <aside
           id="clip-sheet"
-          ref={sheet.ref}
-          className={`side-panel${sheetOn ? ' is-sheet' : ''}${sheet.dragging ? ' is-dragging' : ''}`}
+          ref={sheetRef}
+          className={`side-panel${sheetOn ? ' is-sheet' : ''}${sheetDragging ? ' is-dragging' : ''}`}
           role={sheetOn ? 'region' : undefined}
           aria-label={sheetOn ? 'Clips' : undefined}
           style={
@@ -578,14 +603,14 @@ export default function ClipToTrack() {
           }
         >
           {sheetOn && (
-            <div className="sheet-grab" {...sheet.handleProps}>
+            <div className="sheet-grab" {...sheetHandleProps}>
               <button
                 className="sheet-handle"
                 aria-label="Clip panel"
-                aria-expanded={sheet.snap !== 'collapsed'}
+                aria-expanded={snap !== 'collapsed'}
                 aria-controls="clip-sheet"
                 disabled={clips.length === 0}
-                onClick={sheet.cycle}
+                onClick={cycleSheet}
               >
                 <span />
               </button>
@@ -594,7 +619,7 @@ export default function ClipToTrack() {
                   className="sheet-peek-wrap"
                   onClick={(e) => {
                     if (!(e.target as Element).closest('[data-no-drag]'))
-                      sheet.setSnap('half');
+                      setSnap('half');
                   }}
                 >
                   <SheetPeek
@@ -736,7 +761,7 @@ export default function ClipToTrack() {
             onSelect={selectFromMap}
             onHover={isMobile ? () => {} : setHoveredClipId}
             compact={isMobile}
-            insetBottom={sheetOn ? sheet.visiblePx : 0}
+            insetBottom={sheetOn ? sheetVisiblePx : 0}
             profileHost={isMobile ? profileHost : null}
             onBackgroundTap={onBackgroundTap}
             onImmersive={() => setImmersive(true)}
@@ -752,8 +777,10 @@ export default function ClipToTrack() {
           )}
           {clips.length === 0 && (
             <div className="empty-state">
-              <h2>No tracks yet</h2>
-              <p>Drop a GoPro MP4 to map your adventure.</p>
+              <div className="empty-state-content">
+                <h2>No tracks yet</h2>
+                <p>Drop a GoPro MP4 to map your adventure.</p>
+              </div>
             </div>
           )}
         </section>

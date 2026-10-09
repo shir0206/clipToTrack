@@ -153,3 +153,34 @@
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
+.settings-disclosure {
+  display: block;
+}
+.settings-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 48px;
+  cursor: pointer;
+  list-style: none;
+}
+.settings-summary::-webkit-details-marker {
+  display: none;
+}
+.settings-summary .settings-title {
+  display: block;
+}
+.settings-summary .chevron-icon {
+  flex: none;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+.settings-disclosure[open] .settings-summary .chevron-icon {
+  transform: rotate(180deg);
+}
+.settings-summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 8px;
+}

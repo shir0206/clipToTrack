@@ -179,13 +179,23 @@ export default function Settings({
           </label>
         </section>
 
-        <section
-          className="settings-section has-divider"
+        <details
+          className="settings-section settings-disclosure has-divider"
+          role="group"
           aria-labelledby="set-view"
         >
-          <h3 className="settings-title" id="set-view">
-            View · map toolbars
-          </h3>
+          <summary className="settings-summary">
+            <span>
+              <span className="settings-title" id="set-view">
+                View and map toolbars
+              </span>
+              <small className="settings-hint">
+                Search, map style, layers, tools, coordinates, GPS, terrain, and
+                scale controls
+              </small>
+            </span>
+            <Icon name="chevron" size={14} className="chevron-icon" />
+          </summary>
           {VIEW_ITEMS.map(([k, label, hint]) => {
             // the legend only exists while the map is coloured by speed / altitude
             const off = k === 'legend' && colorMode === 'route';
@@ -227,7 +237,7 @@ export default function Settings({
               Show all
             </button>
           </div>
-        </section>
+        </details>
 
         {!hideLayout && (
           <section

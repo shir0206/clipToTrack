@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -82,9 +81,15 @@ export function useBottomSheet({ enabled, lock }: Opts) {
       setGeo((g) => (g.full === full && g.safe === safe ? g : { full, safe }));
     };
     measure();
+    const ro =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(measure);
+    ro?.observe(el);
     window.addEventListener('resize', measure);
     window.addEventListener('orientationchange', measure);
     return () => {
+      ro?.disconnect();
       window.removeEventListener('resize', measure);
       window.removeEventListener('orientationchange', measure);
     };
@@ -108,10 +113,6 @@ export function useBottomSheet({ enabled, lock }: Opts) {
     }
     apply(visiblePx);
   }, [enabled, visiblePx, apply]);
-
-  useEffect(() => {
-    if (!enabled) setDragging(false);
-  }, [enabled]);
 
   const cycle = useCallback(() => {
     if (lock) return;
@@ -185,5 +186,13 @@ export function useBottomSheet({ enabled, lock }: Opts) {
     },
   };
 
-  return { ref, snap, setSnap, cycle, visiblePx, dragging, handleProps };
+  return {
+    ref,
+    snap,
+    setSnap,
+    cycle,
+    visiblePx,
+    dragging: enabled && dragging,
+    handleProps,
+  };
 }

@@ -121,6 +121,14 @@
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   scroll-padding-top: 64px;
 }
+[data-layout='mobile'][data-empty] .side-panel.is-sheet {
+  height: auto;
+  max-height: var(--sheet-max);
+}
+[data-layout='mobile'][data-empty] .side-panel.is-sheet .sheet-body {
+  flex: none;
+  max-height: none;
+}
 /* one scroller only: a list that scrolls inside the scroller traps the finger */
 [data-layout='mobile'] .side-panel.is-sheet .plain-list {
   overflow: visible;

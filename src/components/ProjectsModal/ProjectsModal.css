@@ -61,7 +61,8 @@
 .project-empty p {
   margin: 0;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
+  margin: 16px 0 8px 0;
   color: var(--text-muted);
 }
 .project-row {

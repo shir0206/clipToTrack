@@ -117,9 +117,12 @@ export default function VideoModal({
   };
   useEffect(() => {
     if (!mobile) return;
-    poke();
-    return () => window.clearTimeout(hideTimer.current);
-  }, [mobile]); // eslint-disable-line react-hooks/exhaustive-deps
+    const id = window.setTimeout(poke, 0);
+    return () => {
+      window.clearTimeout(id);
+      window.clearTimeout(hideTimer.current);
+    };
+  }, [mobile]);
 
   useEffect(() => {
     // no native toolbar: click / Space = play-pause, ← → = seek 5 s, Esc = close
