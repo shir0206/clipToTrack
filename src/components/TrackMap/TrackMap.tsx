@@ -1175,7 +1175,7 @@ export default function TrackMap({
         >
           <div className="map-scale-cluster">
             {view.coords && (
-              <button
+              <span
                 ref={coordEl}
                 className="map-coordinates"
                 title="Click to copy coordinates"
@@ -1185,14 +1185,14 @@ export default function TrackMap({
                 }
               >
                 lat, lon
-              </button>
+              </span>
             )}
-            <div ref={scaleSlot} className="map-scale-slot" />
+            <span ref={scaleSlot} className="map-scale-slot" />
           </div>
 
-          <button className="map-credit-button">
+          <span className="map-credit-button">
             © {COPYRIGHT_OWNER} {new Date().getUTCFullYear()} · © OpenStreetMap
-          </button>
+          </span>
         </div>
       </div>
 
