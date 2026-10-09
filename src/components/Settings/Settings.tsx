@@ -46,7 +46,7 @@ const VIEW_ITEMS: [keyof ViewSettings, string, string][] = [
   ['coords', 'Coordinates', 'Lat / lon readout in the map corner'],
   ['zoom', 'Zoom & compass', 'Zoom in / out buttons and the compass'],
   ['gps', 'My location (GPS)', 'Button that shows where you are'],
-  ['terrain', '3D terrain', 'Button that tilts the map into 3D relief'],
+  ['terrain', 'Terrain button', 'Show the map terrain toggle'],
   ['scale', 'Scale bar', 'Distance scale in the map corner'],
 ];
 
@@ -190,8 +190,8 @@ export default function Settings({
                 View and map toolbars
               </span>
               <small className="settings-hint">
-                Search, map style, layers, tools, coordinates, GPS, terrain, and
-                scale controls
+                Search, map style, layers, tools, coordinates, GPS, terrain
+                button, and scale controls
               </small>
             </span>
             <Icon name="chevron" size={14} className="chevron-icon" />

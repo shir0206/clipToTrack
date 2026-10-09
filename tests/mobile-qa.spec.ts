@@ -49,7 +49,7 @@ test.describe('mobile QA regressions', () => {
       .toBe(0);
 
     const initialTopControls = page.locator(
-      '.maplibregl-ctrl-top-right button',
+      '.maplibregl-ctrl-top-right button:visible',
     );
     for (let i = 0; i < (await initialTopControls.count()); i += 1) {
       const box = await initialTopControls.nth(i).boundingBox();
@@ -71,7 +71,7 @@ test.describe('mobile QA regressions', () => {
       .toBeGreaterThan(before.top + 80);
 
     const mapButtons = page.locator(
-      '.maplibregl-ctrl-top-right button, .maplibregl-ctrl-bottom-right button, .maplibregl-ctrl-bottom-left button',
+      '.maplibregl-ctrl-top-right button:visible, .maplibregl-ctrl-bottom-right button:visible, .maplibregl-ctrl-bottom-left button:visible',
     );
     const count = await mapButtons.count();
     for (let i = 0; i < count; i += 1) {
@@ -91,7 +91,7 @@ test.describe('mobile QA regressions', () => {
     const scale = page.locator('.maplibregl-ctrl-scale');
     await expect(credits).toHaveCount(1);
     await expect(credits.first()).toHaveText(
-      '© Shir Zabolotny | © OpenStreetMap',
+      '© Shir Zabolotny 2026 · © OpenStreetMap',
     );
     await expect(scale).toBeVisible();
 
@@ -105,6 +105,18 @@ test.describe('mobile QA regressions', () => {
       scaleBox!.y + scaleBox!.height / 2,
     ];
     expect(Math.max(...rowCenters) - Math.min(...rowCenters)).toBeLessThan(3);
+    expect(coordBox!.x).toBeLessThan(scaleBox!.x);
+    expect(scaleBox!.x).toBeLessThan(creditBox!.x);
+    expect(scaleBox!.x).toBeGreaterThanOrEqual(coordBox!.x + coordBox!.width);
+    expect(scaleBox!.x + scaleBox!.width).toBeLessThanOrEqual(creditBox!.x);
+    const coordinateGap = scaleBox!.x - (coordBox!.x + coordBox!.width);
+    const creditGap = creditBox!.x - (coordBox!.x + coordBox!.width);
+    expect(coordinateGap).toBeLessThanOrEqual(12);
+    expect(coordinateGap).toBeLessThan(creditGap);
+    const heights = [creditBox!.height, coordBox!.height, scaleBox!.height];
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1);
+    await credits.first().click();
+    await expect(page.locator('.map-credits-pop')).toHaveCount(0);
 
     const chipStyles = await Promise.all(
       [credits.first(), coordinates, scale].map((locator) =>
@@ -126,6 +138,7 @@ test.describe('mobile QA regressions', () => {
     expect(new Set(chipStyles.map((style) => JSON.stringify(style))).size).toBe(
       1,
     );
+    expect(chipStyles[0].backgroundColor).toBe('rgb(255, 255, 255)');
     await expect
       .poll(() =>
         coordinates.evaluate((el) => getComputedStyle(el).flexGrow),
@@ -171,7 +184,7 @@ test.describe('mobile QA regressions', () => {
     expect(card!.height).toBeLessThanOrEqual(panel!.height);
 
     const mapButtons = page.locator(
-      '.maplibregl-ctrl-top-right button, .maplibregl-ctrl-bottom-right button, .maplibregl-ctrl-bottom-left button',
+      '.maplibregl-ctrl-top-right button:visible, .maplibregl-ctrl-bottom-right button:visible, .maplibregl-ctrl-bottom-left button:visible',
     );
     const count = await mapButtons.count();
     for (let i = 0; i < count; i += 1) {
@@ -200,6 +213,55 @@ test.describe('mobile QA regressions', () => {
 
     await toolbarSection.getByText('View and map toolbars').click();
     await expect(page.getByText('Place search')).toBeVisible();
+  });
+
+  test('mobile clip video tap toggles playback without a maximize button', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() =>
+      localStorage.setItem('clip-to-track:force-layout', 'mobile'),
+    );
+    await openMobile(page);
+
+    const card = page.locator('.clip-card').first();
+    await expect(
+      card.getByRole('button', { name: /Maximize/i }),
+    ).toHaveCount(0);
+
+    const video = card.locator('video.video-frame');
+    await expect(video).toBeVisible();
+
+    await video.click();
+    await expect(card.getByRole('button', { name: /Pause/i })).toBeVisible();
+
+    await video.click();
+    await expect(card.getByRole('button', { name: /Play/i })).toBeVisible();
+  });
+
+  test('terrain control is hidden by default and can be shown from settings', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() =>
+      localStorage.setItem('clip-to-track:force-layout', 'mobile'),
+    );
+    await openMobile(page);
+
+    const terrainControl = page.locator(
+      '.maplibregl-ctrl-terrain, .maplibregl-ctrl-terrain-enabled',
+    );
+    await expect(terrainControl).toBeHidden();
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const toolbarSection = page.getByRole('group', {
+      name: 'View and map toolbars',
+    });
+    await toolbarSection.getByText('View and map toolbars').click();
+    await page.getByRole('switch', { name: 'Terrain button' }).check();
+    await page.getByRole('button', { name: 'Close settings' }).click();
+
+    await expect(terrainControl).toBeVisible();
   });
 
   test('empty project sheet wraps upload content instead of filling half the screen', async ({

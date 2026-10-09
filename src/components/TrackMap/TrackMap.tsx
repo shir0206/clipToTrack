@@ -312,6 +312,7 @@ export default function TrackMap({
   const lastHead = useRef(0);
   const data = useRef(clips); // latest clips for handlers registered once
   const coordEl = useRef<HTMLButtonElement>(null);
+  const scaleSlot = useRef<HTMLDivElement>(null);
   const lastCoord = useRef('');
   const pinCtl = useRef<{ unpin: () => void; clipId: () => string } | null>(
     null,
@@ -325,7 +326,6 @@ export default function TrackMap({
   // desktop setting, and never saved into it).
   const [phoneProfile, setPhoneProfile] = useState(false);
   const profileOn = compact ? phoneProfile : opts.profile;
-  const [creditsOpen, setCreditsOpen] = useState(false);
   const set = (p: Partial<MapOpts>) => {
     const { profile, ...rest } = p;
     if (profile !== undefined && compact) setPhoneProfile(profile);
@@ -363,23 +363,6 @@ export default function TrackMap({
   useEffect(() => {
     measuringRef.current = measuring;
   }, [measuring]);
-  useEffect(() => {
-    if (!creditsOpen) return;
-    const close = (e: Event) => {
-      if (
-        e instanceof KeyboardEvent
-          ? e.key === 'Escape'
-          : !(e.target as Element).closest('.map-credits')
-      )
-        setCreditsOpen(false);
-    };
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', close);
-    };
-  }, [creditsOpen]);
   useEffect(() => {
     // The probe belongs to the previous selection/profile overlay, so clear it when either changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -431,11 +414,15 @@ export default function TrackMap({
       new maplibregl.ScaleControl({ unit: 'metric' }),
       'bottom-right',
     );
+    const scaleEl = el.current?.querySelector<HTMLElement>(
+      '.maplibregl-ctrl-scale',
+    );
+    if (scaleEl && scaleSlot.current) scaleSlot.current.append(scaleEl);
 
     const showCoords = (lng: number, lat: number) => {
       lastCoord.current = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       if (coordEl.current)
-        coordEl.current.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)} · z${m.getZoom().toFixed(1)}`;
+        coordEl.current.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     };
     m.on('mousemove', (e) => showCoords(e.lngLat.lng, e.lngLat.lat));
     // touch has no pointer position: show the map centre instead
@@ -1171,40 +1158,26 @@ export default function TrackMap({
           className="map-credits"
           style={compact ? { bottom: insetBottom + 8 } : undefined}
         >
-          {creditsOpen && (
-            <div
-              className="map-credits-pop"
-              id="map-credits-pop"
-              role="dialog"
-              aria-label="Map credits"
-            >
-              <p>{BASEMAPS[opts.base].attribution}</p>
-              {opts.relief && <p>Terrain: Mapzen / AWS Open Data</p>}
-              <p>Map engine: MapLibre GL JS</p>
-            </div>
-          )}
-          <button
-            className="map-credit-button"
-            aria-expanded={creditsOpen}
-            aria-controls="map-credits-pop"
-            onClick={() => setCreditsOpen((v) => !v)}
-          >
-            © {COPYRIGHT_OWNER} | © OpenStreetMap
-          </button>
+          <div className="map-scale-cluster">
+            {view.coords && (
+              <button
+                ref={coordEl}
+                className="map-coordinates"
+                title="Click to copy coordinates"
+                onClick={() =>
+                  lastCoord.current &&
+                  void navigator.clipboard?.writeText(lastCoord.current)
+                }
+              >
+                lat, lon
+              </button>
+            )}
+            <div ref={scaleSlot} className="map-scale-slot" />
+          </div>
 
-          {view.coords && (
-            <button
-              ref={coordEl}
-              className="map-coordinates"
-              title="Click to copy coordinates"
-              onClick={() =>
-                lastCoord.current &&
-                void navigator.clipboard?.writeText(lastCoord.current)
-              }
-            >
-              lat, lon
-            </button>
-          )}
+          <button className="map-credit-button">
+            © {COPYRIGHT_OWNER} {new Date().getUTCFullYear()} · © OpenStreetMap
+          </button>
         </div>
       </div>
 

@@ -187,7 +187,11 @@ export default function ClipCard({
           canPlay
             ? (e) => {
                 e.stopPropagation();
-                onMaximize(); // opens the video in its own window
+                if (stacked) {
+                  handleToggle();
+                } else {
+                  onMaximize(); // opens the video in its own window
+                }
               }
             : undefined
         }
@@ -359,15 +363,17 @@ export default function ClipCard({
             >
               <Icon name="stop" size={13} />
             </button>
-            <button
-              className="icon-button"
-              aria-label={`Maximize ${clip.title}`}
-              title="Open larger"
-              disabled={!canPlay}
-              onClick={stop(onMaximize)}
-            >
-              <Icon name="maximize" size={14} />
-            </button>
+            {!stacked && (
+              <button
+                className="icon-button"
+                aria-label={`Maximize ${clip.title}`}
+                title="Open larger"
+                disabled={!canPlay}
+                onClick={stop(onMaximize)}
+              >
+                <Icon name="maximize" size={14} />
+              </button>
+            )}
           </div>
           {active && (
             <span className="playing-indicator" role="status">
