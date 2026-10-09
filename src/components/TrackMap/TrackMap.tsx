@@ -52,6 +52,9 @@ type Props = {
   /** phone: replaces the Fullscreen API, which iOS only offers for <video> */
   onImmersive?: () => void;
   onSearchFocus?: (focused: boolean) => void;
+  playingId?: string | null;
+  onTogglePlay?: (id: string) => void;
+  onStopPlayback?: () => void;
 };
 
 // ───────── basemaps (all key-free). Every one is a hidden raster layer; switching = toggle visibility ─────────
@@ -303,6 +306,9 @@ export default function TrackMap({
   onBackgroundTap,
   onImmersive,
   onSearchFocus,
+  playingId = null,
+  onTogglePlay,
+  onStopPlayback,
 }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -1070,6 +1076,15 @@ export default function TrackMap({
         probe={probe}
         onProbe={setProbe}
         onClose={() => set({ profile: false })}
+        playback={
+          compact && onTogglePlay && onStopPlayback
+            ? {
+                playing: sel.id === playingId,
+                onTogglePlay: () => onTogglePlay(sel.id),
+                onStop: onStopPlayback,
+              }
+            : undefined
+        }
       />
     ) : null;
   const unit = opts.color === 'speed' ? 'km/h' : 'm';

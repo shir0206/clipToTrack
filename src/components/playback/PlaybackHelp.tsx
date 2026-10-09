@@ -19,7 +19,7 @@ function stepsFor(b: BrowserInfo): Step[] {
   if (b.os === 'ios')
     return [
       {
-        text: 'Update iOS (Settings → General → Software Update). Every iPhone and iPad browser uses Apple\'s video engine, which plays HEVC itself, so switching browsers will not help.',
+        text: "Update iOS (Settings → General → Software Update). Every iPhone and iPad browser uses Apple's video engine, which plays HEVC itself, so switching browsers will not help.",
       },
       {
         text: 'Very large clips (5.3K, high frame rate) can be too much for an older iPhone or iPad. The small .LRV file below plays on any of them.',
@@ -31,7 +31,7 @@ function stepsFor(b: BrowserInfo): Step[] {
         text: `Update ${b.name} from Google Play, then reload this page.`,
       },
       {
-        text: 'HEVC playback on Android depends on your phone\'s hardware decoder. Some budget or older phones do not have one, or cannot handle 5.3K. If you use another browser, try Chrome.',
+        text: "HEVC playback on Android depends on your phone's hardware decoder. Some budget or older phones do not have one, or cannot handle 5.3K. If you use another browser, try Chrome.",
       },
     ];
   const scheme = b.family === 'edge' ? 'edge' : 'chrome';

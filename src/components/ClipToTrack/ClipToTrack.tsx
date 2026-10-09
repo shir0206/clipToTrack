@@ -766,6 +766,12 @@ export default function ClipToTrack() {
             onBackgroundTap={onBackgroundTap}
             onImmersive={() => setImmersive(true)}
             onSearchFocus={onSearchFocus}
+            playingId={playingClipId}
+            onTogglePlay={(id) => {
+              setSelectedClipId(id);
+              setPlayingClipId((p) => (p === id ? null : id));
+            }}
+            onStopPlayback={() => setPlayingClipId(null)}
           />
           {immersive && (
             <button

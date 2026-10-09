@@ -135,7 +135,9 @@ export default function Logo({
             <i>to</i>
             <b className="logo-accent">Track</b>
           </span>
-          {tagline && !compact && <span className="brand-tagline">{tagline}</span>}
+          {tagline && !compact && (
+            <span className="brand-tagline">{tagline}</span>
+          )}
         </div>
       )}
     </div>

@@ -22,6 +22,11 @@ type Props = {
   onClose: () => void;
   /** phone sheet: no resize grip, no pop-out windows, no drag-to-split, finger scrubbing */
   compact?: boolean;
+  playback?: {
+    playing: boolean;
+    onTogglePlay: () => void;
+    onStop: () => void;
+  };
 };
 
 type Metric = 'alt' | 'speed';
@@ -57,6 +62,7 @@ function Pane({
   mode,
   onPop,
   compact = false,
+  playback,
 }: {
   clip: Clip;
   metric: Metric;
@@ -66,6 +72,7 @@ function Pane({
   mode: ViewMode;
   /** open this metric in its own window (absent inside the popup itself) */
   onPop?: () => void;
+  playback?: Props['playback'];
 }) {
   const unit = UNIT[metric];
   const dial = mode === 'dial';
@@ -150,9 +157,19 @@ function Pane({
 
       {dial ? (
         metric === 'alt' ? (
-          <AltitudeCluster key={clip.id} clip={clip} probe={probe} />
+          <AltitudeCluster
+            key={clip.id}
+            clip={clip}
+            probe={probe}
+            playback={compact ? playback : undefined}
+          />
         ) : (
-          <SpeedCluster key={clip.id} clip={clip} probe={probe} />
+          <SpeedCluster
+            key={clip.id}
+            clip={clip}
+            probe={probe}
+            playback={compact ? playback : undefined}
+          />
         )
       ) : chart ? (
         <div
@@ -334,6 +351,7 @@ export default function ElevationProfile({
   onProbe,
   onClose,
   compact = false,
+  playback,
 }: Props) {
   const [tab, setTab] = useState<Tab>('alt');
   const [single, setSingle] = useState<Metric>('alt'); // where "cancel" returns to
@@ -441,26 +459,26 @@ export default function ElevationProfile({
     compact
       ? {}
       : {
-    draggable: true,
-    onDragStart: (e: DragEvent) => {
-      e.dataTransfer.setData('text/plain', k); // Firefox needs data to start a drag
-      e.dataTransfer.effectAllowed = 'move';
-      setDrag(k);
-    },
-    onDragEnd: endDrag,
-    onDragOver: (e: DragEvent) => {
-      if (drag && drag !== k) {
-        e.preventDefault();
-        setOverTab(k);
-      }
-    },
-    onDragLeave: () => setOverTab(null),
-    onDrop: (e: DragEvent) => {
-      e.preventDefault();
-      if (drag && drag !== k) makeSplit(drag, 'right'); // dragged tab joins the one it was dropped on
-      endDrag();
-    },
-  };
+          draggable: true,
+          onDragStart: (e: DragEvent) => {
+            e.dataTransfer.setData('text/plain', k); // Firefox needs data to start a drag
+            e.dataTransfer.effectAllowed = 'move';
+            setDrag(k);
+          },
+          onDragEnd: endDrag,
+          onDragOver: (e: DragEvent) => {
+            if (drag && drag !== k) {
+              e.preventDefault();
+              setOverTab(k);
+            }
+          },
+          onDragLeave: () => setOverTab(null),
+          onDrop: (e: DragEvent) => {
+            e.preventDefault();
+            if (drag && drag !== k) makeSplit(drag, 'right'); // dragged tab joins the one it was dropped on
+            endDrag();
+          },
+        };
 
   return (
     <div
@@ -474,19 +492,19 @@ export default function ElevationProfile({
       }
     >
       {!compact && (
-      <div
-        className="profile-grip"
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Resize profile"
-        aria-valuenow={height}
-        aria-valuemin={MIN_H}
-        tabIndex={0}
-        onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
-        onPointerMove={onGripMove}
-        onKeyDown={onGripKey}
-        onDoubleClick={() => setHeight(clampH(DEFAULT_H))}
-      />
+        <div
+          className="profile-grip"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize profile"
+          aria-valuenow={height}
+          aria-valuemin={MIN_H}
+          tabIndex={0}
+          onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+          onPointerMove={onGripMove}
+          onKeyDown={onGripKey}
+          onDoubleClick={() => setHeight(clampH(DEFAULT_H))}
+        />
       )}
       <div className="profile-header">
         <Icon name="chart" size={14} />
@@ -577,6 +595,7 @@ export default function ElevationProfile({
             mode={modes[m]}
             onPop={compact ? undefined : () => pop(m)}
             compact={compact}
+            playback={playback}
           />
         ))}
 

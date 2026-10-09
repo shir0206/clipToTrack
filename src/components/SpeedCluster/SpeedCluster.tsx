@@ -8,6 +8,11 @@ type Props = {
   clip: Clip;
   /** index into clip.samples, driven by the map path (hover / click / video playhead); null = nothing yet */
   probe: number | null;
+  playback?: {
+    playing: boolean;
+    onTogglePlay: () => void;
+    onStop: () => void;
+  };
 };
 
 const fin = (n: unknown): n is number =>
@@ -264,7 +269,7 @@ export function Dial({
  * It has no controls of its own: it shows the sample picked by `probe`, so the route on the map
  * (hover, click, or the video playhead) is the controller.
  */
-export default function SpeedCluster({ clip, probe }: Props) {
+export default function SpeedCluster({ clip, probe, playback }: Props) {
   const samples = clip.samples;
   const last = samples.length - 1;
 
@@ -319,6 +324,27 @@ export default function SpeedCluster({ clip, probe }: Props) {
       role="img"
       aria-label={`Speedometer: ${v !== undefined ? Math.round(v) : 'no'} km/h, ${v !== undefined ? Math.round(eng.rpm) : 'no'} rpm`}
     >
+      {playback && (
+        <div className="gauge-playback-controls" aria-label="Speed playback">
+          <button
+            className="gauge-playback-button"
+            aria-label={`${playback.playing ? 'Pause' : 'Play'} ${clip.title} speed`}
+            onClick={playback.onTogglePlay}
+            disabled={!clip.videoUrl}
+          >
+            <Icon name={playback.playing ? 'pause' : 'play'} size={15} />
+          </button>
+          <button
+            className="gauge-playback-button"
+            aria-label={`Stop ${clip.title} speed`}
+            onClick={playback.onStop}
+            disabled={!clip.videoUrl}
+          >
+            <Icon name="stop" size={15} />
+          </button>
+        </div>
+      )}
+
       <Dial
         className="gauge-tachometer"
         labels={rpmLabels}

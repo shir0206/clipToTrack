@@ -279,6 +279,43 @@ test.describe('mobile QA regressions', () => {
     await expect(page.getByText('Place search')).toBeVisible();
   });
 
+  test('mobile speed and altitude clusters expose playback controls', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() =>
+      localStorage.setItem('clip-to-track:force-layout', 'mobile'),
+    );
+    await openMobile(page);
+
+    await page
+      .getByRole('button', { name: 'Telemetry: speed and altitude' })
+      .click();
+    await page.getByRole('button', { name: 'Altimeter' }).click();
+    await expect(page.locator('.altitude-cluster')).toBeVisible();
+    await expect(
+      page.locator('.altitude-cluster .gauge-playback-button').first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Play .* altitude/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Stop .* altitude/i }),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Speed', exact: true }).click();
+    await page.getByRole('button', { name: 'Speedometer' }).click();
+    await expect(
+      page.locator('.gauge-cluster:not(.altitude-cluster)'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Play .* speed/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Stop .* speed/i }),
+    ).toBeVisible();
+  });
+
   test('map options sheet stays within the mobile viewport', async ({
     browser,
   }) => {
