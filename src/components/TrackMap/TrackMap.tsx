@@ -1108,13 +1108,13 @@ export default function TrackMap({
           onExport={exportAs}
           compact={compact}
           onSearchFocus={onSearchFocus}
-          onGo={(b) =>
-            map.current?.fitBounds(b, {
+          onGo={(b) => {
+            const next = map.current?.cameraForBounds(b, {
               padding: 40,
               maxZoom: 16,
-              duration: 700,
-            })
-          }
+            });
+            if (next) map.current?.jumpTo(next);
+          }}
         />
 
         {range && view.legend && (

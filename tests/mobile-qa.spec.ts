@@ -66,8 +66,44 @@ async function expectMeasureBarClearOfMapCredits(page: Page) {
   expect(overlaps.filter(({ overlaps: hasOverlap }) => hasOverlap)).toEqual([]);
 }
 
+async function stubPlaceSearch(page: Page) {
+  await page.route('https://nominatim.openstreetmap.org/search**', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          place_id: 209952533,
+          display_name: 'Haifa, Haifa Subdistrict, Haifa District, Israel',
+          boundingbox: ['32.7579523', '32.8475328', '34.9486027', '35.0797444'],
+        },
+      ]),
+    }),
+  );
+}
+
 test.describe('mobile QA regressions', () => {
   test.use({ hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+
+  test('mobile place search result moves the map to the selected place', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() =>
+      localStorage.setItem('clip-to-track:force-layout', 'mobile'),
+    );
+    await stubPlaceSearch(page);
+    await openMobile(page);
+
+    await page.locator('.search-box input').fill('haifa');
+    await page.getByRole('option', { name: /Haifa/ }).click();
+
+    await expect
+      .poll(async () => {
+        const text = await page.locator('.map-coordinates').textContent();
+        return text ?? '';
+      })
+      .toContain('32.');
+  });
 
   test('portrait sheet scrolls with touch and map controls stay usable', async ({
     page,
