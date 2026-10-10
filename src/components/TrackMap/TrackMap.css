@@ -57,8 +57,8 @@
   .map-credit-button,
   .map-credits .map-coordinates,
   .map-scale-slot .maplibregl-ctrl-scale {
-    font-size: 7px;
-    min-height: 21px;
+    font-size: 11px;
+    min-height: 44px;
   }
 }
 .map-credit-button {

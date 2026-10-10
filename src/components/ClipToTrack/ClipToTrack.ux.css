@@ -76,6 +76,67 @@
 [data-layout^='mobile'] .profile-panel.is-compact .profile-body {
   min-height: 0;
   height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-header {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  padding: 6px;
+  overflow: hidden;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-tabs {
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-view {
+  margin-left: 0;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-header > strong {
+  min-width: 0;
+  max-width: 9ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-layout^='mobile']
+  .profile-panel.is-compact
+  .profile-header
+  > .inline-icon {
+  display: none;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-header .icon-button {
+  margin-left: auto;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-pane {
+  min-width: 0;
+  overflow: hidden;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-pane.is-readout {
+  width: 100%;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .telemetry-readout {
+  width: 100%;
+  max-width: 100%;
+  transform: none;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .telemetry-readout-cell {
+  padding: 8px clamp(12px, 4vw, 24px);
+}
+[data-layout^='mobile'] .profile-panel.is-compact .telemetry-readout small {
+  font-size: clamp(14px, 4vw, 18px);
+}
+[data-layout^='mobile'] .profile-panel.is-compact .telemetry-readout-value {
+  gap: clamp(6px, 2vw, 10px);
+}
+[data-layout^='mobile'] .profile-panel.is-compact .telemetry-readout-number {
+  overflow: visible;
+  font-size: clamp(44px, 14vw, 58px);
+}
+[data-layout^='mobile'] .profile-panel.is-compact .telemetry-readout-unit {
+  font-size: clamp(22px, 6vw, 30px);
 }
 
 /* ── Video: full width, 16:9, never taller than a third of the screen while you also watch the map ── */

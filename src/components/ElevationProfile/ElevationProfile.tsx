@@ -27,12 +27,13 @@ type Props = {
     onTogglePlay: () => void;
     onStop: () => void;
   };
+  initialModes?: Partial<Record<Metric, ViewMode>>;
 };
 
 type Metric = 'alt' | 'speed';
 type Tab = Metric | 'split';
 type Side = 'left' | 'right';
-type ViewMode = 'graph' | 'dial';
+type ViewMode = 'graph' | 'dial' | 'readout';
 
 const W = 1000;
 const H = 100;
@@ -52,6 +53,101 @@ const DIAL_LABEL: Record<Metric, string> = {
   speed: 'Speedometer',
 };
 const otherOf = (m: Metric): Metric => (m === 'alt' ? 'speed' : 'alt');
+const fin = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isFinite(n);
+const kmh = (p: Clip['samples'][number] | undefined) =>
+  !p
+    ? undefined
+    : fin(p.speed3dKmh)
+      ? p.speed3dKmh
+      : fin(p.speed3dMs)
+        ? p.speed3dMs * 3.6
+        : undefined;
+const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+function TelemetryDigits({
+  value,
+  ariaLabel,
+}: {
+  value: string;
+  ariaLabel: string;
+}) {
+  if (value === '—')
+    return (
+      <span className="telemetry-readout-number" aria-label={ariaLabel}>
+        —
+      </span>
+    );
+
+  return (
+    <span className="telemetry-readout-number" aria-label={ariaLabel}>
+      {[...value].map((ch, i) => {
+        const digit = Number(ch);
+        return Number.isInteger(digit) ? (
+          <span className="telemetry-digit-column" aria-hidden="true" key={i}>
+            <span
+              className="telemetry-digit-strip"
+              style={{ '--digit': digit } as CSSProperties}
+            >
+              {DIGITS.map((k) => (
+                <span key={k}>{k}</span>
+              ))}
+            </span>
+          </span>
+        ) : (
+          <span aria-hidden="true" key={i}>
+            {ch}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+export function TelemetryReadout({
+  clip,
+  probe,
+}: {
+  clip: Clip;
+  probe: number | null;
+}) {
+  const sample = clip.samples[probe ?? 0];
+  const altitude = fin(sample?.altM) ? Math.round(sample.altM) : null;
+  const speed = kmh(sample);
+  const roundedSpeed = speed === undefined ? null : Math.round(speed);
+  const altitudeText = altitude === null ? '—' : String(altitude);
+  const speedText = roundedSpeed === null ? '—' : String(roundedSpeed);
+  const progress =
+    clip.samples.length > 1 && probe !== null
+      ? Math.round((probe / (clip.samples.length - 1)) * 100)
+      : 0;
+  const aria =
+    altitude === null && roundedSpeed === null
+      ? 'No altitude or speed sample selected'
+      : `Altitude ${altitudeText} meters, speed ${speedText} kilometers per hour`;
+
+  return (
+    <div className="telemetry-readout" role="group" aria-label={aria}>
+      <div className="telemetry-readout-cell">
+        <small>Altitude</small>
+        <div className="telemetry-readout-value">
+          <TelemetryDigits value={altitudeText} ariaLabel={altitudeText} />
+          <span className="telemetry-readout-unit">m</span>
+        </div>
+      </div>
+      <div className="telemetry-readout-cell">
+        <small>Speed</small>
+        <div className="telemetry-readout-value">
+          <TelemetryDigits value={speedText} ariaLabel={speedText} />
+          <span className="telemetry-readout-unit">km/h</span>
+        </div>
+      </div>
+      <div className="gauge-bar" aria-hidden="true">
+        <i style={{ '--progress': `${progress}%` } as CSSProperties} />
+      </div>
+    </div>
+  );
+}
 
 /** One metric of the selected clip: a chart or its instrument cluster (altimeter / speedometer). */
 function Pane({
@@ -137,11 +233,11 @@ function Pane({
 
   return (
     <section
-      className={`profile-pane${dial ? ' is-dial' : ''}`}
+      className={`profile-pane${dial ? ' is-dial' : ''}${mode === 'readout' ? ' is-readout' : ''}`}
       aria-label={LABEL[metric]}
     >
-      {dial && popBtn}
-      {!dial && (
+      {(dial || mode === 'readout') && popBtn}
+      {!dial && mode !== 'readout' && (
         <div className="pane-header">
           <b>{LABEL[metric]}</b>
           <span className="profile-readout">
@@ -155,7 +251,9 @@ function Pane({
         </div>
       )}
 
-      {dial ? (
+      {mode === 'readout' ? (
+        <TelemetryReadout clip={clip} probe={probe} />
+      ) : dial ? (
         metric === 'alt' ? (
           <AltitudeCluster
             key={clip.id}
@@ -352,13 +450,14 @@ export default function ElevationProfile({
   onClose,
   compact = false,
   playback,
+  initialModes,
 }: Props) {
   const [tab, setTab] = useState<Tab>('alt');
   const [single, setSingle] = useState<Metric>('alt'); // where "cancel" returns to
   const [split, setSplit] = useState<[Metric, Metric] | null>(null); // [left, right]
   const [modes, setModes] = useState<Record<Metric, ViewMode>>({
-    alt: 'graph',
-    speed: 'graph',
+    alt: initialModes?.alt ?? 'graph',
+    speed: initialModes?.speed ?? 'graph',
   });
 
   // pop-out windows, one per metric
@@ -561,15 +660,24 @@ export default function ElevationProfile({
             aria-label={`${LABEL[m]} view`}
           >
             {metrics.length > 1 && <Icon name={ICON[m]} size={13} />}
-            {(['graph', 'dial'] as const).map((v) => (
+            {(['graph', 'dial', 'readout'] as const).map((v) => (
               <button
                 key={v}
                 className={`map-chip${modes[m] === v ? ' is-on' : ''}`}
                 aria-pressed={modes[m] === v}
                 onClick={() => setModes((s) => ({ ...s, [m]: v }))}
               >
-                <Icon name={v === 'graph' ? 'chart' : 'dial'} size={13} />
-                {v === 'graph' ? 'Graph' : DIAL_LABEL[m]}
+                <Icon
+                  name={
+                    v === 'graph' ? 'chart' : v === 'dial' ? 'dial' : 'type'
+                  }
+                  size={13}
+                />
+                {v === 'graph'
+                  ? 'Graph'
+                  : v === 'dial'
+                    ? DIAL_LABEL[m]
+                    : 'Values'}
               </button>
             ))}
           </div>

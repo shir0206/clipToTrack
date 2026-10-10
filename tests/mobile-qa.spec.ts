@@ -352,6 +352,56 @@ test.describe('mobile QA regressions', () => {
     ).toBeVisible();
   });
 
+  test('mobile telemetry Values view stays inside the visible profile pane', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() =>
+      localStorage.setItem('clip-to-track:force-layout', 'mobile'),
+    );
+    await openMobile(page);
+
+    await page
+      .getByRole('button', { name: 'Telemetry: speed and altitude' })
+      .click();
+    await page.getByRole('button', { name: 'Values' }).click();
+
+    const metrics = await page.evaluate(() => {
+      const pane = document
+        .querySelector('.profile-pane.is-readout')!
+        .getBoundingClientRect();
+      const readout = document
+        .querySelector('.telemetry-readout')!
+        .getBoundingClientRect();
+      const controls = [
+        ...document.querySelectorAll<HTMLElement>('.profile-header button'),
+      ]
+        .filter((el) => el.offsetParent !== null)
+        .map((el) => el.getBoundingClientRect());
+      return {
+        paneLeft: pane.left,
+        paneRight: pane.right,
+        readoutLeft: readout.left,
+        readoutRight: readout.right,
+        controls: controls.map((rect) => ({
+          left: rect.left,
+          right: rect.right,
+        })),
+      };
+    });
+
+    expect(metrics.readoutLeft).toBeGreaterThanOrEqual(metrics.paneLeft);
+    expect(metrics.readoutRight).toBeLessThanOrEqual(metrics.paneRight);
+    for (const [i, control] of metrics.controls.entries()) {
+      expect(control.left, `profile control ${i} left`).toBeGreaterThanOrEqual(
+        metrics.paneLeft,
+      );
+      expect(control.right, `profile control ${i} right`).toBeLessThanOrEqual(
+        metrics.paneRight,
+      );
+    }
+  });
+
   test('map options sheet stays within the mobile viewport', async ({
     browser,
   }) => {

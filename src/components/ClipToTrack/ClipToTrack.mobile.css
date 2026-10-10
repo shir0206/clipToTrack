@@ -1066,7 +1066,7 @@
 
 /* ── phone in landscape: side panel instead of a sheet ── */
 [data-layout='mobile-landscape'] {
-  --header-h: 40px;
+  --header-h: 44px;
 }
 [data-layout='mobile-landscape'] .app-layout {
   display: flex;
