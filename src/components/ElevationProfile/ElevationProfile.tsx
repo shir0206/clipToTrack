@@ -586,7 +586,7 @@ export default function ElevationProfile({
       style={
         {
           ...clipColorVars(clip.color),
-          ...(compact ? {} : { '--h': `${height}px` }),
+          ...(compact ? {} : { '--height': `${height}px` }),
         } as CSSProperties
       }
     >

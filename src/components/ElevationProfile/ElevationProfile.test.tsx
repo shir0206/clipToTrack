@@ -60,6 +60,20 @@ describe('ElevationProfile telemetry readout', () => {
     expect(html).toContain('Values');
   });
 
+  it('writes the desktop dock height to the CSS variable used by the panel', () => {
+    const html = renderToStaticMarkup(
+      <ElevationProfile
+        clip={clip}
+        probe={1}
+        onProbe={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('--height:260px');
+    expect(html).not.toContain('--h:260px');
+  });
+
   it('shows altitude and speed numbers from the current probe sample', () => {
     const html = renderToStaticMarkup(
       <TelemetryReadout clip={clip} probe={1} />,
