@@ -139,7 +139,7 @@ export function Dial({
     <svg
       className={`gauge-dial ${className}`}
       viewBox="0 0 200 200"
-      style={{ '--f': f } as CSSProperties}
+      style={{ '--fraction': f } as CSSProperties}
       aria-hidden="true"
     >
       <defs>
@@ -364,7 +364,7 @@ export default function SpeedCluster({ clip, probe, playback }: Props) {
           {Array.from({ length: 12 }, (_, k) => (
             <i
               key={k}
-              style={{ '--on': clamp01(speedFrac * 12 - k) } as CSSProperties}
+              style={{ '--segment-opacity': clamp01(speedFrac * 12 - k) } as CSSProperties}
             />
           ))}
         </div>
