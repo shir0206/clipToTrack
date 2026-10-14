@@ -364,7 +364,11 @@ export default function SpeedCluster({ clip, probe, playback }: Props) {
           {Array.from({ length: 12 }, (_, k) => (
             <i
               key={k}
-              style={{ '--segment-opacity': clamp01(speedFrac * 12 - k) } as CSSProperties}
+              style={
+                {
+                  '--segment-opacity': clamp01(speedFrac * 12 - k),
+                } as CSSProperties
+              }
             />
           ))}
         </div>

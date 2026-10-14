@@ -531,7 +531,11 @@ export default function AltitudeCluster({
           {Array.from({ length: 12 }, (_, k) => (
             <i
               key={k}
-              style={{ '--segment-opacity': clamp(segFrac * 12 - k, 0, 1) } as CSSProperties}
+              style={
+                {
+                  '--segment-opacity': clamp(segFrac * 12 - k, 0, 1),
+                } as CSSProperties
+              }
             />
           ))}
         </div>
