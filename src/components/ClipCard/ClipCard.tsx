@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Clip } from '../../types';
 import Icon, { type IconName } from '../Icon/Icon';
+import { usePlaybackReporting } from '../../lib/video/usePlaybackReporting';
 import { watchPicture } from '../../lib/video/videoSupport';
 import { CLIP_MIME } from '../../lib/projects';
 import { clipColorVars } from '../../lib/clipColorStyle';
@@ -15,6 +16,7 @@ type Props = {
   nowPlaying?: boolean;
   onSelect: () => void;
   onHover: (hovering: boolean) => void;
+  onPlayingChange?: (playing: boolean) => void;
   onTogglePlay: () => void;
   onStop: () => void;
   onMaximize: () => void;
@@ -49,6 +51,7 @@ export default function ClipCard({
   onSelect,
   onHover,
   onTogglePlay,
+  onPlayingChange,
   onStop,
   onMaximize,
   hidden,
@@ -78,6 +81,7 @@ export default function ClipCard({
     !!clip.videoUrl &&
     !videoError &&
     (!stacked || playing || selected || nowPlaying);
+  usePlaybackReporting(videoRef, onPlayingChange, clip.videoUrl, mountVideo);
   const onStopRef = useRef(onStop);
   useEffect(() => {
     onStopRef.current = onStop;
@@ -198,6 +202,7 @@ export default function ClipCard({
       >
         {mountVideo && (
           <video
+            data-clip-id={clip.id}
             ref={videoRef}
             className="video-frame"
             src={clip.videoUrl}

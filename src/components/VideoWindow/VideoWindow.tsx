@@ -1,3 +1,4 @@
+import { usePlaybackReporting } from '../../lib/video/usePlaybackReporting';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Clip } from '../../types';
@@ -63,6 +64,7 @@ export default function VideoWindow({
 }: Props) {
   const [root] = useState(() => win.document.getElementById(ROOT_ID));
   const videoRef = useRef<HTMLVideoElement>(null);
+  usePlaybackReporting(videoRef, onPlayingChange, clip.videoUrl);
   const onProgressRef = useRef(onProgress);
   useEffect(() => {
     onProgressRef.current = onProgress;
@@ -132,15 +134,13 @@ export default function VideoWindow({
   if (!root) return null;
   return createPortal(
     <video
+      data-clip-id={clip.id}
       ref={videoRef}
       src={clip.videoUrl}
       poster={clip.thumbnail}
       autoPlay
       onClick={(e) => toggle(e.currentTarget)}
       playsInline
-      onPlay={() => onPlayingChange?.(true)}
-      onPause={() => onPlayingChange?.(false)}
-      onEnded={() => onPlayingChange?.(false)}
       // still report on seek/pause so the playhead lands exactly where the video is
       onSeeked={(e) =>
         e.currentTarget.duration &&

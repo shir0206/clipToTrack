@@ -68,6 +68,7 @@ type Props = {
   onFitAll: () => void;
   onFitSelected: () => void;
   onFullscreen: () => void;
+  onRecordMap?: () => void;
   onExport: (kind: 'gpx' | 'geojson' | 'png') => void;
   onGo: (bbox: [number, number, number, number]) => void; // [w, s, e, n]
   /** phone layout: one search pill + one Layers menu instead of ~17 loose controls */
@@ -445,6 +446,7 @@ function MapMenu({
   onFitSelected,
   onFullscreen,
   onExport,
+  onRecordMap,
   onClose,
 }: Omit<Props, 'onGo' | 'compact' | 'onSearchFocus'> & {
   onClose: () => void;
@@ -578,6 +580,14 @@ function MapMenu({
                 label="Immersive map"
                 onClick={act(onFullscreen)}
               />
+              {onRecordMap && (
+                <MenuRow
+                  icon="camera"
+                  label="Record map · 25 fps"
+                  disabled={!hasClips}
+                  onClick={act(onRecordMap)}
+                />
+              )}
               {EXPORTS.map((x) => (
                 <MenuRow
                   key={x.value}
@@ -607,6 +617,7 @@ export default function MapPanel({
   onFitSelected,
   onFullscreen,
   onExport,
+  onRecordMap,
   onGo,
   compact = false,
   onSearchFocus,
@@ -680,6 +691,7 @@ export default function MapPanel({
             onFitSelected={onFitSelected}
             onFullscreen={onFullscreen}
             onExport={onExport}
+            onRecordMap={onRecordMap}
             onClose={() => setMenuOpen(false)}
           />
         )}
@@ -794,6 +806,17 @@ export default function MapPanel({
             label="Fullscreen map"
             onClick={onFullscreen}
           />
+          {onRecordMap && (
+            <button
+              className="icon-button"
+              title="Record map · 25 fps"
+              aria-label="Record map · 25 fps"
+              disabled={!hasClips}
+              onClick={onRecordMap}
+            >
+              <Icon name="camera" size={16} />
+            </button>
+          )}
           <Dropdown
             {...dd}
             id="export"

@@ -8,6 +8,8 @@ import {
 import { createPortal } from 'react-dom';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Clip } from '../../types';
+import type { MapVideoRecorderOptions } from '../../lib/mapCapture/mapVideoRecorder';
+import type { CapturePlayback } from '../../lib/video/usePlaybackReporting';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Point } from 'geojson';
@@ -19,6 +21,8 @@ import MapPanel, {
   type BaseKey,
   type MapOpts,
 } from '../MapPanel/MapPanel';
+import type { CaptureStartPosition } from '../../lib/video/prepareCapturePlayback';
+import MapCapture from '../MapCapture/MapCapture';
 import ElevationProfile from '../ElevationProfile/ElevationProfile';
 import Icon from '../Icon/Icon';
 import { COPYRIGHT_OWNER } from '../../config/copyright';
@@ -30,8 +34,19 @@ import { clipToGeoJson, clipToGpx, download } from '../../lib/exportTrack';
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 /** Imperative handle for per-frame updates that shouldn't re-render React (video playhead). */
+export type MapCaptureSource = Pick<
+  MapVideoRecorderOptions,
+  'canvas' | 'subscribeRender' | 'requestRender' | 'setRecordingActive'
+>;
+
 export type MapApi = {
-  setPlayhead: (clipId: string, frac: number | null) => void;
+  getCaptureSource: () => MapCaptureSource | null;
+  waitForCaptureFrame: (signal: AbortSignal) => Promise<void>;
+  setPlayhead: (
+    clipId: string,
+    frac: number | null,
+    force?: boolean,
+  ) => void | Promise<void>;
 };
 
 type Props = {
@@ -52,6 +67,12 @@ type Props = {
   /** phone: replaces the Fullscreen API, which iOS only offers for <video> */
   onImmersive?: () => void;
   onSearchFocus?: (focused: boolean) => void;
+  /** Actual playback state for capture; playingId remains the playback command. */
+  capturePlayback?: CapturePlayback;
+  prepareCapturePlayback?: (
+    position: CaptureStartPosition,
+    signal: AbortSignal,
+  ) => Promise<() => Promise<void>>;
   playingId?: string | null;
   onTogglePlay?: (id: string) => void;
   onStopPlayback?: () => void;
@@ -307,15 +328,19 @@ export default function TrackMap({
   onImmersive,
   onSearchFocus,
   playingId = null,
+  capturePlayback = { clipId: null, playing: false },
+  prepareCapturePlayback,
   onTogglePlay,
   onStopPlayback,
 }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [ready, setReady] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const cb = useRef({ onSelect, onHover, onBackgroundTap });
   const compactRef = useRef(compact);
   const lastHead = useRef(0);
+  const captureActive = useRef(false);
   const data = useRef(clips); // latest clips for handlers registered once
   const coordEl = useRef<HTMLButtonElement>(null);
   const scaleSlot = useRef<HTMLDivElement>(null);
@@ -805,11 +830,67 @@ export default function TrackMap({
   useEffect(() => {
     if (!apiRef) return;
     apiRef.current = {
-      setPlayhead: (clipId, frac) => {
+      getCaptureSource: () => {
+        const m = map.current;
+        if (!m || !m.getSource('playhead')) return null;
+        return {
+          canvas: m.getCanvas(),
+          subscribeRender: (listener) => {
+            m.on('render', listener);
+            return () => {
+              m.off('render', listener);
+            };
+          },
+          requestRender: () => {
+            m.triggerRepaint();
+          },
+          setRecordingActive: (active) => {
+            captureActive.current = active;
+          },
+        };
+      },
+      waitForCaptureFrame: (signal) =>
+        new Promise<void>((resolve, reject) => {
+          const m = map.current;
+          if (!m) {
+            reject(new Error('The map is not ready.'));
+            return;
+          }
+          const cleanup = () => {
+            clearTimeout(timer);
+            m.off('render', done);
+            signal.removeEventListener('abort', aborted);
+          };
+          const done = () => {
+            if (!m.isSourceLoaded('playhead')) return;
+            cleanup();
+            resolve();
+          };
+          const aborted = () => {
+            cleanup();
+            reject(signal.reason);
+          };
+          const timer = setTimeout(() => {
+            cleanup();
+            reject(
+              new Error('Wait for the map to finish loading, then try again.'),
+            );
+          }, 10000);
+          m.on('render', done);
+          signal.addEventListener('abort', aborted, { once: true });
+          if (signal.aborted) aborted();
+          else m.triggerRepaint();
+        }),
+      setPlayhead: (clipId, frac, force = false) => {
         const m = map.current;
         const src = m?.getSource('playhead') as GeoJSONSource | undefined;
         if (!m || !src) return;
-        if (frac !== null && compactRef.current) {
+        if (
+          frac !== null &&
+          compactRef.current &&
+          !captureActive.current &&
+          !force
+        ) {
           const now = performance.now();
           if (now - lastHead.current < PLAYHEAD_MS) return; // throttle on phones
           lastHead.current = now;
@@ -833,10 +914,11 @@ export default function TrackMap({
           a[0] + (b[0] - a[0]) * t,
           a[1] + (b[1] - a[1]) * t,
         ];
-        src.setData(dotFeature(c, clip.color));
+        const updated = src.setData(dotFeature(c, clip.color));
         // same position, as a sample index: the profile charts and the speedometer follow the video
         if (clipId === selIdRef.current) setProbe(Math.round(pos));
         if (followRef.current) m.jumpTo({ center: c });
+        return updated;
       },
     };
     return () => {
@@ -1093,7 +1175,7 @@ export default function TrackMap({
     <div
       className={`map-column${view.zoom ? '' : ' hides-zoom'}${view.gps ? '' : ' hides-location'}${view.terrain ? '' : ' hides-terrain'}${view.scale ? '' : ' hides-scale'}`}
     >
-      <div className="map-stage">
+      <div className={`map-stage${captureOpen ? ' is-capturing' : ''}`}>
         <div ref={el} className="map-canvas" />
         <MapPanel
           opts={{ ...opts, profile: profileOn }}
@@ -1106,6 +1188,7 @@ export default function TrackMap({
           onFitSelected={fitSelected}
           onFullscreen={fullscreen}
           onExport={exportAs}
+          onRecordMap={ready ? () => setCaptureOpen(true) : undefined}
           compact={compact}
           onSearchFocus={onSearchFocus}
           onGo={(b) => {
@@ -1117,6 +1200,27 @@ export default function TrackMap({
           }}
         />
 
+        {captureOpen && (
+          <MapCapture
+            getSource={() => apiRef?.current?.getCaptureSource() ?? null}
+            playback={capturePlayback}
+            preparePlayback={prepareCapturePlayback}
+            clipTitle={
+              clips.find((c) => c.id === capturePlayback.clipId)?.title ??
+              'clip'
+            }
+            hasRoute={
+              !!clips.find(
+                (c) =>
+                  c.id === capturePlayback.clipId &&
+                  !!c.videoUrl &&
+                  c.coordinates.length > 1,
+              )
+            }
+            insetBottom={compact ? insetBottom : 0}
+            onClose={() => setCaptureOpen(false)}
+          />
+        )}
         {range && view.legend && (
           <div
             className="map-legend"
