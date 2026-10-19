@@ -277,6 +277,7 @@ for (const mobile of [false, true]) {
       );
     }
     await page.goto('/clipToTrack/');
+    await expect(page.locator('.clip-card').first()).toBeVisible();
     if (mobile)
       await page
         .getByRole('button', { name: 'Map options', exact: true })

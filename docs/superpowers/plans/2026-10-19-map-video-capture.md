@@ -155,3 +155,12 @@ All four implementation tasks are complete on `record`. Changes remain uncommitt
 - Real Chrome validation: began recording from a paused selected clip; playback started at zero. Retried from five seconds and verified playback restarted at zero. Saved `/private/tmp/gopro-map-capture-task1/no-credits-from-zero.mp4`.
 - Tests were added after implementation: seven playback-preparation cases and recorder first-frame readiness; browser cases cover default beginning selection, paused start, current-position selection, and beginning playback waiting for the initial captured frame. Real MP4 checks inspect bottom pixels to reject the former credits-strip appearance.
 - Verification: **88 unit tests passed / 6 existing tests skipped**, **42 browser cases passed** across Chromium, Firefox, and WebKit, repository formatting/lint/build passed. Final independent review found no material issues. Physical-device coverage remains unavailable.
+
+## Approved visual integration
+
+- Applied the existing site tokens for blue actions, typography, surfaces, borders, focus states, and popover/dialog shadows.
+- Replaced wide capture banners with a compact floating configuration panel and centered action bar. Start position uses the site's segmented-control treatment.
+- Reused the existing SVG icon component for camera, playback, stop, download, retry, discard, and icon-only dismissal. Icon-only controls retain accessible names and tooltips.
+- Matched preview spacing and action hierarchy to the app: secondary discard, retry, and a blue Download MP4 action.
+- Frame placement now measures configuration and action panels; mobile consolidates format information and removes redundant hints to leave more map space. Capture controls remain outside exported pixels.
+- Visually inspected desktop and 412 × 915 mobile-emulation framing and preview screenshots; exercised recording, preview, download approval, retry, and pause-to-preview in both layouts. Existing regression checks were run; no new tests were added for this styling change.
