@@ -425,7 +425,7 @@ export async function createMapVideoRecorder(
             if (
               frameCount &&
               options.getPlaybackSeconds &&
-              frameCount / 25 > options.getPlaybackSeconds()
+              frameCount / 25 >= options.getPlaybackSeconds()
             ) {
               await new Promise((resolve) => window.setTimeout(resolve, 20));
               continue;

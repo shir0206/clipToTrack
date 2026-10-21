@@ -79,7 +79,7 @@ type Props = {
   onSearchFocus?: (focused: boolean) => void;
   /** Actual playback state for capture; playingId remains the playback command. */
   capturePlayback?: CapturePlayback;
-  prepareSpeedometerPlayback?: (
+  prepareTelemetryPlayback?: (
     clipId: string,
     position: CaptureStartPosition,
     signal: AbortSignal,
@@ -344,7 +344,7 @@ export default function TrackMap({
   prepareCapturePlayback,
   getPlaybackTime,
   isPlaybackPlaying,
-  prepareSpeedometerPlayback,
+  prepareTelemetryPlayback,
   pauseCapturePlayback,
   onTogglePlay,
   onStopPlayback,
@@ -1214,7 +1214,7 @@ export default function TrackMap({
         getCurrentTime: getPlaybackTime,
         isPlaying: isPlaybackPlaying,
         playback: capturePlayback,
-        preparePlayback: prepareSpeedometerPlayback,
+        preparePlayback: prepareTelemetryPlayback,
         pausePlayback: pauseCapturePlayback,
       }}
     >

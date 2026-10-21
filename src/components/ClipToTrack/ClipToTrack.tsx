@@ -454,7 +454,7 @@ export default function ClipToTrack() {
     captureVideoFor(clipId)?.pause();
     if (maxClipId !== clipId) setPlayingClipId(null);
   };
-  const prepareSpeedometerPlayback = async (
+  const prepareTelemetryPlayback = async (
     clipId: string,
     position: CaptureStartPosition,
     signal: AbortSignal,
@@ -850,7 +850,7 @@ export default function ClipToTrack() {
             playingId={playingClipId}
             capturePlayback={capturePlayback}
             prepareCapturePlayback={prepareMapRecording}
-            prepareSpeedometerPlayback={prepareSpeedometerPlayback}
+            prepareTelemetryPlayback={prepareTelemetryPlayback}
             pauseCapturePlayback={pauseCapturePlayback}
             isPlaybackPlaying={(clipId) => {
               const video = captureVideoFor(clipId);

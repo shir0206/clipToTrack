@@ -1,9 +1,13 @@
 import type { GpsPoint } from '../../types';
 
 /** Export time is independent of wall-clock time and encoder throughput. */
-export function speedometerTimeline(samples: GpsPoint[], duration: number) {
-  if (!samples.some((p) => Number.isFinite(p.speed3dKmh ?? p.speed3dMs)))
-    throw new Error('Select a clip with usable speed telemetry.');
+export function telemetryTimeline(samples: GpsPoint[], duration: number) {
+  if (
+    !samples.some((p) =>
+      [p.altM, p.speed3dKmh, p.speed3dMs].some(Number.isFinite),
+    )
+  )
+    throw new Error('Select a clip with usable telemetry.');
   const first = Date.parse(samples[0]?.utc ?? '');
   const utc = samples.map((p) => (Date.parse(p.utc ?? '') - first) / 1000);
   const valid = utc.every(

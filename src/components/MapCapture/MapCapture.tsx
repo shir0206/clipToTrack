@@ -26,7 +26,9 @@ import Icon from '../Icon/Icon';
 import './MapCapture.css';
 
 type Props = {
-  target?: 'map' | 'speedometer';
+  target?: 'map' | 'telemetry';
+  targetLabel?: string;
+  filenameTarget?: string;
   headerHost?: HTMLElement;
   composition?: ReactNode;
   compositionZoom?: number;
@@ -47,13 +49,13 @@ const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 export default function MapCapture(props: Props) {
-  const target = props.target ?? 'map';
-  const speedometer = target === 'speedometer';
+  const target = props.targetLabel ?? props.target ?? 'map';
+  const telemetry = props.target === 'telemetry';
   const [position, setPosition] = useState<CaptureStartPosition>('beginning');
   const startupAbort = useRef<AbortController | null>(null);
   const [phase, setPhase] = useState<Phase>('framing');
   const [finalizingPercent, setFinalizingPercent] = useState(0);
-  const finalizingPreview = speedometer && phase === 'finalizing';
+  const finalizingPreview = telemetry && phase === 'finalizing';
   const [support, setSupport] = useState<MapCaptureSupport | null>(null);
   const [frame, setFrame] = useState<CaptureRect | null>(null);
   const [seconds, setSeconds] = useState(0);
@@ -128,7 +130,7 @@ export default function MapCapture(props: Props) {
 
   const layoutFrame = useCallback(() => {
     const box = root.current?.getBoundingClientRect();
-    if (current.current.props.target === 'speedometer' && box) {
+    if (current.current.props.target === 'telemetry' && box) {
       const zoom = current.current.props.compositionZoom ?? 1;
       const width = Math.max(1, (box.width - 16) / zoom);
       const height = Math.max(
@@ -226,7 +228,7 @@ export default function MapCapture(props: Props) {
   const recordingClip = useRef<string | null>(null);
   useEffect(() => {
     if (
-      (phase === 'recording' || (!speedometer && phase === 'starting')) &&
+      (phase === 'recording' || (!telemetry && phase === 'starting')) &&
       ((!props.playback.playing &&
         (phase === 'recording' || position === 'current')) ||
         props.playback.clipId !== recordingClip.current ||
@@ -237,7 +239,7 @@ export default function MapCapture(props: Props) {
       );
   }, [
     phase,
-    speedometer,
+    telemetry,
     props.playback.playing,
     props.playback.clipId,
     props.hasRoute,
@@ -255,7 +257,7 @@ export default function MapCapture(props: Props) {
       phase !== 'framing' ||
       !frame ||
       !support?.supported ||
-      (!speedometer && position === 'current' && !props.playback.playing) ||
+      (!telemetry && position === 'current' && !props.playback.playing) ||
       !props.hasRoute
     )
       return;
@@ -285,7 +287,7 @@ export default function MapCapture(props: Props) {
       const resume = await props.preparePlayback?.(position, controller.signal);
       controller.signal.throwIfAborted();
       const bounds = source.canvas.getBoundingClientRect();
-      const crop = speedometer
+      const crop = telemetry
         ? {
             x: 0,
             y: 0,
@@ -370,7 +372,7 @@ export default function MapCapture(props: Props) {
   };
   const canStart =
     support?.supported &&
-    (speedometer || position === 'beginning' || props.playback.playing) &&
+    (telemetry || position === 'beginning' || props.playback.playing) &&
     props.hasRoute &&
     frame;
   const renderHeader = (content: ReactNode) =>
@@ -378,7 +380,7 @@ export default function MapCapture(props: Props) {
   return (
     <div
       ref={root}
-      className={`map-capture${speedometer ? ' speedometer-capture' : ''}`}
+      className={`map-capture${telemetry ? ' telemetry-capture' : ''}`}
       aria-label={`${target} video capture`}
     >
       {phase !== 'preview' && !finalizingPreview && (
@@ -432,8 +434,8 @@ export default function MapCapture(props: Props) {
               <small>
                 <Icon name="clock" size={13} /> Up to 5 min · 256 MiB{' '}
                 <span className="map-capture-tip">
-                  {speedometer
-                    ? 'Fit or zoom the dashboard'
+                  {telemetry
+                    ? 'Fit or zoom to compose'
                     : 'Pan and zoom to compose'}
                 </span>
               </small>
@@ -450,7 +452,7 @@ export default function MapCapture(props: Props) {
                 height: frame.height,
               }}
             >
-              {speedometer &&
+              {telemetry &&
                 ['tl', 'tr', 'bl', 'br'].map((corner) => (
                   <i key={corner} className={`capture-corner ${corner}`} />
                 ))}
@@ -476,7 +478,7 @@ export default function MapCapture(props: Props) {
                 ) : !frame ? (
                   'Make more room for the map to frame a recording.'
                 ) : !props.hasRoute ||
-                  (!speedometer &&
+                  (!telemetry &&
                     position === 'current' &&
                     !props.playback.playing) ? (
                   'Select a video clip with a visible route, or play it to record from its current position.'
@@ -504,7 +506,7 @@ export default function MapCapture(props: Props) {
               {phase === 'recording' && (
                 <button className="map-capture-primary" onClick={() => stop()}>
                   <Icon name="stop" size={14} />
-                  {speedometer ? 'Pause recording' : 'Stop & preview'}
+                  {telemetry ? 'Pause recording' : 'Stop & preview'}
                 </button>
               )}
               {(phase === 'starting' || phase === 'finalizing') && (
@@ -589,7 +591,7 @@ export default function MapCapture(props: Props) {
                         .slice(0, 120) || 'clip';
                     download(
                       preview.recording.blob,
-                      `${title}-${target}-1920x1080-25fps.mp4`,
+                      `${title}-${props.filenameTarget ?? target}-1920x1080-25fps.mp4`,
                     );
                   }}
                 >

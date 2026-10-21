@@ -4,9 +4,20 @@ import {
   type RecordingTarget,
 } from '../../src/components/MapCapture/RecordingTargetContext';
 import { createRoot } from 'react-dom/client';
-import SpeedometerCapture from '../../src/components/SpeedometerCapture/SpeedometerCapture';
+import TelemetryCapture from '../../src/components/TelemetryCapture/TelemetryCapture';
 import '../../src/styles.css';
+import '../../src/components/ClipToTrack/ClipToTrack.css';
+import '../../src/components/TrackMap/TrackMap.css';
+import '../../src/components/ClipToTrack/ClipToTrack.ux.css';
+import { clipColorVars } from '../../src/lib/clipColorStyle';
+import type {
+  Metric,
+  ViewMode,
+} from '../../src/lib/mapCapture/telemetryConfig';
 import type { Clip } from '../../src/types';
+const params = new URLSearchParams(location.search);
+const metric = (params.get('metric') ?? 'speed') as Metric;
+const mode = (params.get('mode') ?? 'dial') as ViewMode;
 const duration = new URLSearchParams(location.search).has('long') ? 10 : 2;
 const clip: Clip = {
   id: 'test',
@@ -47,6 +58,11 @@ const clip: Clip = {
     },
   ],
 };
+if (params.has('altitudeOnly'))
+  clip.samples = clip.samples.map((sample) => ({
+    ...sample,
+    speed3dKmh: undefined,
+  }));
 function Fixture() {
   const [target, setTarget] = useState<RecordingTarget | null>(null);
   const [probe, setProbe] = useState(0);
@@ -99,8 +115,13 @@ function Fixture() {
       }}
     >
       <div
-        className="app-shell map-column"
-        style={{ height: 800, width: 1200 }}
+        className={`app-shell map-column${params.has('popup') ? ' point-popup' : ''}`}
+        data-layout={params.has('compact') ? 'mobile-portrait' : 'desktop'}
+        style={{
+          ...clipColorVars(clip.color),
+          height: 800,
+          width: params.has('compact') ? 412 : 1200,
+        }}
       >
         <div
           className="map-stage"
@@ -127,8 +148,18 @@ function Fixture() {
             Pause clip
           </button>
         </div>
-        <div style={{ height: 300, display: 'flex' }}>
-          <SpeedometerCapture clip={clip} probe={probe} />
+        <div
+          className={`profile-panel${params.has('compact') ? ' is-compact' : ''}`}
+          style={{ height: 300, display: 'flex' }}
+        >
+          <TelemetryCapture
+            key={`${metric}:${mode}`}
+            clip={clip}
+            probe={probe}
+            compact={params.has('compact')}
+            metric={metric}
+            mode={mode}
+          />
         </div>
       </div>
     </RecordingTargetContext.Provider>

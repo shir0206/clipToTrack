@@ -16,6 +16,7 @@ type Props = {
   clip: Clip;
   /** index into clip.samples, driven by the map path (hover / click / video playhead); null = nothing yet */
   probe: number | null;
+  sample?: GpsPoint;
   /** Optional measured weather. When absent, pressure and temperature are standard-atmosphere (ISA) values. */
   weather?: { pressureHpa?: number; tempC?: number };
   playback?: {
@@ -424,6 +425,7 @@ export default function AltitudeCluster({
   probe,
   weather,
   playback,
+  sample,
 }: Props) {
   const samples = clip.samples;
   const S = useMemo(() => buildSeries(samples), [samples]);
@@ -439,7 +441,11 @@ export default function AltitudeCluster({
     );
 
   const i = idx !== null ? Math.min(idx, S.alt.length - 1) : null;
-  const alt = i !== null ? S.alt[i] : undefined;
+  const alt = fin(sample?.altM)
+    ? sample!.altM
+    : i !== null
+      ? S.alt[i]
+      : undefined;
   const rate = i !== null ? S.rate[i] : 0;
   const d = S.decimals;
 
