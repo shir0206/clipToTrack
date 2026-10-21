@@ -148,6 +148,7 @@ beforeEach(() => {
     isSecureContext: true,
     setInterval,
     clearInterval,
+    setTimeout,
   });
   vi.stubGlobal('document', {
     createElement: () => ({ width: 0, height: 0, getContext: () => context }),
@@ -161,6 +162,71 @@ afterEach(() => {
 });
 
 describe('map video recorder', () => {
+  it('samples deterministic sources at media time even when rendering is slow', async () => {
+    const { options } = setup();
+    const times: number[] = [];
+    options.renderFrame = async (seconds) => {
+      times.push(seconds);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return seconds < 0.12;
+    };
+    const recorder = await createMapVideoRecorder(options);
+    await vi.advanceTimersByTimeAsync(600);
+    const result = await recorder.stop();
+    expect(times).toEqual([0, 0.04, 0.08, 0.12]);
+    expect(result.durationSeconds).toBe(0.12);
+    expect(result.frameCount).toBe(3);
+    expect(options.onStopped).toHaveBeenCalledOnce();
+  });
+
+  it('paces live rendering and finalizes exactly the interval before pause', async () => {
+    const { options } = setup();
+    const progress: number[] = [];
+    options.onFinalizationProgress = (percent) => progress.push(percent);
+    let playbackSeconds = 0;
+    const times: number[] = [];
+    options.getPlaybackSeconds = () => playbackSeconds;
+    options.renderFrame = async (seconds) => {
+      times.push(seconds);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return true;
+    };
+    const recorder = await createMapVideoRecorder(options);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(times).toEqual([0]); // never renders ahead of playback
+    playbackSeconds = 0.2;
+    await vi.advanceTimersByTimeAsync(20);
+    const stopped = recorder.stop();
+    await vi.advanceTimersByTimeAsync(1000);
+    const recording = await stopped;
+    expect(recording.durationSeconds).toBe(0.2);
+    expect(recording.frameCount).toBe(5);
+    expect(progress[0]).toBe(0);
+    expect(progress.at(-1)).toBe(100);
+    expect(progress.some((percent) => percent > 0 && percent < 95)).toBe(true);
+    expect(
+      progress.every((percent, i) => i === 0 || percent >= progress[i - 1]),
+    ).toBe(true);
+    expect(times).toContain(0.16); // renders pending telemetry during finalization
+    expect(times.every((time) => time < 0.2)).toBe(true);
+  });
+
+  it('discards an asynchronous deterministic frame after cancellation', async () => {
+    const { options } = setup();
+    let complete!: (value: boolean) => void;
+    options.renderFrame = () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      });
+    const recorder = await createMapVideoRecorder(options);
+    recorder.cancel();
+    complete(true);
+    await Promise.resolve();
+    expect(harness.frames).toHaveLength(1); // capability probe only
+    expect(options.onStopped).not.toHaveBeenCalled();
+    await expect(recorder.ready).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('encodes exactly 25 evenly spaced frames for one second and flushes before finalizing', async () => {
     const { options, unsubscribe } = setup();
     const recorder = await createMapVideoRecorder(options);

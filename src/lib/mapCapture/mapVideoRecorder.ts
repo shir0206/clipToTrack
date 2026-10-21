@@ -75,6 +75,10 @@ export const MAP_RECORDING_LIMITS = {
 
 export type MapVideoRecorderOptions = {
   canvas: HTMLCanvasElement;
+  /** Deterministic sources render the requested media time before each encode. False ends the clip. */
+  renderFrame?: (seconds: number) => Promise<boolean>;
+  /** Live sources expose elapsed playback time. Rendering must never run ahead of it. */
+  getPlaybackSeconds?: () => number;
   crop: import('./captureGeometry').CaptureRect;
   /** Invoke the listener synchronously in MapLibre's render event, before WebGL clears. */
   subscribeRender: (listener: () => void) => () => void;
@@ -85,6 +89,8 @@ export type MapVideoRecorderOptions = {
     status: 'recording' | 'finalizing' | 'stopped' | 'canceled',
   ) => void;
   onProgress?: (seconds: number) => void;
+  /** Work completed while rendering pending frames and packaging the MP4 (0–100). */
+  onFinalizationProgress?: (percent: number) => void;
   /** Automatic stops only; callers obtain manual stops from stop(). */
   onStopped?: (recording: MapRecording, reason: string) => void;
   onError?: (error: Error) => void;
@@ -158,7 +164,8 @@ export async function createMapVideoRecorder(
   let failure: Error | null = null;
   let stopPromise: Promise<MapRecording> | undefined;
   let reportedSecond = -1;
-  let preserveTimeline = true;
+  let preserveTimeline = !options.renderFrame;
+  let rendering: Promise<boolean> | null = null;
   const isCanceled = () => state === 'canceled';
   const abortError = () =>
     new DOMException('Map recording canceled.', 'AbortError');
@@ -204,20 +211,36 @@ export async function createMapVideoRecorder(
   const stop = (): Promise<MapRecording> => {
     if (stopPromise) return stopPromise;
     if (state === 'canceled') return Promise.reject(abortError());
+    const playbackSeconds = options.getPlaybackSeconds?.();
     const finalFrameCount =
-      preserveTimeline && startedAt !== null
+      playbackSeconds !== undefined
         ? Math.min(
             7500,
-            Math.max(
-              frameCount,
-              Math.ceil((performance.now() - startedAt) / 40),
-            ),
+            Math.max(frameCount, Math.ceil(playbackSeconds * 25 - 0.000001)),
           )
-        : frameCount;
+        : preserveTimeline && startedAt !== null
+          ? Math.min(
+              7500,
+              Math.max(
+                frameCount,
+                Math.ceil((performance.now() - startedAt) / 40),
+              ),
+            )
+          : frameCount;
     state = 'finalizing';
+    options.onFinalizationProgress?.(0);
+    const reportFinalization = () =>
+      options.onFinalizationProgress?.(
+        Math.min(
+          95,
+          Math.floor((frameCount / Math.max(1, finalFrameCount)) * 95),
+        ),
+      );
     stopCapture();
     stopPromise = (async () => {
       try {
+        if (rendering) await rendering;
+        if (isCanceled()) throw abortError();
         if (failure) throw failure;
         if (!frameCount && startedAt !== null) encodeFrame();
         if (!frameCount)
@@ -228,6 +251,7 @@ export async function createMapVideoRecorder(
         await pendingWrites;
         if (isCanceled()) throw abortError();
         if (failure) throw failure;
+        reportFinalization();
         // A short recording can stop during encoder warmup. Finish its timeline
         // using the last composition, in bounded batches rather than losing time.
         while (
@@ -238,16 +262,38 @@ export async function createMapVideoRecorder(
             finalFrameCount,
             frameCount + MAP_RECORDING_LIMITS.queuedFrames,
           );
-          while (frameCount < end) encodeFrame();
+          while (frameCount < end) {
+            if (options.renderFrame) {
+              const available = await options.renderFrame(frameCount / 25);
+              if (isCanceled()) throw abortError();
+              if (!available) break;
+              context!.drawImage(
+                canvas,
+                crop.x,
+                crop.y,
+                crop.width,
+                crop.height,
+                0,
+                0,
+                1920,
+                1080,
+              );
+            }
+            encodeFrame();
+            reportFinalization();
+          }
+          const reachedEnd = frameCount < end;
           await encoder!.flush();
           await pendingWrites;
           if (isCanceled()) throw abortError();
           if (failure) throw failure;
+          if (reachedEnd) break;
         }
         if (encodedFrames !== frameCount)
           throw new Error(
             'The video encoder dropped frames. Try another browser or device.',
           );
+        options.onFinalizationProgress?.(99);
         source!.close();
         await output!.finalize();
         if (isCanceled()) throw abortError();
@@ -263,6 +309,7 @@ export async function createMapVideoRecorder(
           fps: 25,
         };
         state = 'stopped';
+        options.onFinalizationProgress?.(100);
         release();
         options.onStatus?.('stopped');
         return recording;
@@ -370,6 +417,55 @@ export async function createMapVideoRecorder(
         fail(error);
       }
     };
+    if (options.renderFrame) {
+      options.onStatus?.('recording');
+      void (async () => {
+        try {
+          while (state === 'recording' && frameCount < 7500) {
+            if (
+              frameCount &&
+              options.getPlaybackSeconds &&
+              frameCount / 25 > options.getPlaybackSeconds()
+            ) {
+              await new Promise((resolve) => window.setTimeout(resolve, 20));
+              continue;
+            }
+            rendering = options.renderFrame!(frameCount / 25);
+            const available = await rendering;
+            rendering = null;
+            if (state !== 'recording') return;
+            if (!available) {
+              automaticStop('The clip ended.', false);
+              return;
+            }
+            context!.drawImage(
+              canvas,
+              crop.x,
+              crop.y,
+              crop.width,
+              crop.height,
+              0,
+              0,
+              1920,
+              1080,
+            );
+            encodeFrame();
+            if (frameCount === 1) resolveReady();
+            options.onProgress?.(
+              options.getPlaybackSeconds?.() ?? frameCount / 25,
+            );
+            // Backpressure slows rendering, never the exported telemetry timeline.
+            await encoder!.flush();
+            await pendingWrites;
+          }
+          if (state === 'recording')
+            automaticStop('Recording reached the five-minute limit.', false);
+        } catch (error) {
+          if (state === 'recording') fail(error);
+        }
+      })();
+      return { stop, cancel, ready };
+    }
     unsubscribe = options.subscribeRender(() => {
       if (state !== 'recording') return;
       if (canvas.width !== sourceWidth || canvas.height !== sourceHeight) {

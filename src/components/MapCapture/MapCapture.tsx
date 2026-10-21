@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import type { MapCaptureSource } from '../TrackMap/TrackMap';
 import type { CaptureStartPosition } from '../../lib/video/prepareCapturePlayback';
 import type { CapturePlayback } from '../../lib/video/usePlaybackReporting';
@@ -19,12 +26,17 @@ import Icon from '../Icon/Icon';
 import './MapCapture.css';
 
 type Props = {
-  getSource: () => MapCaptureSource | null;
+  target?: 'map' | 'speedometer';
+  headerHost?: HTMLElement;
+  composition?: ReactNode;
+  compositionZoom?: number;
+  getSource: (position: CaptureStartPosition) => MapCaptureSource | null;
   playback: CapturePlayback;
   preparePlayback?: (
     position: CaptureStartPosition,
     signal: AbortSignal,
   ) => Promise<() => Promise<void>>;
+  pausePlayback?: () => void;
   clipTitle: string;
   hasRoute: boolean;
   insetBottom: number;
@@ -35,9 +47,13 @@ const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
 export default function MapCapture(props: Props) {
+  const target = props.target ?? 'map';
+  const speedometer = target === 'speedometer';
   const [position, setPosition] = useState<CaptureStartPosition>('beginning');
   const startupAbort = useRef<AbortController | null>(null);
   const [phase, setPhase] = useState<Phase>('framing');
+  const [finalizingPercent, setFinalizingPercent] = useState(0);
+  const finalizingPreview = speedometer && phase === 'finalizing';
   const [support, setSupport] = useState<MapCaptureSupport | null>(null);
   const [frame, setFrame] = useState<CaptureRect | null>(null);
   const [seconds, setSeconds] = useState(0);
@@ -83,7 +99,7 @@ export default function MapCapture(props: Props) {
     setMessage(
       error instanceof Error
         ? error.message
-        : 'Could not record the map. Please try again.',
+        : `Could not record the ${current.current.props.target ?? 'map'}. Please try again.`,
     );
     setPhase('framing');
   }, []);
@@ -100,6 +116,7 @@ export default function MapCapture(props: Props) {
         return;
       }
       if (!active) return;
+      current.current.props.pausePlayback?.();
       setPhase('finalizing');
       void active
         .stop()
@@ -111,6 +128,21 @@ export default function MapCapture(props: Props) {
 
   const layoutFrame = useCallback(() => {
     const box = root.current?.getBoundingClientRect();
+    if (current.current.props.target === 'speedometer' && box) {
+      const zoom = current.current.props.compositionZoom ?? 1;
+      const width = Math.max(1, (box.width - 16) / zoom);
+      const height = Math.max(
+        1,
+        Math.min(box.height - 16, ((box.width - 16) * 9) / 16 / zoom),
+      );
+      setFrame({
+        x: (box.width - width) / 2,
+        y: (box.height - height) / 2,
+        width,
+        height,
+      });
+      return;
+    }
     const narrow = window.matchMedia('(max-width: 640px)').matches;
     const top = (header.current?.offsetHeight ?? 120) + (narrow ? 24 : 46);
     const bottom = (controls.current?.offsetHeight ?? 80) + (narrow ? 18 : 30);
@@ -189,12 +221,12 @@ export default function MapCapture(props: Props) {
       stop('The capture area changed size.');
     previousInset.current = props.insetBottom;
     if (phase === 'framing') layoutFrame();
-  }, [phase, props.insetBottom, stop, layoutFrame]);
+  }, [phase, props.insetBottom, props.compositionZoom, stop, layoutFrame]);
 
   const recordingClip = useRef<string | null>(null);
   useEffect(() => {
     if (
-      (phase === 'recording' || phase === 'starting') &&
+      (phase === 'recording' || (!speedometer && phase === 'starting')) &&
       ((!props.playback.playing &&
         (phase === 'recording' || position === 'current')) ||
         props.playback.clipId !== recordingClip.current ||
@@ -205,6 +237,7 @@ export default function MapCapture(props: Props) {
       );
   }, [
     phase,
+    speedometer,
     props.playback.playing,
     props.playback.clipId,
     props.hasRoute,
@@ -212,8 +245,9 @@ export default function MapCapture(props: Props) {
     stop,
   ]);
   useEffect(() => {
-    if (phase === 'preview') dialog.current?.showModal();
-  }, [phase]);
+    if ((phase === 'preview' || finalizingPreview) && !dialog.current?.open)
+      dialog.current?.showModal();
+  }, [phase, finalizingPreview]);
 
   const start = async () => {
     if (
@@ -221,14 +255,20 @@ export default function MapCapture(props: Props) {
       phase !== 'framing' ||
       !frame ||
       !support?.supported ||
-      (position === 'current' && !props.playback.playing) ||
+      (!speedometer && position === 'current' && !props.playback.playing) ||
       !props.hasRoute
     )
       return;
-    const source = props.getSource();
+    let source: MapCaptureSource | null;
+    try {
+      source = props.getSource(position);
+    } catch (error) {
+      reportError(error);
+      return;
+    }
     const box = root.current?.getBoundingClientRect();
     if (!source || !box) {
-      setMessage('Wait for the map to finish loading, then try again.');
+      setMessage(`Wait for the ${target} to finish loading, then try again.`);
       return;
     }
     starting.current = true;
@@ -239,26 +279,38 @@ export default function MapCapture(props: Props) {
     recordedTitle.current = props.clipTitle;
     setMessage('');
     setSeconds(0);
+    setFinalizingPercent(0);
     setPhase('starting');
     try {
       const resume = await props.preparePlayback?.(position, controller.signal);
       controller.signal.throwIfAborted();
       const bounds = source.canvas.getBoundingClientRect();
-      const crop = toCanvasCrop(
-        {
-          ...frame,
-          x: frame.x + box.left - bounds.left,
-          y: frame.y + box.top - bounds.top,
-        },
-        bounds.width,
-        bounds.height,
-        source.canvas.width,
-        source.canvas.height,
-      );
+      const crop = speedometer
+        ? {
+            x: 0,
+            y: 0,
+            width: source.canvas.width,
+            height: source.canvas.height,
+          }
+        : toCanvasCrop(
+            {
+              ...frame,
+              x: frame.x + box.left - bounds.left,
+              y: frame.y + box.top - bounds.top,
+            },
+            bounds.width,
+            bounds.height,
+            source.canvas.width,
+            source.canvas.height,
+          );
       let finishedBeforeReady = false;
       const active = await createMapVideoRecorder({
         ...source,
         crop,
+        onFinalizationProgress: (value) => {
+          if (mounted.current && token === generation.current)
+            setFinalizingPercent(value);
+        },
         onProgress: (value) => {
           if (mounted.current && token === generation.current)
             setSeconds(value);
@@ -318,67 +370,79 @@ export default function MapCapture(props: Props) {
   };
   const canStart =
     support?.supported &&
-    (position === 'beginning' || props.playback.playing) &&
+    (speedometer || position === 'beginning' || props.playback.playing) &&
     props.hasRoute &&
     frame;
+  const renderHeader = (content: ReactNode) =>
+    props.headerHost ? createPortal(content, props.headerHost) : content;
   return (
-    <div ref={root} className="map-capture" aria-label="Map video capture">
-      {phase !== 'preview' && (
+    <div
+      ref={root}
+      className={`map-capture${speedometer ? ' speedometer-capture' : ''}`}
+      aria-label={`${target} video capture`}
+    >
+      {phase !== 'preview' && !finalizingPreview && (
         <>
-          <div ref={header} className="map-capture-header">
-            <div className="map-capture-heading">
-              <span className="map-capture-symbol">
-                <Icon name="camera" size={18} />
-              </span>
-              <strong>
-                {phase === 'recording'
-                  ? 'Recording map'
-                  : phase === 'finalizing'
-                    ? 'Preparing preview…'
-                    : 'Frame your map'}
-              </strong>
-              <span className="map-capture-format-short">
-                1920 × 1080 · 25 fps
-              </span>
-            </div>
-            <span>1920 × 1080 · 25 fps · Landscape · No audio</span>
-            {phase === 'framing' && (
-              <div
-                role="radiogroup"
-                aria-label="Recording start"
-                className="map-capture-start-position"
-              >
-                <label>
-                  <input
-                    type="radio"
-                    name="map-capture-position"
-                    checked={position === 'beginning'}
-                    onChange={() => setPosition('beginning')}
-                  />
-                  <Icon name="back" size={14} />
-                  <span>From beginning</span>
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="map-capture-position"
-                    checked={position === 'current'}
-                    onChange={() => setPosition('current')}
-                  />
-                  <Icon name="play" size={14} />
-                  <span>From current position</span>
-                </label>
+          {renderHeader(
+            <div ref={header} className="map-capture-header">
+              <div className="map-capture-heading">
+                <span className="map-capture-symbol">
+                  <Icon name="camera" size={18} />
+                </span>
+                <strong>
+                  {phase === 'recording'
+                    ? `Recording ${target}`
+                    : phase === 'finalizing'
+                      ? 'Preparing preview…'
+                      : `Frame your ${target}`}
+                </strong>
+                <span className="map-capture-format-short">
+                  1920 × 1080 · 25 fps
+                </span>
               </div>
-            )}
-            <small>
-              <Icon name="clock" size={13} /> Up to 5 min · 256 MiB{' '}
-              <span className="map-capture-tip">Pan and zoom to compose</span>
-            </small>
-          </div>
+              <span>1920 × 1080 · 25 fps · Landscape · No audio</span>
+              {phase === 'framing' && (
+                <div
+                  role="radiogroup"
+                  aria-label="Recording start"
+                  className="map-capture-start-position"
+                >
+                  <label>
+                    <input
+                      type="radio"
+                      name="map-capture-position"
+                      checked={position === 'beginning'}
+                      onChange={() => setPosition('beginning')}
+                    />
+                    <Icon name="back" size={14} />
+                    <span>From beginning</span>
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="map-capture-position"
+                      checked={position === 'current'}
+                      onChange={() => setPosition('current')}
+                    />
+                    <Icon name="play" size={14} />
+                    <span>From current position</span>
+                  </label>
+                </div>
+              )}
+              <small>
+                <Icon name="clock" size={13} /> Up to 5 min · 256 MiB{' '}
+                <span className="map-capture-tip">
+                  {speedometer
+                    ? 'Fit or zoom the dashboard'
+                    : 'Pan and zoom to compose'}
+                </span>
+              </small>
+            </div>,
+          )}
           {frame && (
             <div
               className="map-capture-frame"
-              aria-label="Map capture area"
+              aria-label={`${target} capture area`}
               style={{
                 left: frame.x,
                 top: frame.y,
@@ -386,6 +450,10 @@ export default function MapCapture(props: Props) {
                 height: frame.height,
               }}
             >
+              {speedometer &&
+                ['tl', 'tr', 'bl', 'br'].map((corner) => (
+                  <i key={corner} className={`capture-corner ${corner}`} />
+                ))}
               <span className="map-capture-frame-label" aria-hidden="true">
                 <Icon name="fit" size={12} /> Capture area <b>16:9</b>
               </span>
@@ -408,7 +476,9 @@ export default function MapCapture(props: Props) {
                 ) : !frame ? (
                   'Make more room for the map to frame a recording.'
                 ) : !props.hasRoute ||
-                  (position === 'current' && !props.playback.playing) ? (
+                  (!speedometer &&
+                    position === 'current' &&
+                    !props.playback.playing) ? (
                   'Select a video clip with a visible route, or play it to record from its current position.'
                 ) : phase === 'recording' ? (
                   <>
@@ -416,9 +486,10 @@ export default function MapCapture(props: Props) {
                     {clock(seconds)}
                   </>
                 ) : (
-                  'Only the map inside the frame will be recorded.'
+                  `Only the ${target} inside the frame will be recorded.`
                 ))}
             </div>
+            {phase === 'framing' && props.composition}
             <div className="map-capture-actions">
               {phase === 'framing' && (
                 <button
@@ -433,7 +504,7 @@ export default function MapCapture(props: Props) {
               {phase === 'recording' && (
                 <button className="map-capture-primary" onClick={() => stop()}>
                   <Icon name="stop" size={14} />
-                  Stop &amp; preview
+                  {speedometer ? 'Pause recording' : 'Stop & preview'}
                 </button>
               )}
               {(phase === 'starting' || phase === 'finalizing') && (
@@ -466,11 +537,12 @@ export default function MapCapture(props: Props) {
           </div>
         </>
       )}
-      {preview && (
+      {(preview || finalizingPreview) && (
         <dialog
           ref={dialog}
           className="map-capture-preview"
           aria-labelledby="map-capture-preview-title"
+          aria-busy={finalizingPreview}
           onCancel={(event) => {
             event.preventDefault();
             props.onClose();
@@ -481,53 +553,86 @@ export default function MapCapture(props: Props) {
               <Icon name="camera" size={20} />
             </span>
             <div>
-              <span className="map-capture-eyebrow">MAP VIDEO</span>
-              <h2 id="map-capture-preview-title">Preview map recording</h2>
+              <span className="map-capture-eyebrow">
+                {target.toUpperCase()} VIDEO
+              </span>
+              <h2 id="map-capture-preview-title">Preview {target} recording</h2>
             </div>
           </div>
-          <p>
-            1920 × 1080 · 25 fps ·{' '}
-            {preview.recording.durationSeconds.toFixed(2)} seconds · No audio
-          </p>
-          {message && <p role="status">{message}</p>}
-          <video
-            src={preview.url}
-            controls
-            playsInline
-            preload="metadata"
-            aria-label="Map recording preview"
-          />
-          <div className="map-capture-actions">
-            <button
-              className="map-capture-primary"
-              onClick={() => {
-                const title =
-                  preview.title
-                    .replace(/[<>:"/\\|?*]/g, '-')
-                    .split('')
-                    .map((char) => (char.charCodeAt(0) < 32 ? '-' : char))
-                    .join('')
-                    .trim()
-                    .replace(/\.[^.]+$/, '')
-                    .slice(0, 120) || 'clip';
-                download(
-                  preview.recording.blob,
-                  `${title}-map-1920x1080-25fps.mp4`,
-                );
-              }}
-            >
-              <Icon name="download" size={16} />
-              Download MP4
-            </button>
-            <button onClick={retry}>
-              <Icon name="back" size={15} />
-              Record again
-            </button>
-            <button className="map-capture-discard" onClick={props.onClose}>
-              <Icon name="trash" size={15} />
-              Discard
-            </button>
-          </div>
+          {preview ? (
+            <>
+              <p>
+                1920 × 1080 · 25 fps ·{' '}
+                {preview.recording.durationSeconds.toFixed(2)} seconds · No
+                audio
+              </p>
+              {message && <p role="status">{message}</p>}
+              <video
+                src={preview.url}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label={`${target} recording preview`}
+              />
+              <div className="map-capture-actions">
+                <button
+                  className="map-capture-primary"
+                  onClick={() => {
+                    const title =
+                      preview.title
+                        .replace(/[<>:"/\\|?*]/g, '-')
+                        .split('')
+                        .map((char) => (char.charCodeAt(0) < 32 ? '-' : char))
+                        .join('')
+                        .trim()
+                        .replace(/\.[^.]+$/, '')
+                        .slice(0, 120) || 'clip';
+                    download(
+                      preview.recording.blob,
+                      `${title}-${target}-1920x1080-25fps.mp4`,
+                    );
+                  }}
+                >
+                  <Icon name="download" size={16} />
+                  Download MP4
+                </button>
+                <button onClick={retry}>
+                  <Icon name="back" size={15} />
+                  Record again
+                </button>
+                <button className="map-capture-discard" onClick={props.onClose}>
+                  <Icon name="trash" size={15} />
+                  Discard
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="map-capture-finalizing">
+                <span className="map-capture-spinner" aria-hidden="true" />
+                <strong role="status">Finalizing MP4</strong>
+                <span className="map-capture-percent">
+                  {finalizingPercent}%
+                </span>
+                <div
+                  className="map-capture-progress"
+                  role="progressbar"
+                  aria-label="Finalizing MP4"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={finalizingPercent}
+                >
+                  <span style={{ width: `${finalizingPercent}%` }} />
+                </div>
+              </div>
+              <div className="map-capture-actions">
+                <button className="map-capture-discard" onClick={props.onClose}>
+                  <Icon name="trash" size={15} />
+                  Discard
+                </button>
+              </div>
+            </>
+          )}
         </dialog>
       )}
     </div>

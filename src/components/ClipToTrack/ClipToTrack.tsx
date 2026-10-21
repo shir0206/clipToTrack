@@ -442,6 +442,43 @@ export default function ClipToTrack() {
       : !!playingClipId && inlinePlayingId === playingClipId,
   };
   if (!capturePlayback.clipId) capturePlayback.playing = false;
+  const captureVideoFor = (clipId: string) =>
+    maxClipId === clipId
+      ? videoWin && !videoWin.closed
+        ? videoWin.document.querySelector<HTMLVideoElement>('video')
+        : document.querySelector<HTMLVideoElement>('.modal-video')
+      : Array.from(
+          document.querySelectorAll<HTMLVideoElement>('video.video-frame'),
+        ).find((element) => element.dataset.clipId === clipId);
+  const pauseCapturePlayback = (clipId: string) => {
+    captureVideoFor(clipId)?.pause();
+    if (maxClipId !== clipId) setPlayingClipId(null);
+  };
+  const prepareSpeedometerPlayback = async (
+    clipId: string,
+    position: CaptureStartPosition,
+    signal: AbortSignal,
+  ) => {
+    signal.throwIfAborted();
+    const video = captureVideoFor(clipId);
+    if (!video) throw new Error('Select the clip so its video is ready.');
+    if (position === 'current' && video.ended)
+      throw new Error(
+        'The clip has ended. Choose From beginning to record it again.',
+      );
+    pauseCapturePlayback(clipId);
+    if (position === 'beginning')
+      await prepareCapturePlayback(video, 'beginning', signal);
+    return async () => {
+      signal.throwIfAborted();
+      if (maxClipId !== clipId) setPlayingClipId(clipId);
+      await video.play();
+      if (signal.aborted) {
+        pauseCapturePlayback(clipId);
+        signal.throwIfAborted();
+      }
+    };
+  };
   const prepareMapRecording = async (
     position: CaptureStartPosition,
     signal: AbortSignal,
@@ -449,13 +486,7 @@ export default function ClipToTrack() {
     const clipId = capturePlayback.clipId;
     if (!clipId) throw new Error('Select a clip with a video and route first.');
     const large = maxClipId === clipId;
-    const video = large
-      ? videoWin && !videoWin.closed
-        ? videoWin.document.querySelector<HTMLVideoElement>('video')
-        : document.querySelector<HTMLVideoElement>('.modal-video')
-      : Array.from(
-          document.querySelectorAll<HTMLVideoElement>('video.video-frame'),
-        ).find((element) => element.dataset.clipId === clipId);
+    const video = captureVideoFor(clipId);
     if (!video)
       throw new Error('Select the clip in the list so its video is ready.');
     if (position === 'beginning') {
@@ -819,6 +850,13 @@ export default function ClipToTrack() {
             playingId={playingClipId}
             capturePlayback={capturePlayback}
             prepareCapturePlayback={prepareMapRecording}
+            prepareSpeedometerPlayback={prepareSpeedometerPlayback}
+            pauseCapturePlayback={pauseCapturePlayback}
+            isPlaybackPlaying={(clipId) => {
+              const video = captureVideoFor(clipId);
+              return !!video && !video.paused && !video.ended;
+            }}
+            getPlaybackTime={(clipId) => captureVideoFor(clipId)?.currentTime}
             onTogglePlay={toggleInlinePlayback}
             onStopPlayback={() => setPlayingClipId(null)}
           />
