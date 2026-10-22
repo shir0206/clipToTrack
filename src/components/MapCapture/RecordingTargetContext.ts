@@ -2,7 +2,7 @@ import { createContext } from 'react';
 import type { CapturePlayback } from '../../lib/video/usePlaybackReporting';
 import type { CaptureStartPosition } from '../../lib/video/prepareCapturePlayback';
 
-export type RecordingTarget = 'map' | 'speedometer';
+export type RecordingTarget = 'map' | 'telemetry';
 export const RecordingTargetContext = createContext<{
   target: RecordingTarget | null;
   owner?: string;

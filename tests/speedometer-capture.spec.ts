@@ -19,7 +19,7 @@ test('exports a real dashboard-only MP4 with changing telemetry and black paddin
   );
   await expect(page.getByText('Map stays visible')).toBeVisible();
   await expect(
-    page.locator('.speedometer-capture-stage .map-capture-frame'),
+    page.locator('.telemetry-capture-stage .map-capture-frame'),
   ).toBeVisible();
   await page
     .getByRole('button', { name: 'Start recording', exact: true })
@@ -76,7 +76,7 @@ test('exports a real dashboard-only MP4 with changing telemetry and black paddin
   );
   await page.getByRole('button', { name: 'Discard', exact: true }).click();
   await expect(page.locator('.map-capture')).toHaveCount(0);
-  await expect(page.locator('.speedometer-export')).toHaveCount(0);
+  await expect(page.locator('.telemetry-export')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -106,7 +106,7 @@ test('current-position uses media time, zoom changes only composition, and cance
     .click();
   await page.getByRole('button', { name: 'Discard', exact: true }).click();
   await expect(page.locator('.map-capture')).toHaveCount(0);
-  await expect(page.locator('.speedometer-export')).toHaveCount(0);
+  await expect(page.locator('.telemetry-export')).toHaveCount(0);
 });
 
 for (const control of ['Pause clip', 'Pause recording']) {

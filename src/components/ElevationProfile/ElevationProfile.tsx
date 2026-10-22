@@ -1,6 +1,6 @@
 import {
   useEffect,
-  useMemo,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -11,8 +11,9 @@ import {
 import { createPortal } from 'react-dom';
 import type { Clip } from '../../types';
 import Icon, { type IconName } from '../Icon/Icon';
-import SpeedometerCapture from '../SpeedometerCapture/SpeedometerCapture';
-import AltitudeCluster from '../AltitudeCluster/AltitudeCluster';
+import TelemetryCapture from '../TelemetryCapture/TelemetryCapture';
+import type { Metric, ViewMode } from '../../lib/mapCapture/telemetryConfig';
+export { TelemetryReadout } from './TelemetryView';
 import { clipColorVars } from '../../lib/clipColorStyle';
 
 type Props = {
@@ -30,14 +31,8 @@ type Props = {
   initialModes?: Partial<Record<Metric, ViewMode>>;
 };
 
-type Metric = 'alt' | 'speed';
 type Tab = Metric | 'split';
 type Side = 'left' | 'right';
-type ViewMode = 'graph' | 'dial' | 'readout';
-
-const W = 1000;
-const H = 100;
-const PAD = 6;
 
 const HEIGHT_KEY = 'clip-to-track:profile-height';
 const DEFAULT_H = 260;
@@ -45,7 +40,6 @@ const MIN_H = 170;
 const MIN_STAGE = 200; // the map always keeps at least this much
 
 const LABEL: Record<Metric, string> = { alt: 'Altitude', speed: 'Speed' };
-const UNIT: Record<Metric, string> = { alt: 'm', speed: 'km/h' };
 const ICON: Record<Metric, IconName> = { alt: 'mountain', speed: 'gauge' };
 /** label of the instrument-cluster view of each metric */
 const DIAL_LABEL: Record<Metric, string> = {
@@ -53,272 +47,6 @@ const DIAL_LABEL: Record<Metric, string> = {
   speed: 'Speedometer',
 };
 const otherOf = (m: Metric): Metric => (m === 'alt' ? 'speed' : 'alt');
-const fin = (n: unknown): n is number =>
-  typeof n === 'number' && Number.isFinite(n);
-const kmh = (p: Clip['samples'][number] | undefined) =>
-  !p
-    ? undefined
-    : fin(p.speed3dKmh)
-      ? p.speed3dKmh
-      : fin(p.speed3dMs)
-        ? p.speed3dMs * 3.6
-        : undefined;
-const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-
-function TelemetryDigits({
-  value,
-  ariaLabel,
-}: {
-  value: string;
-  ariaLabel: string;
-}) {
-  if (value === '—')
-    return (
-      <span className="telemetry-readout-number" aria-label={ariaLabel}>
-        —
-      </span>
-    );
-
-  return (
-    <span className="telemetry-readout-number" aria-label={ariaLabel}>
-      {[...value].map((ch, i) => {
-        const digit = Number(ch);
-        return Number.isInteger(digit) ? (
-          <span className="telemetry-digit-column" aria-hidden="true" key={i}>
-            <span
-              className="telemetry-digit-strip"
-              style={{ '--digit': digit } as CSSProperties}
-            >
-              {DIGITS.map((k) => (
-                <span key={k}>{k}</span>
-              ))}
-            </span>
-          </span>
-        ) : (
-          <span aria-hidden="true" key={i}>
-            {ch}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
-export function TelemetryReadout({
-  clip,
-  probe,
-}: {
-  clip: Clip;
-  probe: number | null;
-}) {
-  const sample = clip.samples[probe ?? 0];
-  const altitude = fin(sample?.altM) ? Math.round(sample.altM) : null;
-  const speed = kmh(sample);
-  const roundedSpeed = speed === undefined ? null : Math.round(speed);
-  const altitudeText = altitude === null ? '—' : String(altitude);
-  const speedText = roundedSpeed === null ? '—' : String(roundedSpeed);
-  const progress =
-    clip.samples.length > 1 && probe !== null
-      ? Math.round((probe / (clip.samples.length - 1)) * 100)
-      : 0;
-  const aria =
-    altitude === null && roundedSpeed === null
-      ? 'No altitude or speed sample selected'
-      : `Altitude ${altitudeText} meters, speed ${speedText} kilometers per hour`;
-
-  return (
-    <div className="telemetry-readout" role="group" aria-label={aria}>
-      <div className="telemetry-readout-cell">
-        <small>Altitude</small>
-        <div className="telemetry-readout-value">
-          <TelemetryDigits value={altitudeText} ariaLabel={altitudeText} />
-          <span className="telemetry-readout-unit">m</span>
-        </div>
-      </div>
-      <div className="telemetry-readout-cell">
-        <small>Speed</small>
-        <div className="telemetry-readout-value">
-          <TelemetryDigits value={speedText} ariaLabel={speedText} />
-          <span className="telemetry-readout-unit">km/h</span>
-        </div>
-      </div>
-      <div className="gauge-bar" aria-hidden="true">
-        <i style={{ '--progress': `${progress}%` } as CSSProperties} />
-      </div>
-    </div>
-  );
-}
-
-/** One metric of the selected clip: a chart or its instrument cluster (altimeter / speedometer). */
-function Pane({
-  clip,
-  metric,
-  probe,
-  onProbe,
-  mode,
-  onPop,
-  compact = false,
-  playback,
-}: {
-  clip: Clip;
-  metric: Metric;
-  compact?: boolean;
-  probe: number | null;
-  onProbe: (i: number | null) => void;
-  mode: ViewMode;
-  /** open this metric in its own window (absent inside the popup itself) */
-  onPop?: () => void;
-  playback?: Props['playback'];
-}) {
-  const unit = UNIT[metric];
-  const dial = mode === 'dial';
-
-  const chart = useMemo(() => {
-    const vals = clip.samples.map((p) =>
-      metric === 'alt' ? p.altM : p.speed3dKmh,
-    );
-    const xs = clip.samples.map((p, i) => p.cumulativeDistM ?? i);
-    const ok = vals.filter(
-      (v): v is number => typeof v === 'number' && Number.isFinite(v),
-    );
-    if (ok.length < 2) return null;
-    const min = Math.min(...ok);
-    const max = Math.max(...ok);
-    const span = max - min || 1;
-    const total = xs[xs.length - 1] || 1;
-    const px = (i: number) => (xs[i] / total) * W;
-    const py = (v: number) => H - PAD - ((v - min) / span) * (H - 2 * PAD);
-    let line = '';
-    vals.forEach((v, i) => {
-      if (typeof v === 'number' && Number.isFinite(v))
-        line += `${line ? 'L' : 'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`;
-    });
-    return {
-      vals,
-      xs,
-      min,
-      max,
-      total,
-      line,
-      area: `${line}L${W},${H}L0,${H}Z`,
-      py,
-    };
-  }, [clip, metric]);
-
-  const onMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!chart) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const target =
-      Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1) * chart.total;
-    let best = 0;
-    for (let i = 1; i < chart.xs.length; i++)
-      if (Math.abs(chart.xs[i] - target) < Math.abs(chart.xs[best] - target))
-        best = i;
-    onProbe(best);
-  };
-
-  const popBtn = onPop && (
-    <button
-      className="icon-button pane-popover"
-      aria-label={`Open ${LABEL[metric]} in a new window`}
-      title="Open in a new window"
-      onClick={onPop}
-    >
-      <Icon name="external" size={13} />
-    </button>
-  );
-
-  const pv = chart && probe !== null ? chart.vals[probe] : undefined;
-  const showProbe = chart && probe !== null && typeof pv === 'number';
-
-  return (
-    <section
-      className={`profile-pane${dial ? ' is-dial' : ''}${mode === 'readout' ? ' is-readout' : ''}`}
-      aria-label={LABEL[metric]}
-    >
-      {(dial || mode === 'readout') && popBtn}
-      {!dial && mode !== 'readout' && (
-        <div className="pane-header">
-          <b>{LABEL[metric]}</b>
-          <span className="profile-readout">
-            {chart && showProbe
-              ? `${chart.xs[probe!].toFixed(0)} m · ${pv!.toFixed(1)} ${unit}`
-              : chart
-                ? `${chart.min.toFixed(0)}-${chart.max.toFixed(0)} ${unit}`
-                : ''}
-          </span>
-          {popBtn}
-        </div>
-      )}
-
-      {mode === 'readout' ? (
-        <TelemetryReadout clip={clip} probe={probe} />
-      ) : dial ? (
-        metric === 'alt' ? (
-          <AltitudeCluster
-            key={clip.id}
-            clip={clip}
-            probe={probe}
-            playback={compact ? playback : undefined}
-          />
-        ) : (
-          <SpeedometerCapture
-            key={clip.id}
-            clip={clip}
-            probe={probe}
-            playback={compact ? playback : undefined}
-          />
-        )
-      ) : chart ? (
-        <div
-          className="profile-plot"
-          onPointerDown={compact ? onMove : undefined}
-          onPointerMove={onMove}
-          // a lifted finger must not blank the playhead marker that the video is driving
-          onPointerLeave={compact ? undefined : () => onProbe(null)}
-          style={compact ? { touchAction: 'pan-y' } : undefined}
-        >
-          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            <path d={chart.area} fill="var(--c)" opacity="0.15" />
-            <path
-              d={chart.line}
-              fill="none"
-              stroke="var(--c)"
-              strokeWidth="2.5"
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
-          {showProbe && (
-            <>
-              <i
-                className="profile-crosshair"
-                style={
-                  {
-                    '--x': `${(chart.xs[probe!] / chart.total) * 100}%`,
-                  } as CSSProperties
-                }
-              />
-              <i
-                className="profile-dot"
-                style={
-                  {
-                    '--x': `${(chart.xs[probe!] / chart.total) * 100}%`,
-                    '--y': `${(chart.py(pv!) / H) * 100}%`,
-                  } as CSSProperties
-                }
-              />
-            </>
-          )}
-        </div>
-      ) : (
-        <p className="video-hint is-padded">
-          No {metric === 'alt' ? 'altitude' : 'speed'} data in this clip.
-        </p>
-      )}
-    </section>
-  );
-}
-
 const PLOT_ROOT = 'ctt-plot-root';
 
 /**
@@ -422,7 +150,8 @@ function PlotWindow({
         style={clipColorVars(clip.color) as CSSProperties}
       >
         <div className="profile-body">
-          <Pane
+          <TelemetryCapture
+            key={`${clip.id}:${metric}:${mode}`}
             clip={clip}
             metric={metric}
             probe={probe}
@@ -433,6 +162,113 @@ function PlotWindow({
       </div>
     </div>,
     root,
+  );
+}
+
+/** A split pane owns its recording portal so actions never cross between metrics. */
+function SplitPane({
+  clip,
+  metric,
+  mode,
+  probe,
+  onProbe,
+  compact,
+  playback,
+  onMode,
+  onPop,
+}: Omit<Props, 'onClose'> & {
+  metric: Metric;
+  mode: ViewMode;
+  onMode: (mode: ViewMode) => void;
+  onPop: () => void;
+}) {
+  const [controlsHost, setControlsHost] = useState<HTMLSpanElement | null>(
+    null,
+  );
+  const pane = useRef<HTMLElement>(null);
+  const toolbar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = toolbar.current;
+    const section = pane.current;
+    if (!element || !section) return;
+    const measure = () =>
+      section.style.setProperty(
+        '--profile-pane-nav-height',
+        `${element.getBoundingClientRect().height}px`,
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <section
+      ref={pane}
+      className="profile-split-pane"
+      aria-label={`${LABEL[metric]} pane`}
+    >
+      <div
+        ref={toolbar}
+        className="profile-pane-toolbar"
+        role="toolbar"
+        aria-label={`${LABEL[metric]} tools`}
+      >
+        <div className="toolbar-group profile-identity">
+          <Icon name={ICON[metric]} size={16} />
+          <strong title={LABEL[metric]}>{LABEL[metric]}</strong>
+        </div>
+        <div
+          className="toolbar-group profile-tabs profile-view"
+          role="group"
+          aria-label={`${LABEL[metric]} view`}
+        >
+          {(['graph', 'dial', 'readout'] as const).map((view) => (
+            <button
+              key={view}
+              className={`map-chip${mode === view ? ' is-on' : ''}`}
+              aria-pressed={mode === view}
+              onClick={() => onMode(view)}
+            >
+              <Icon
+                name={
+                  view === 'graph' ? 'chart' : view === 'dial' ? 'dial' : 'type'
+                }
+                size={13}
+              />
+              {view === 'graph'
+                ? 'Graph'
+                : view === 'dial'
+                  ? DIAL_LABEL[metric]
+                  : 'Values'}
+            </button>
+          ))}
+        </div>
+        <div className="toolbar-group profile-actions">
+          <span className="profile-record-actions" ref={setControlsHost} />
+          {!compact && (
+            <button
+              className="icon-button"
+              aria-label={`Open ${LABEL[metric]} in a new window`}
+              title={`Open ${LABEL[metric]} in a new window`}
+              onClick={onPop}
+            >
+              <Icon name="external" size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+      <TelemetryCapture
+        key={`${clip.id}:${metric}:${mode}`}
+        clip={clip}
+        metric={metric}
+        probe={probe}
+        onProbe={onProbe}
+        mode={mode}
+        controlsHost={controlsHost}
+        compact={compact}
+        playback={playback}
+      />
+    </section>
   );
 }
 
@@ -452,6 +288,9 @@ export default function ElevationProfile({
   playback,
   initialModes,
 }: Props) {
+  const [controlsHost, setControlsHost] = useState<HTMLSpanElement | null>(
+    null,
+  );
   const [tab, setTab] = useState<Tab>('alt');
   const [single, setSingle] = useState<Metric>('alt'); // where "cancel" returns to
   const [split, setSplit] = useState<[Metric, Metric] | null>(null); // [left, right]
@@ -497,6 +336,22 @@ export default function ElevationProfile({
 
   // dock height: drag the grip on its top edge (or use ↑ / ↓); remembered between visits
   const root = useRef<HTMLDivElement>(null);
+  const navigation = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const header = navigation.current;
+    const panel = root.current;
+    if (!header || !panel) return;
+    const measure = () =>
+      panel.style.setProperty(
+        '--profile-nav-height',
+        `${header.getBoundingClientRect().height}px`,
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   const [height, setHeight] = useState(
     () => Number(localStorage.getItem(HEIGHT_KEY)) || DEFAULT_H,
   );
@@ -582,7 +437,7 @@ export default function ElevationProfile({
   return (
     <div
       ref={root}
-      className={`profile-panel${compact ? ' is-compact' : ''}`}
+      className={`profile-panel${compact ? ' is-compact' : ''}${metrics.length > 1 ? ' is-split' : ''}`}
       style={
         {
           ...clipColorVars(clip.color),
@@ -605,11 +460,18 @@ export default function ElevationProfile({
           onDoubleClick={() => setHeight(clampH(DEFAULT_H))}
         />
       )}
-      <div className="profile-header">
-        <Icon name="chart" size={14} />
-        <strong>{clip.title}</strong>
+      <div
+        ref={navigation}
+        className="profile-header"
+        role="toolbar"
+        aria-label="Telemetry tools"
+      >
+        <div className="toolbar-group profile-identity">
+          <Icon name="chart" size={16} />
+          <strong title={clip.title}>{clip.title}</strong>
+        </div>
 
-        <div className="profile-tabs">
+        <div className="toolbar-group profile-tabs">
           {(['alt', 'speed'] as const).map((k) => (
             <button
               key={k}
@@ -641,50 +503,72 @@ export default function ElevationProfile({
                 {LABEL[split[0]]} | {LABEL[split[1]]}
               </button>
               <button
-                className="split-close"
+                className="icon-button split-close"
                 aria-label="Cancel side-by-side view"
                 title="Cancel side-by-side view"
                 onClick={cancelSplit}
               >
-                <Icon name="close" size={11} />
+                <Icon name="close" size={14} />
               </button>
             </span>
           ) : null}
         </div>
 
-        {metrics.map((m) => (
-          <div
-            key={m}
-            className="profile-tabs profile-view"
-            role="group"
-            aria-label={`${LABEL[m]} view`}
-          >
-            {metrics.length > 1 && <Icon name={ICON[m]} size={13} />}
-            {(['graph', 'dial', 'readout'] as const).map((v) => (
+        {metrics.length === 1 &&
+          metrics.map((m) => (
+            <div
+              key={m}
+              className="toolbar-group profile-tabs profile-view"
+              role="group"
+              aria-label={`${LABEL[m]} view`}
+            >
+              {metrics.length > 1 && <Icon name={ICON[m]} size={13} />}
+              {(['graph', 'dial', 'readout'] as const).map((v) => (
+                <button
+                  key={v}
+                  className={`map-chip${modes[m] === v ? ' is-on' : ''}`}
+                  aria-pressed={modes[m] === v}
+                  onClick={() => setModes((s) => ({ ...s, [m]: v }))}
+                >
+                  <Icon
+                    name={
+                      v === 'graph' ? 'chart' : v === 'dial' ? 'dial' : 'type'
+                    }
+                    size={13}
+                  />
+                  {v === 'graph'
+                    ? 'Graph'
+                    : v === 'dial'
+                      ? DIAL_LABEL[m]
+                      : 'Values'}
+                </button>
+              ))}
+            </div>
+          ))}
+
+        <div
+          className="toolbar-group profile-actions"
+          hidden={metrics.length > 1}
+        >
+          {metrics.length === 1 && (
+            <span className="profile-record-actions" ref={setControlsHost} />
+          )}
+          {!compact &&
+            metrics.length === 1 &&
+            metrics.map((m) => (
               <button
-                key={v}
-                className={`map-chip${modes[m] === v ? ' is-on' : ''}`}
-                aria-pressed={modes[m] === v}
-                onClick={() => setModes((s) => ({ ...s, [m]: v }))}
+                key={m}
+                className="icon-button"
+                aria-label={`Open ${LABEL[m]} in a new window`}
+                title={`Open ${LABEL[m]} in a new window`}
+                onClick={() => pop(m)}
               >
-                <Icon
-                  name={
-                    v === 'graph' ? 'chart' : v === 'dial' ? 'dial' : 'type'
-                  }
-                  size={13}
-                />
-                {v === 'graph'
-                  ? 'Graph'
-                  : v === 'dial'
-                    ? DIAL_LABEL[m]
-                    : 'Values'}
+                <Icon name="external" size={16} />
               </button>
             ))}
-          </div>
-        ))}
-
+        </div>
         <button
-          className="icon-button"
+          className="icon-button profile-exit"
           aria-label="Close profile"
           onClick={onClose}
         >
@@ -693,19 +577,36 @@ export default function ElevationProfile({
       </div>
 
       <div className="profile-body">
-        {metrics.map((m) => (
-          <Pane
-            key={m}
-            clip={clip}
-            metric={m}
-            probe={probe}
-            onProbe={onProbe}
-            mode={modes[m]}
-            onPop={compact ? undefined : () => pop(m)}
-            compact={compact}
-            playback={playback}
-          />
-        ))}
+        {metrics.map((m) =>
+          metrics.length > 1 ? (
+            <SplitPane
+              key={m}
+              clip={clip}
+              metric={m}
+              mode={modes[m]}
+              probe={probe}
+              onProbe={onProbe}
+              compact={compact}
+              playback={playback}
+              onMode={(mode) =>
+                setModes((current) => ({ ...current, [m]: mode }))
+              }
+              onPop={() => pop(m)}
+            />
+          ) : (
+            <TelemetryCapture
+              key={`${clip.id}:${m}:${modes[m]}`}
+              clip={clip}
+              metric={m}
+              probe={probe}
+              onProbe={onProbe}
+              mode={modes[m]}
+              controlsHost={controlsHost}
+              compact={compact}
+              playback={playback}
+            />
+          ),
+        )}
 
         {!compact && drag && (
           <div className="profile-dropzone" aria-hidden="true">

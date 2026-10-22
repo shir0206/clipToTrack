@@ -1,0 +1,324 @@
+.telemetry-capture-stage {
+  container-type: inline-size;
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.telemetry-record-button {
+  position: absolute;
+  top: 8px;
+  right: 36px;
+  z-index: 4;
+}
+.telemetry-capture .map-capture-frame {
+  border: 2px dashed var(--primary);
+  box-shadow: none;
+}
+.telemetry-capture .map-capture-frame-label {
+  top: 4px;
+  left: 4px;
+  border-radius: 6px;
+}
+.capture-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: var(--surface);
+  transform: translate(-50%, -50%);
+}
+.capture-corner.tl {
+  left: 0;
+  top: 0;
+}
+.capture-corner.tr {
+  left: 100%;
+  top: 0;
+}
+.capture-corner.bl {
+  left: 0;
+  top: 100%;
+}
+.capture-corner.br {
+  left: 100%;
+  top: 100%;
+}
+.telemetry-capture .map-capture-controls {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.telemetry-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.telemetry-zoom input {
+  width: 90px;
+}
+.telemetry-export *,
+.telemetry-export *::before,
+.telemetry-export *::after {
+  transition: none !important;
+  animation: none !important;
+}
+.map-stage > .map-capture-header {
+  z-index: 13;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.telemetry-capture-stage + .telemetry-capture-stage {
+  border-left: 1px solid var(--border);
+}
+
+/* A compact, shared recording dock for every lower-panel visualization. */
+.telemetry-capture .map-capture-frame {
+  border: 1px dashed color-mix(in srgb, var(--primary) 75%, transparent);
+  border-radius: 8px;
+}
+.telemetry-capture .capture-corner {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
+  box-shadow: 0 0 0 2px var(--focus-halo);
+}
+.telemetry-capture .map-capture-frame-label {
+  top: 8px;
+  left: 8px;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-card);
+}
+.telemetry-capture .map-capture-frame-label b {
+  margin-left: 0;
+  font-size: 10px;
+}
+.telemetry-capture .telemetry-record-bar {
+  width: max-content;
+  max-width: calc(100% - 32px);
+  min-height: 58px;
+  padding: 8px 9px 8px 14px;
+  gap: 14px;
+  flex-wrap: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(16px);
+}
+.telemetry-record-bar .map-capture-message {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 230px;
+  font-size: 11px;
+}
+.telemetry-record-bar .telemetry-ready-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.telemetry-ready-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.telemetry-ready-status strong {
+  display: block;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.telemetry-ready-status small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  text-transform: capitalize;
+}
+.telemetry-record-bar .telemetry-zoom {
+  gap: 7px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+.telemetry-zoom-label {
+  font-size: 10px;
+}
+.telemetry-record-bar .telemetry-zoom input {
+  width: 72px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.telemetry-zoom output {
+  min-width: 32px;
+  color: var(--text);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.telemetry-fit {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.telemetry-fit:hover {
+  background: var(--control);
+  color: var(--primary);
+  border-color: var(--border);
+}
+.telemetry-record-bar .map-capture-actions {
+  gap: 5px;
+}
+.telemetry-record-bar .map-capture-actions button {
+  min-height: 36px;
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+.telemetry-record-bar[data-phase='recording'] .map-capture-message {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.telemetry-record-bar .map-recording-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0;
+}
+.telemetry-record-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.telemetry-record-time {
+  min-width: 32px;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+@container (max-width: 620px) {
+  .telemetry-record-bar .telemetry-zoom-label {
+    display: none;
+  }
+  .telemetry-record-bar .telemetry-zoom input {
+    width: 56px;
+  }
+  .telemetry-record-bar .telemetry-ready-status small {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .telemetry-capture .telemetry-record-bar {
+    width: calc(100% - 24px);
+    max-width: none;
+    gap: 8px;
+    padding: 6px 7px 6px 10px;
+    border-radius: 12px;
+    flex-wrap: wrap;
+  }
+  .telemetry-record-bar .map-capture-message.is-ready-hint {
+    display: block;
+  }
+  .telemetry-record-bar .telemetry-ready-status small,
+  .telemetry-record-bar .telemetry-zoom-label {
+    display: none;
+  }
+  .telemetry-record-bar .map-capture-message {
+    flex: 1;
+    max-width: none;
+  }
+  .telemetry-record-bar .telemetry-zoom {
+    border: 0;
+    padding: 0;
+    gap: 5px;
+  }
+  .telemetry-record-bar .telemetry-zoom input {
+    width: 52px;
+  }
+  .telemetry-record-bar .map-capture-actions {
+    width: auto;
+  }
+  .telemetry-record-bar .map-capture-actions button {
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+  .telemetry-capture .map-capture-frame-label {
+    display: inline-flex;
+  }
+  .telemetry-record-bar .telemetry-ready-status strong {
+    font-size: 10px;
+  }
+}
+@media (max-width: 380px) {
+  .telemetry-record-bar .telemetry-zoom {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+}
+
+.telemetry-ready-short {
+  display: none;
+}
+@media (max-width: 640px) {
+  .telemetry-ready-full {
+    display: none;
+  }
+  .telemetry-ready-short {
+    display: inline;
+  }
+}
+@container (max-width: 360px) {
+  .telemetry-capture .telemetry-record-bar {
+    width: calc(100% - 24px);
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .telemetry-record-bar .telemetry-zoom {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding: 4px 0 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+  .telemetry-record-bar .map-capture-message {
+    flex: 1;
+  }
+  .telemetry-record-bar .telemetry-ready-full,
+  .telemetry-record-status {
+    display: none;
+  }
+  .telemetry-record-bar .telemetry-ready-short {
+    display: inline;
+  }
+  .telemetry-record-bar .map-capture-actions button {
+    font-size: 10px;
+    padding: 7px 9px;
+  }
+}

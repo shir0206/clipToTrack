@@ -1,50 +1,70 @@
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { Clip } from '../../types';
-import SpeedCluster from '../SpeedCluster/SpeedCluster';
+import { createPortal } from 'react-dom';
+import type { Clip, GpsPoint } from '../../types';
+import TelemetryView from '../ElevationProfile/TelemetryView';
+import {
+  hasTelemetry,
+  telemetryConfig,
+  type Metric,
+  type ViewMode,
+} from '../../lib/mapCapture/telemetryConfig';
 import Icon from '../Icon/Icon';
 import MapCapture from '../MapCapture/MapCapture';
 import { RecordingTargetContext } from '../MapCapture/RecordingTargetContext';
-import { speedometerTimeline } from '../../lib/mapCapture/speedometerTimeline';
-import { createSpeedometerSource } from './speedometerSource';
+import { telemetryTimeline } from '../../lib/mapCapture/telemetryTimeline';
+import './TelemetryCapture.css';
+import { createTelemetrySource } from './telemetrySource';
 
-export default function SpeedometerCapture({
+export default function TelemetryCapture({
   clip,
   probe,
   playback,
+  metric = 'speed',
+  mode = 'dial',
+  onProbe,
+  onPop,
+  controlsHost,
+  compact = false,
 }: {
   clip: Clip;
   probe: number | null;
+  metric?: Metric;
+  mode?: ViewMode;
+  onProbe?: (probe: number | null) => void;
+  onPop?: () => void;
+  controlsHost?: HTMLElement | null;
+  compact?: boolean;
   playback?: { playing: boolean; onTogglePlay: () => void; onStop: () => void };
 }) {
+  const config = telemetryConfig(metric, mode);
+  const usable = hasTelemetry(clip.samples, metric, mode);
   const owner = useId();
   const shared = useContext(RecordingTargetContext);
   const [localOpen, setLocalOpen] = useState(false);
   const open =
     localOpen &&
     (!shared ||
-      (shared.target === 'speedometer' &&
+      (shared.target === 'telemetry' &&
         (!shared.owner || shared.owner === owner)));
   const setOpen = (value: boolean) => {
     setLocalOpen(value);
-    shared?.setTarget(value ? 'speedometer' : null, value ? owner : undefined);
+    shared?.setTarget(value ? 'telemetry' : null, value ? owner : undefined);
   };
   const [headerHost, setHeaderHost] = useState<HTMLElement>();
   const [zoom, setZoom] = useState(1);
   const stage = useRef<HTMLDivElement>(null);
-  const session = useRef<ReturnType<typeof createSpeedometerSource> | null>(
-    null,
-  );
+  const session = useRef<ReturnType<typeof createTelemetrySource> | null>(null);
   const heldProbe = useRef(0);
   const timeline = useMemo(
     () =>
-      clip.samples.some((p) => Number.isFinite(p.speed3dKmh ?? p.speed3dMs))
-        ? speedometerTimeline(clip.samples, clip.sort.duration ?? 0)
+      usable
+        ? telemetryTimeline(clip.samples, clip.sort.duration ?? 0)
         : {
             duration: 0.04,
             timeAt: () => 0,
             at: () => ({ sample: clip.samples[0], probe: 0 }),
           },
-    [clip],
+    [clip, usable],
   );
   const [virtualPlaying, setVirtualPlaying] = useState(false);
   const [virtualTime, setVirtualTime] = useState<number | null>(null);
@@ -97,53 +117,100 @@ export default function SpeedometerCapture({
     },
     [clip.id, open],
   );
-  const usable = clip.samples.some((p) =>
-    Number.isFinite(p.speed3dKmh ?? p.speed3dMs),
+  const renderView = (
+    viewProbe: number | null,
+    sample?: GpsPoint,
+    exporting = false,
+  ) => (
+    <TelemetryView
+      clip={clip}
+      metric={metric}
+      mode={mode}
+      probe={viewProbe}
+      sample={sample}
+      compact={compact}
+      onProbe={exporting ? () => {} : (onProbe ?? (() => {}))}
+      onPop={exporting ? undefined : onPop}
+      playback={exporting ? undefined : playback}
+    />
   );
   return (
     <div
       ref={stage}
-      className={`speedometer-capture-stage${open ? ' is-framing' : ''}`}
+      className={`telemetry-capture-stage${open ? ' is-framing' : ''}`}
     >
-      <SpeedCluster
-        clip={clip}
-        probe={
-          virtualTime === null || !open ? probe : timeline.at(virtualTime).probe
-        }
-        sample={
-          virtualTime === null || !open
-            ? undefined
-            : timeline.at(virtualTime).sample
-        }
-        playback={playback}
-      />
-      {!open && usable && (
-        <button
-          className="map-chip speedometer-record-button"
-          title="Record Speedometer"
-          onClick={() => {
-            setHeaderHost(
-              stage.current
-                ?.closest('.map-column')
-                ?.querySelector<HTMLElement>('.map-stage') ?? undefined,
-            );
-            setZoom(1);
-            setVirtualTime(null);
-            setOpen(true);
-          }}
-        >
-          <Icon name="camera" size={14} /> Record Speedometer
-        </button>
+      {renderView(
+        virtualTime === null || !open ? probe : timeline.at(virtualTime).probe,
+        virtualTime === null || !open
+          ? undefined
+          : timeline.at(virtualTime).sample,
       )}
+      {usable &&
+        (!open || controlsHost !== undefined) &&
+        (controlsHost === undefined ? (
+          <button
+            className={
+              controlsHost !== undefined
+                ? `map-chip${open ? ' is-on' : ''}`
+                : 'map-chip telemetry-record-button'
+            }
+            title={`Record ${config.title}`}
+            aria-label={`Record ${config.title}`}
+            aria-pressed={open}
+            onClick={() => {
+              if (open) return;
+              setHeaderHost(
+                stage.current
+                  ?.closest('.map-column')
+                  ?.querySelector<HTMLElement>('.map-stage') ?? undefined,
+              );
+              setZoom(1);
+              setVirtualTime(null);
+              setOpen(true);
+            }}
+          >
+            <Icon name="camera" size={14} />
+          </button>
+        ) : (
+          controlsHost &&
+          createPortal(
+            <button
+              className={
+                controlsHost !== undefined
+                  ? `map-chip${open ? ' is-on' : ''}`
+                  : 'map-chip telemetry-record-button'
+              }
+              title={`Record ${config.title}`}
+              aria-label={`Record ${config.title}`}
+              aria-pressed={open}
+              onClick={() => {
+                if (open) return;
+                setHeaderHost(
+                  stage.current
+                    ?.closest('.map-column')
+                    ?.querySelector<HTMLElement>('.map-stage') ?? undefined,
+                );
+                setZoom(1);
+                setVirtualTime(null);
+                setOpen(true);
+              }}
+            >
+              <Icon name="camera" size={14} />
+            </button>,
+            controlsHost,
+          )
+        ))}
       {open && (
         <MapCapture
-          target="speedometer"
+          target="telemetry"
+          targetLabel={config.label}
+          filenameTarget={config.slug}
           getSource={(position) => {
             const element =
-              stage.current?.querySelector<HTMLElement>('.gauge-cluster');
+              stage.current?.querySelector<HTMLElement>('.profile-pane');
             if (!element) return null;
             session.current?.dispose();
-            session.current = createSpeedometerSource(
+            session.current = createTelemetrySource(
               clip,
               element,
               position === 'current' ? heldProbe.current : 0,
@@ -154,6 +221,13 @@ export default function SpeedometerCapture({
                   : timeline.timeAt(heldProbe.current)
                 : 0,
               getTime,
+              (viewProbe, sample) => renderView(viewProbe, sample, true),
+              mode === 'graph'
+                ? getComputedStyle(element)
+                    .getPropertyValue('--surface')
+                    .trim() || '#fff'
+                : '#000',
+              compact,
             );
             return session.current.source;
           }}
@@ -194,19 +268,35 @@ export default function SpeedometerCapture({
           hasRoute={usable}
           insetBottom={0}
           composition={
-            <label className="speedometer-zoom">
-              Composition{' '}
+            <div
+              className="telemetry-zoom"
+              role="group"
+              aria-label="Composition"
+            >
+              <span className="telemetry-zoom-label">Zoom</span>
               <input
-                aria-label="Speedometer export zoom"
+                aria-label={`${config.title} export zoom`}
                 type="range"
                 min="1"
                 max="3"
                 step="0.05"
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
-              />{' '}
-              <button onClick={() => setZoom(1)}>Fit dashboard</button>
-            </label>
+              />
+              <output aria-hidden="true">{Math.round(zoom * 100)}%</output>
+              <button
+                className="telemetry-fit"
+                onClick={() => setZoom(1)}
+                aria-label={
+                  mode === 'dial'
+                    ? 'Fit dashboard'
+                    : `Fit ${mode === 'graph' ? 'graph' : 'values'}`
+                }
+                title="Reset composition"
+              >
+                <Icon name="fit" size={14} />
+              </button>
+            </div>
           }
           onClose={() => {
             if (session.current) pause();

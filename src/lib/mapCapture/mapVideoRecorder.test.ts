@@ -211,6 +211,17 @@ describe('map video recorder', () => {
     expect(times.every((time) => time < 0.2)).toBe(true);
   });
 
+  it('does not encode a live frame at the exact playback end boundary', async () => {
+    const { options } = setup();
+    options.getPlaybackSeconds = () => 1;
+    options.renderFrame = async () => true;
+    const recorder = await createMapVideoRecorder(options);
+    await vi.advanceTimersByTimeAsync(100);
+    const result = await recorder.stop();
+    expect(result.frameCount).toBe(25);
+    expect(result.durationSeconds).toBe(1);
+  });
+
   it('discards an asynchronous deterministic frame after cancellation', async () => {
     const { options } = setup();
     let complete!: (value: boolean) => void;
