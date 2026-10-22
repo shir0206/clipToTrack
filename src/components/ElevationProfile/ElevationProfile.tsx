@@ -165,6 +165,113 @@ function PlotWindow({
   );
 }
 
+/** A split pane owns its recording portal so actions never cross between metrics. */
+function SplitPane({
+  clip,
+  metric,
+  mode,
+  probe,
+  onProbe,
+  compact,
+  playback,
+  onMode,
+  onPop,
+}: Omit<Props, 'onClose'> & {
+  metric: Metric;
+  mode: ViewMode;
+  onMode: (mode: ViewMode) => void;
+  onPop: () => void;
+}) {
+  const [controlsHost, setControlsHost] = useState<HTMLSpanElement | null>(
+    null,
+  );
+  const pane = useRef<HTMLElement>(null);
+  const toolbar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = toolbar.current;
+    const section = pane.current;
+    if (!element || !section) return;
+    const measure = () =>
+      section.style.setProperty(
+        '--profile-pane-nav-height',
+        `${element.getBoundingClientRect().height}px`,
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <section
+      ref={pane}
+      className="profile-split-pane"
+      aria-label={`${LABEL[metric]} pane`}
+    >
+      <div
+        ref={toolbar}
+        className="profile-pane-toolbar"
+        role="toolbar"
+        aria-label={`${LABEL[metric]} tools`}
+      >
+        <div className="toolbar-group profile-identity">
+          <Icon name={ICON[metric]} size={16} />
+          <strong title={LABEL[metric]}>{LABEL[metric]}</strong>
+        </div>
+        <div
+          className="toolbar-group profile-tabs profile-view"
+          role="group"
+          aria-label={`${LABEL[metric]} view`}
+        >
+          {(['graph', 'dial', 'readout'] as const).map((view) => (
+            <button
+              key={view}
+              className={`map-chip${mode === view ? ' is-on' : ''}`}
+              aria-pressed={mode === view}
+              onClick={() => onMode(view)}
+            >
+              <Icon
+                name={
+                  view === 'graph' ? 'chart' : view === 'dial' ? 'dial' : 'type'
+                }
+                size={13}
+              />
+              {view === 'graph'
+                ? 'Graph'
+                : view === 'dial'
+                  ? DIAL_LABEL[metric]
+                  : 'Values'}
+            </button>
+          ))}
+        </div>
+        <div className="toolbar-group profile-actions">
+          <span className="profile-record-actions" ref={setControlsHost} />
+          {!compact && (
+            <button
+              className="icon-button"
+              aria-label={`Open ${LABEL[metric]} in a new window`}
+              title={`Open ${LABEL[metric]} in a new window`}
+              onClick={onPop}
+            >
+              <Icon name="external" size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+      <TelemetryCapture
+        key={`${clip.id}:${metric}:${mode}`}
+        clip={clip}
+        metric={metric}
+        probe={probe}
+        onProbe={onProbe}
+        mode={mode}
+        controlsHost={controlsHost}
+        compact={compact}
+        playback={playback}
+      />
+    </section>
+  );
+}
+
 /**
  * Altitude / speed dock of the selected clip. Hovering a chart moves a marker on the map.
  * - Drag a tab onto the other tab (or onto the left / right half of the dock) to open them side by side in a new tab.
@@ -330,7 +437,7 @@ export default function ElevationProfile({
   return (
     <div
       ref={root}
-      className={`profile-panel${compact ? ' is-compact' : ''}`}
+      className={`profile-panel${compact ? ' is-compact' : ''}${metrics.length > 1 ? ' is-split' : ''}`}
       style={
         {
           ...clipColorVars(clip.color),
@@ -407,40 +514,47 @@ export default function ElevationProfile({
           ) : null}
         </div>
 
-        {metrics.map((m) => (
-          <div
-            key={m}
-            className="toolbar-group profile-tabs profile-view"
-            role="group"
-            aria-label={`${LABEL[m]} view`}
-          >
-            {metrics.length > 1 && <Icon name={ICON[m]} size={13} />}
-            {(['graph', 'dial', 'readout'] as const).map((v) => (
-              <button
-                key={v}
-                className={`map-chip${modes[m] === v ? ' is-on' : ''}`}
-                aria-pressed={modes[m] === v}
-                onClick={() => setModes((s) => ({ ...s, [m]: v }))}
-              >
-                <Icon
-                  name={
-                    v === 'graph' ? 'chart' : v === 'dial' ? 'dial' : 'type'
-                  }
-                  size={13}
-                />
-                {v === 'graph'
-                  ? 'Graph'
-                  : v === 'dial'
-                    ? DIAL_LABEL[m]
-                    : 'Values'}
-              </button>
-            ))}
-          </div>
-        ))}
+        {metrics.length === 1 &&
+          metrics.map((m) => (
+            <div
+              key={m}
+              className="toolbar-group profile-tabs profile-view"
+              role="group"
+              aria-label={`${LABEL[m]} view`}
+            >
+              {metrics.length > 1 && <Icon name={ICON[m]} size={13} />}
+              {(['graph', 'dial', 'readout'] as const).map((v) => (
+                <button
+                  key={v}
+                  className={`map-chip${modes[m] === v ? ' is-on' : ''}`}
+                  aria-pressed={modes[m] === v}
+                  onClick={() => setModes((s) => ({ ...s, [m]: v }))}
+                >
+                  <Icon
+                    name={
+                      v === 'graph' ? 'chart' : v === 'dial' ? 'dial' : 'type'
+                    }
+                    size={13}
+                  />
+                  {v === 'graph'
+                    ? 'Graph'
+                    : v === 'dial'
+                      ? DIAL_LABEL[m]
+                      : 'Values'}
+                </button>
+              ))}
+            </div>
+          ))}
 
-        <div className="toolbar-group profile-actions">
-          <span className="profile-record-actions" ref={setControlsHost} />
+        <div
+          className="toolbar-group profile-actions"
+          hidden={metrics.length > 1}
+        >
+          {metrics.length === 1 && (
+            <span className="profile-record-actions" ref={setControlsHost} />
+          )}
           {!compact &&
+            metrics.length === 1 &&
             metrics.map((m) => (
               <button
                 key={m}
@@ -463,19 +577,36 @@ export default function ElevationProfile({
       </div>
 
       <div className="profile-body">
-        {metrics.map((m) => (
-          <TelemetryCapture
-            key={`${clip.id}:${m}:${modes[m]}`}
-            clip={clip}
-            metric={m}
-            probe={probe}
-            onProbe={onProbe}
-            mode={modes[m]}
-            controlsHost={controlsHost}
-            compact={compact}
-            playback={playback}
-          />
-        ))}
+        {metrics.map((m) =>
+          metrics.length > 1 ? (
+            <SplitPane
+              key={m}
+              clip={clip}
+              metric={m}
+              mode={modes[m]}
+              probe={probe}
+              onProbe={onProbe}
+              compact={compact}
+              playback={playback}
+              onMode={(mode) =>
+                setModes((current) => ({ ...current, [m]: mode }))
+              }
+              onPop={() => pop(m)}
+            />
+          ) : (
+            <TelemetryCapture
+              key={`${clip.id}:${m}:${modes[m]}`}
+              clip={clip}
+              metric={m}
+              probe={probe}
+              onProbe={onProbe}
+              mode={modes[m]}
+              controlsHost={controlsHost}
+              compact={compact}
+              playback={playback}
+            />
+          ),
+        )}
 
         {!compact && drag && (
           <div className="profile-dropzone" aria-hidden="true">

@@ -1,3 +1,4 @@
+import ElevationProfile from '../../src/components/ElevationProfile/ElevationProfile';
 import { useEffect, useRef, useState } from 'react';
 import {
   RecordingTargetContext,
@@ -150,19 +151,28 @@ function Fixture() {
             Pause clip
           </button>
         </div>
-        <div
-          className={`profile-panel${params.has('compact') ? ' is-compact' : ''}`}
-          style={{ height: 300, display: 'flex' }}
-        >
-          <TelemetryCapture
-            key={`${metric}:${mode}`}
+        {params.has('profile') ? (
+          <ElevationProfile
             clip={clip}
             probe={probe}
-            compact={params.has('compact')}
-            metric={metric}
-            mode={mode}
+            onProbe={(index) => setProbe(index ?? 0)}
+            onClose={() => {}}
           />
-        </div>
+        ) : (
+          <div
+            className={`profile-panel${params.has('compact') ? ' is-compact' : ''}`}
+            style={{ height: 300, display: 'flex' }}
+          >
+            <TelemetryCapture
+              key={`${metric}:${mode}`}
+              clip={clip}
+              probe={probe}
+              compact={params.has('compact')}
+              metric={metric}
+              mode={mode}
+            />
+          </div>
+        )}
       </div>
     </RecordingTargetContext.Provider>
   );

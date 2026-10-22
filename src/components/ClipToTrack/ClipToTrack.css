@@ -985,7 +985,8 @@
 .profile-header > * {
   pointer-events: auto;
 }
-.profile-header .profile-identity {
+.profile-header .profile-identity,
+.profile-pane-toolbar .profile-identity {
   min-width: 0;
   gap: 8px;
   height: 38px;
@@ -1943,3 +1944,58 @@
 }
 
 /* controls hidden by Settings (coordinates readout stays opt-in on phones) */
+
+/* Split mode keeps shared navigation above independently controlled panes. */
+.profile-panel.is-split > .profile-body {
+  padding-top: var(--profile-nav-height, 58px);
+}
+.profile-split-pane {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.profile-split-pane + .profile-split-pane {
+  border-left: 1px solid var(--border);
+}
+.profile-split-pane > .telemetry-capture-stage {
+  grid-area: 1 / 1;
+}
+.profile-pane-toolbar {
+  grid-area: 1 / 1;
+  align-self: start;
+  position: relative;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 10px;
+  flex: none;
+}
+.profile-pane-toolbar .map-chip {
+  min-height: 32px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 13px;
+}
+.profile-pane-toolbar .map-chip.is-on {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+.profile-pane-toolbar .icon-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #fff;
+  color: #152033;
+}
+.profile-panel.is-split .profile-split-pane .profile-pane {
+  padding-top: var(--profile-pane-nav-height, 48px);
+}
+.profile-header > [hidden] {
+  display: none;
+}
