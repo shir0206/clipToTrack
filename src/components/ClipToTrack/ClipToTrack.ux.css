@@ -84,7 +84,7 @@
   align-content: flex-start;
   gap: 6px;
   padding: 6px;
-  overflow: hidden;
+  overflow: visible;
 }
 [data-layout^='mobile'] .profile-panel.is-compact .profile-tabs {
   flex: 0 1 auto;
