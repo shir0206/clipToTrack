@@ -1238,6 +1238,7 @@ export default function TrackMap({
             onFullscreen={fullscreen}
             onExport={exportAs}
             onRecordMap={ready ? () => setCaptureOpen(true) : undefined}
+            recordingMap={captureOpen}
             compact={compact}
             onSearchFocus={onSearchFocus}
             onGo={(b) => {

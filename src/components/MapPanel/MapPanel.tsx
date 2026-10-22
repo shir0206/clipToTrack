@@ -69,6 +69,7 @@ type Props = {
   onFitSelected: () => void;
   onFullscreen: () => void;
   onRecordMap?: () => void;
+  recordingMap?: boolean;
   onExport: (kind: 'gpx' | 'geojson' | 'png') => void;
   onGo: (bbox: [number, number, number, number]) => void; // [w, s, e, n]
   /** phone layout: one search pill + one Layers menu instead of ~17 loose controls */
@@ -447,6 +448,7 @@ function MapMenu({
   onFullscreen,
   onExport,
   onRecordMap,
+  recordingMap = false,
   onClose,
 }: Omit<Props, 'onGo' | 'compact' | 'onSearchFocus'> & {
   onClose: () => void;
@@ -584,6 +586,7 @@ function MapMenu({
                 <MenuRow
                   icon="camera"
                   label="Record map · 25 fps"
+                  on={recordingMap}
                   disabled={!hasClips}
                   onClick={act(onRecordMap)}
                 />
@@ -618,6 +621,7 @@ export default function MapPanel({
   onFullscreen,
   onExport,
   onRecordMap,
+  recordingMap = false,
   onGo,
   compact = false,
   onSearchFocus,
@@ -626,6 +630,24 @@ export default function MapPanel({
   const [menuOpen, setMenuOpen] = useState(false);
   const bar = useRef<HTMLDivElement>(null);
   const { view } = useSettings();
+
+  useEffect(() => {
+    const toolbar = bar.current;
+    const stage = toolbar?.parentElement;
+    if (!toolbar || !stage) return;
+    const measure = () =>
+      stage.style.setProperty(
+        '--map-toolbar-bottom',
+        `${toolbar.offsetTop + toolbar.offsetHeight}px`,
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(toolbar);
+    return () => {
+      observer.disconnect();
+      stage.style.removeProperty('--map-toolbar-bottom');
+    };
+  }, [compact, view.search, view.mapStyle, view.layers, view.tools]);
 
   // close menus on outside click / Escape
   useEffect(() => {
@@ -649,6 +671,7 @@ export default function MapPanel({
     return (
       <>
         <div
+          ref={bar}
           className="map-toolbar is-compact"
           role="toolbar"
           aria-label="Map tools"
@@ -692,6 +715,7 @@ export default function MapPanel({
             onFullscreen={onFullscreen}
             onExport={onExport}
             onRecordMap={onRecordMap}
+            recordingMap={recordingMap}
             onClose={() => setMenuOpen(false)}
           />
         )}
@@ -808,13 +832,14 @@ export default function MapPanel({
           />
           {onRecordMap && (
             <button
-              className="icon-button"
+              className={`map-chip map-record-button${recordingMap ? ' is-on' : ''}`}
               title="Record map · 25 fps"
               aria-label="Record map · 25 fps"
+              aria-pressed={recordingMap}
               disabled={!hasClips}
               onClick={onRecordMap}
             >
-              <Icon name="camera" size={16} />
+              <Icon name="camera" size={14} />
             </button>
           )}
           <Dropdown

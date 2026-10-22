@@ -1,4 +1,5 @@
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Clip, GpsPoint } from '../../types';
 import TelemetryView from '../ElevationProfile/TelemetryView';
 import {
@@ -22,6 +23,7 @@ export default function TelemetryCapture({
   mode = 'dial',
   onProbe,
   onPop,
+  controlsHost,
   compact = false,
 }: {
   clip: Clip;
@@ -30,6 +32,7 @@ export default function TelemetryCapture({
   mode?: ViewMode;
   onProbe?: (probe: number | null) => void;
   onPop?: () => void;
+  controlsHost?: HTMLElement | null;
   compact?: boolean;
   playback?: { playing: boolean; onTogglePlay: () => void; onStop: () => void };
 }) {
@@ -142,24 +145,61 @@ export default function TelemetryCapture({
           ? undefined
           : timeline.at(virtualTime).sample,
       )}
-      {!open && usable && (
-        <button
-          className="map-chip telemetry-record-button"
-          title={`Record ${config.title}`}
-          onClick={() => {
-            setHeaderHost(
-              stage.current
-                ?.closest('.map-column')
-                ?.querySelector<HTMLElement>('.map-stage') ?? undefined,
-            );
-            setZoom(1);
-            setVirtualTime(null);
-            setOpen(true);
-          }}
-        >
-          <Icon name="camera" size={14} /> Record {config.title}
-        </button>
-      )}
+      {usable &&
+        (!open || controlsHost !== undefined) &&
+        (controlsHost === undefined ? (
+          <button
+            className={
+              controlsHost !== undefined
+                ? `map-chip${open ? ' is-on' : ''}`
+                : 'map-chip telemetry-record-button'
+            }
+            title={`Record ${config.title}`}
+            aria-label={`Record ${config.title}`}
+            aria-pressed={open}
+            onClick={() => {
+              if (open) return;
+              setHeaderHost(
+                stage.current
+                  ?.closest('.map-column')
+                  ?.querySelector<HTMLElement>('.map-stage') ?? undefined,
+              );
+              setZoom(1);
+              setVirtualTime(null);
+              setOpen(true);
+            }}
+          >
+            <Icon name="camera" size={14} />
+          </button>
+        ) : (
+          controlsHost &&
+          createPortal(
+            <button
+              className={
+                controlsHost !== undefined
+                  ? `map-chip${open ? ' is-on' : ''}`
+                  : 'map-chip telemetry-record-button'
+              }
+              title={`Record ${config.title}`}
+              aria-label={`Record ${config.title}`}
+              aria-pressed={open}
+              onClick={() => {
+                if (open) return;
+                setHeaderHost(
+                  stage.current
+                    ?.closest('.map-column')
+                    ?.querySelector<HTMLElement>('.map-stage') ?? undefined,
+                );
+                setZoom(1);
+                setVirtualTime(null);
+                setOpen(true);
+              }}
+            >
+              <Icon name="camera" size={14} />
+            </button>,
+            controlsHost,
+          )
+        ))}
       {open && (
         <MapCapture
           target="telemetry"
@@ -228,8 +268,12 @@ export default function TelemetryCapture({
           hasRoute={usable}
           insetBottom={0}
           composition={
-            <label className="telemetry-zoom">
-              Composition{' '}
+            <div
+              className="telemetry-zoom"
+              role="group"
+              aria-label="Composition"
+            >
+              <span className="telemetry-zoom-label">Zoom</span>
               <input
                 aria-label={`${config.title} export zoom`}
                 type="range"
@@ -238,13 +282,21 @@ export default function TelemetryCapture({
                 step="0.05"
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
-              />{' '}
-              <button onClick={() => setZoom(1)}>
-                {mode === 'dial'
-                  ? 'Fit dashboard'
-                  : `Fit ${mode === 'graph' ? 'graph' : 'values'}`}
+              />
+              <output aria-hidden="true">{Math.round(zoom * 100)}%</output>
+              <button
+                className="telemetry-fit"
+                onClick={() => setZoom(1)}
+                aria-label={
+                  mode === 'dial'
+                    ? 'Fit dashboard'
+                    : `Fit ${mode === 'graph' ? 'graph' : 'values'}`
+                }
+                title="Reset composition"
+              >
+                <Icon name="fit" size={14} />
               </button>
-            </label>
+            </div>
           }
           onClose={() => {
             if (session.current) pause();

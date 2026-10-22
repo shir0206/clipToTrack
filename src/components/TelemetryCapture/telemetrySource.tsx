@@ -20,6 +20,9 @@ async function visualizationImage(
       element.ownerDocument.defaultView!.getComputedStyle(original);
     const styles = (style: CSSStyleDeclaration) =>
       Array.from(style)
+        // Chromium exposes a legacy shorthand that adds `fill`, turning a
+        // border gradient into a background. Preserve the standard longhands.
+        .filter((key) => key !== '-webkit-border-image')
         .map((key) => `${key}:${style.getPropertyValue(key)}`)
         .join(';')
         .replace(/url\(["']?[^)"']*#([^)"']+)["']?\)/g, 'url(#$1)');

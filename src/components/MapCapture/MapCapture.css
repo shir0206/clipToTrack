@@ -190,11 +190,29 @@
   border-color: var(--primary);
   color: var(--contrast);
 }
-.map-capture-actions .map-capture-dismiss {
-  padding: 8px;
-  width: 36px;
-  border-color: transparent;
-  color: var(--text-muted);
+.map-capture .map-capture-actions .map-capture-dismiss {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--text);
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+.map-capture .map-capture-actions .map-capture-dismiss:active:not(:disabled) {
+  transform: scale(0.93);
+}
+@media (hover: hover) {
+  .map-capture .map-capture-actions .map-capture-dismiss:not(:disabled):hover {
+    background: var(--control-hover);
+  }
 }
 .map-capture-actions .map-capture-discard {
   margin-right: auto;
@@ -285,9 +303,16 @@
   background: var(--video);
   margin-bottom: 20px;
 }
-.map-stage.is-capturing > .map-toolbar,
+.map-stage.is-capturing > .map-toolbar {
+  z-index: 13;
+}
 .map-stage.is-capturing .maplibregl-control-container {
   visibility: hidden;
+}
+.map-stage.is-capturing
+  .map-capture:not(.telemetry-capture)
+  .map-capture-header {
+  top: calc(var(--map-toolbar-bottom, 58px) + 8px);
 }
 .map-capture-sr-only {
   position: absolute;
@@ -329,9 +354,6 @@
   }
   .map-capture-actions button {
     min-height: 44px;
-  }
-  .map-capture-actions .map-capture-dismiss {
-    width: 44px;
   }
   .map-capture-preview {
     padding: 16px;

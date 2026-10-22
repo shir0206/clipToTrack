@@ -457,13 +457,15 @@ export default function MapCapture(props: Props) {
                   <i key={corner} className={`capture-corner ${corner}`} />
                 ))}
               <span className="map-capture-frame-label" aria-hidden="true">
-                <Icon name="fit" size={12} /> Capture area <b>16:9</b>
+                <Icon name="fit" size={12} /> {!telemetry && 'Capture area'}{' '}
+                <b>16:9</b>
               </span>
             </div>
           )}
           <div
             ref={controls}
-            className="map-capture-controls"
+            className={`map-capture-controls${telemetry ? ' telemetry-record-bar' : ''}`}
+            data-phase={phase}
             style={{ bottom: props.insetBottom + 12 }}
           >
             <div
@@ -485,8 +487,33 @@ export default function MapCapture(props: Props) {
                 ) : phase === 'recording' ? (
                   <>
                     <i className="map-recording-dot" />
-                    {clock(seconds)}
+                    {telemetry && (
+                      <span className="telemetry-record-status">Recording</span>
+                    )}
+                    <span
+                      className={
+                        telemetry ? 'telemetry-record-time' : undefined
+                      }
+                    >
+                      {clock(seconds)}
+                    </span>
                   </>
+                ) : telemetry ? (
+                  <span
+                    className="telemetry-ready-status"
+                    title={`Only the ${target} inside the frame will be recorded.`}
+                  >
+                    <span className="telemetry-ready-dot" aria-hidden="true" />
+                    <span>
+                      <strong>
+                        <span className="telemetry-ready-full">
+                          Ready to record
+                        </span>
+                        <span className="telemetry-ready-short">Ready</span>
+                      </strong>
+                      <small>{target}</small>
+                    </span>
+                  </span>
                 ) : (
                   `Only the ${target} inside the frame will be recorded.`
                 ))}
@@ -528,7 +555,7 @@ export default function MapCapture(props: Props) {
                     : 'Cancel'
                 }
               >
-                <Icon name="close" size={17} />
+                <Icon name="close" size={14} />
                 <span className="map-capture-sr-only">
                   {phase === 'recording' || phase === 'finalizing'
                     ? 'Discard'

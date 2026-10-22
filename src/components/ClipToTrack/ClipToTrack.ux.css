@@ -94,7 +94,7 @@
 [data-layout^='mobile'] .profile-panel.is-compact .profile-view {
   margin-left: 0;
 }
-[data-layout^='mobile'] .profile-panel.is-compact .profile-header > strong {
+[data-layout^='mobile'] .profile-panel.is-compact .profile-identity strong {
   min-width: 0;
   max-width: 9ch;
   overflow: hidden;
@@ -107,8 +107,11 @@
   > .inline-icon {
   display: none;
 }
-[data-layout^='mobile'] .profile-panel.is-compact .profile-header .icon-button {
-  margin-left: auto;
+[data-layout^='mobile'] .profile-panel.is-compact .profile-identity {
+  max-width: 100%;
+}
+[data-layout^='mobile'] .profile-panel.is-compact .profile-actions {
+  margin-left: 0;
 }
 [data-layout^='mobile'] .profile-panel.is-compact .profile-pane {
   min-width: 0;

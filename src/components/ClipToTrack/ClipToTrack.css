@@ -841,7 +841,7 @@
   border-radius: 999px;
   background: var(--surface);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   cursor: pointer;
   transition:
@@ -970,29 +970,104 @@
   outline: none;
 }
 .profile-header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 6;
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 10px;
   font-size: 12px;
+  pointer-events: none;
+}
+.profile-header > * {
+  pointer-events: auto;
+}
+.profile-header .profile-identity {
+  min-width: 0;
+  gap: 8px;
+  height: 38px;
+  padding: 3px 12px;
+}
+.profile-identity > .inline-icon {
+  flex: none;
+  color: var(--text-muted);
+}
+.profile-identity strong {
+  overflow: hidden;
+  max-width: 18ch;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .profile-tabs {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  max-width: 100%;
+}
+.profile-header .map-chip,
+.map-toolbar .map-record-button {
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 13px;
+}
+.profile-header .map-chip.is-on,
+.map-toolbar .map-record-button.is-on {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 .profile-header .icon-button {
-  width: 26px;
-  height: 26px;
-  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #fff;
+  color: #152033;
 }
-/* Graph / Speedometer sit in the header row, right-aligned, same chip size as the tabs */
-.profile-view {
+.profile-header .profile-exit {
   margin-left: auto;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--text);
 }
-.profile-view + .icon-button {
+@media (hover: hover) {
+  .profile-header .profile-exit:hover {
+    background: var(--control-hover);
+  }
+}
+.profile-actions {
   margin-left: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.profile-record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+/* Each view selector is its own floating cluster, like the map controls. */
+.profile-view {
+  margin-left: 0;
+}
+@media (hover: hover) {
+  .profile-header .map-chip:hover:not(:disabled),
+  .map-toolbar .map-record-button:hover:not(:disabled) {
+    background: var(--background);
+  }
+  .profile-header .map-chip.is-on:hover,
+  .map-toolbar .map-record-button.is-on:hover {
+    background: var(--primary-soft);
+  }
 }
 
 /* draggable tabs */
@@ -1012,8 +1087,7 @@
   gap: 0;
   overflow: hidden;
 }
-.split-main,
-.split-close {
+.split-main {
   all: unset;
   cursor: pointer;
   padding: 4px 9px;
@@ -1023,18 +1097,20 @@
   align-items: center;
   gap: 5px;
 }
-.split-close {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 7px 4px 5px;
-  opacity: 0.6;
-}
-.split-close:focus-visible {
-  opacity: 1;
+.profile-header .split-close {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--control);
+  color: var(--text);
 }
 @media (hover: hover) {
-  .split-close:hover {
-    opacity: 1;
+  .profile-header .split-close:hover {
+    background: var(--control-hover);
   }
 }
 .split-main:focus-visible,
@@ -1062,6 +1138,24 @@
 .profile-pane.is-readout {
   justify-content: stretch;
   padding: 0;
+}
+/* The pane fills the panel; only its content clears the floating navigation. */
+.profile-panel:has(> .profile-header) .profile-pane {
+  padding-top: var(--profile-nav-height, 58px);
+}
+.profile-panel:has(> .profile-header) .profile-pane.is-readout {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(255 255 255 / 8%), transparent 40%),
+    linear-gradient(180deg, #15171c 0%, #07080a 52%, #030304 100%);
+}
+.profile-panel:has(> .profile-header)
+  .profile-pane.is-readout
+  .telemetry-readout {
+  background: transparent;
+  box-shadow: none;
+}
+.profile-panel:has(> .profile-header) .profile-pane.is-dial {
+  background: var(--gauge-deep);
 }
 .telemetry-readout {
   flex: 1;
@@ -1546,6 +1640,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
+.profile-identity strong,
 .sort-label {
   flex: none;
   font-size: 11px;

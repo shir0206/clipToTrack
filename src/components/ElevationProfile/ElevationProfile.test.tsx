@@ -60,6 +60,23 @@ describe('ElevationProfile telemetry readout', () => {
     expect(html).toContain('Values');
   });
 
+  it('places the pop-out action inside the telemetry toolbar', () => {
+    const html = renderToStaticMarkup(
+      <ElevationProfile
+        clip={clip}
+        probe={1}
+        onProbe={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const header = html.slice(
+      html.indexOf('class="profile-header"'),
+      html.indexOf('class="profile-body"'),
+    );
+    expect(header).toContain('aria-label="Open Altitude in a new window"');
+    expect(html).not.toContain('pane-popover');
+  });
+
   it('writes the desktop dock height to the CSS variable used by the panel', () => {
     const html = renderToStaticMarkup(
       <ElevationProfile
@@ -104,6 +121,6 @@ describe('ElevationProfile telemetry readout', () => {
 
     expect(html).toContain('class="profile-pane is-readout"');
     expect(html).not.toContain('class="pane-header"');
-    expect(html).toContain('class="icon-button pane-popover"');
+    expect(html).toContain('aria-label="Open Altitude in a new window"');
   });
 });

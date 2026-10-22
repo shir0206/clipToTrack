@@ -120,7 +120,9 @@ function Fixture() {
         style={{
           ...clipColorVars(clip.color),
           height: 800,
-          width: params.has('compact') ? 412 : 1200,
+          width: params.has('compact')
+            ? Math.min(412, window.innerWidth)
+            : 1200,
         }}
       >
         <div

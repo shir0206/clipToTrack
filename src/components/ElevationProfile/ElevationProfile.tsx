@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -180,6 +181,9 @@ export default function ElevationProfile({
   playback,
   initialModes,
 }: Props) {
+  const [controlsHost, setControlsHost] = useState<HTMLSpanElement | null>(
+    null,
+  );
   const [tab, setTab] = useState<Tab>('alt');
   const [single, setSingle] = useState<Metric>('alt'); // where "cancel" returns to
   const [split, setSplit] = useState<[Metric, Metric] | null>(null); // [left, right]
@@ -225,6 +229,22 @@ export default function ElevationProfile({
 
   // dock height: drag the grip on its top edge (or use ↑ / ↓); remembered between visits
   const root = useRef<HTMLDivElement>(null);
+  const navigation = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const header = navigation.current;
+    const panel = root.current;
+    if (!header || !panel) return;
+    const measure = () =>
+      panel.style.setProperty(
+        '--profile-nav-height',
+        `${header.getBoundingClientRect().height}px`,
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   const [height, setHeight] = useState(
     () => Number(localStorage.getItem(HEIGHT_KEY)) || DEFAULT_H,
   );
@@ -333,11 +353,18 @@ export default function ElevationProfile({
           onDoubleClick={() => setHeight(clampH(DEFAULT_H))}
         />
       )}
-      <div className="profile-header">
-        <Icon name="chart" size={14} />
-        <strong>{clip.title}</strong>
+      <div
+        ref={navigation}
+        className="profile-header"
+        role="toolbar"
+        aria-label="Telemetry tools"
+      >
+        <div className="toolbar-group profile-identity">
+          <Icon name="chart" size={16} />
+          <strong title={clip.title}>{clip.title}</strong>
+        </div>
 
-        <div className="profile-tabs">
+        <div className="toolbar-group profile-tabs">
           {(['alt', 'speed'] as const).map((k) => (
             <button
               key={k}
@@ -369,12 +396,12 @@ export default function ElevationProfile({
                 {LABEL[split[0]]} | {LABEL[split[1]]}
               </button>
               <button
-                className="split-close"
+                className="icon-button split-close"
                 aria-label="Cancel side-by-side view"
                 title="Cancel side-by-side view"
                 onClick={cancelSplit}
               >
-                <Icon name="close" size={11} />
+                <Icon name="close" size={14} />
               </button>
             </span>
           ) : null}
@@ -383,7 +410,7 @@ export default function ElevationProfile({
         {metrics.map((m) => (
           <div
             key={m}
-            className="profile-tabs profile-view"
+            className="toolbar-group profile-tabs profile-view"
             role="group"
             aria-label={`${LABEL[m]} view`}
           >
@@ -411,8 +438,23 @@ export default function ElevationProfile({
           </div>
         ))}
 
+        <div className="toolbar-group profile-actions">
+          <span className="profile-record-actions" ref={setControlsHost} />
+          {!compact &&
+            metrics.map((m) => (
+              <button
+                key={m}
+                className="icon-button"
+                aria-label={`Open ${LABEL[m]} in a new window`}
+                title={`Open ${LABEL[m]} in a new window`}
+                onClick={() => pop(m)}
+              >
+                <Icon name="external" size={16} />
+              </button>
+            ))}
+        </div>
         <button
-          className="icon-button"
+          className="icon-button profile-exit"
           aria-label="Close profile"
           onClick={onClose}
         >
@@ -429,7 +471,7 @@ export default function ElevationProfile({
             probe={probe}
             onProbe={onProbe}
             mode={modes[m]}
-            onPop={compact ? undefined : () => pop(m)}
+            controlsHost={controlsHost}
             compact={compact}
             playback={playback}
           />
