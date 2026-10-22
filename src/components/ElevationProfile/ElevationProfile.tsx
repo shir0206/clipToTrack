@@ -11,7 +11,7 @@ import {
 import { createPortal } from 'react-dom';
 import type { Clip } from '../../types';
 import Icon, { type IconName } from '../Icon/Icon';
-import SpeedCluster from '../SpeedCluster/SpeedCluster';
+import SpeedometerCapture from '../SpeedometerCapture/SpeedometerCapture';
 import AltitudeCluster from '../AltitudeCluster/AltitudeCluster';
 import { clipColorVars } from '../../lib/clipColorStyle';
 
@@ -262,7 +262,7 @@ function Pane({
             playback={compact ? playback : undefined}
           />
         ) : (
-          <SpeedCluster
+          <SpeedometerCapture
             key={clip.id}
             clip={clip}
             probe={probe}

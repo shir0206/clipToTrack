@@ -364,3 +364,77 @@
     transition: none;
   }
 }
+
+.speedometer-capture-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.speedometer-record-button {
+  position: absolute;
+  top: 8px;
+  right: 36px;
+  z-index: 4;
+}
+.speedometer-capture .map-capture-frame {
+  border: 2px dashed var(--primary);
+  box-shadow: none;
+}
+.speedometer-capture .map-capture-frame-label {
+  top: 4px;
+  left: 4px;
+  border-radius: 6px;
+}
+.capture-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: var(--surface);
+  transform: translate(-50%, -50%);
+}
+.capture-corner.tl {
+  left: 0;
+  top: 0;
+}
+.capture-corner.tr {
+  left: 100%;
+  top: 0;
+}
+.capture-corner.bl {
+  left: 0;
+  top: 100%;
+}
+.capture-corner.br {
+  left: 100%;
+  top: 100%;
+}
+.speedometer-capture .map-capture-controls {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.speedometer-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.speedometer-zoom input {
+  width: 90px;
+}
+.speedometer-export *,
+.speedometer-export *::before,
+.speedometer-export *::after {
+  transition: none !important;
+  animation: none !important;
+}
+.map-stage > .map-capture-header {
+  z-index: 13;
+  color: var(--text);
+  font-family: var(--font-sans);
+}

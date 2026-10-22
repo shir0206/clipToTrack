@@ -9,6 +9,11 @@ import {
   type PointerEvent,
 } from 'react';
 import type { Clip } from '../../types';
+import {
+  prepareCapturePlayback,
+  type CaptureStartPosition,
+} from '../../lib/video/prepareCapturePlayback';
+import type { CapturePlayback } from '../../lib/video/usePlaybackReporting';
 import ClipCard from '../ClipCard/ClipCard';
 import TrackMap, { type MapApi } from '../TrackMap/TrackMap';
 import UploadZone from '../UploadZone/UploadZone';
@@ -148,6 +153,7 @@ export default function ClipToTrack() {
   ); // single source of truth
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   const [playingClipId, setPlayingClipId] = useState<string | null>(null);
+  const [inlinePlayingId, setInlinePlayingId] = useState<string | null>(null);
   const [maxClipId, setMaxClipId] = useState<string | null>(null);
   const [maxPlaying, setMaxPlaying] = useState(false); // is the large player (popup / modal) actually playing?
   const [videoWin, setVideoWin] = useState<Window | null>(null); // popup window; null => in-page modal fallback
@@ -342,10 +348,17 @@ export default function ClipToTrack() {
     if (videoWin && !videoWin.closed) videoWin.close(); // replaces any popup already open
     // phones: window.open gives a new tab, not null, so the modal must be forced
     const win = isMobile ? null : openVideoWindow(clip.title); // must run synchronously inside the click
+    setMaxPlaying(false);
     setVideoWin(win); // null (popup blocked / phone) falls back to the modal
     setPlayingClipId(null); // the large player takes over
     setSelectedClipId(clip.id);
     setMaxClipId(clip.id);
+  };
+
+  const toggleInlinePlayback = (id: string) => {
+    closeMax(); // only one player may drive the map and recording at a time
+    setSelectedClipId(id);
+    setPlayingClipId((current) => (current === id ? null : id));
   };
 
   const handleDelete = (id: string) => {
@@ -421,6 +434,75 @@ export default function ClipToTrack() {
   };
 
   const maxClip = clips.find((c) => c.id === maxClipId && c.videoUrl);
+  const captureClipId = maxClip?.id ?? playingClipId ?? selectedClipId;
+  const capturePlayback: CapturePlayback = {
+    clipId: mapClips.some((c) => c.id === captureClipId) ? captureClipId : null,
+    playing: maxClip
+      ? maxPlaying
+      : !!playingClipId && inlinePlayingId === playingClipId,
+  };
+  if (!capturePlayback.clipId) capturePlayback.playing = false;
+  const captureVideoFor = (clipId: string) =>
+    maxClipId === clipId
+      ? videoWin && !videoWin.closed
+        ? videoWin.document.querySelector<HTMLVideoElement>('video')
+        : document.querySelector<HTMLVideoElement>('.modal-video')
+      : Array.from(
+          document.querySelectorAll<HTMLVideoElement>('video.video-frame'),
+        ).find((element) => element.dataset.clipId === clipId);
+  const pauseCapturePlayback = (clipId: string) => {
+    captureVideoFor(clipId)?.pause();
+    if (maxClipId !== clipId) setPlayingClipId(null);
+  };
+  const prepareSpeedometerPlayback = async (
+    clipId: string,
+    position: CaptureStartPosition,
+    signal: AbortSignal,
+  ) => {
+    signal.throwIfAborted();
+    const video = captureVideoFor(clipId);
+    if (!video) throw new Error('Select the clip so its video is ready.');
+    if (position === 'current' && video.ended)
+      throw new Error(
+        'The clip has ended. Choose From beginning to record it again.',
+      );
+    pauseCapturePlayback(clipId);
+    if (position === 'beginning')
+      await prepareCapturePlayback(video, 'beginning', signal);
+    return async () => {
+      signal.throwIfAborted();
+      if (maxClipId !== clipId) setPlayingClipId(clipId);
+      await video.play();
+      if (signal.aborted) {
+        pauseCapturePlayback(clipId);
+        signal.throwIfAborted();
+      }
+    };
+  };
+  const prepareMapRecording = async (
+    position: CaptureStartPosition,
+    signal: AbortSignal,
+  ) => {
+    const clipId = capturePlayback.clipId;
+    if (!clipId) throw new Error('Select a clip with a video and route first.');
+    const large = maxClipId === clipId;
+    const video = captureVideoFor(clipId);
+    if (!video)
+      throw new Error('Select the clip in the list so its video is ready.');
+    if (position === 'beginning') {
+      setSelectedClipId(clipId);
+      if (!large) setPlayingClipId(null);
+    }
+    const resume = await prepareCapturePlayback(video, position, signal);
+    if (position === 'beginning') {
+      await mapApi.current?.setPlayhead(clipId, 0, true);
+      await mapApi.current?.waitForCaptureFrame(signal);
+    }
+    return async () => {
+      await resume();
+      if (position === 'beginning' && !large) setPlayingClipId(clipId);
+    };
+  };
   // peek bar: what you hear is what you see, so a playing clip wins over the selection
   const peekClip =
     clips.find((c) => c.id === playingClipId) ??
@@ -511,6 +593,11 @@ export default function ClipToTrack() {
               place={projects.clipPlace[clip.id]}
               selected={clip.id === selectedClipId}
               playing={clip.id === playingClipId}
+              onPlayingChange={(playing) =>
+                setInlinePlayingId((current) =>
+                  playing ? clip.id : current === clip.id ? null : current,
+                )
+              }
               nowPlaying={clip.id === maxClipId && maxPlaying}
               layout={isMobile ? 'stacked' : 'row'}
               onSelect={() => select(clip.id)}
@@ -522,10 +609,7 @@ export default function ClipToTrack() {
                   : undefined
               }
               onHelp={isMobile ? () => setPlaybackHelp(true) : undefined}
-              onTogglePlay={() => {
-                setSelectedClipId(clip.id);
-                setPlayingClipId((p) => (p === clip.id ? null : clip.id));
-              }}
+              onTogglePlay={() => toggleInlinePlayback(clip.id)}
               onStop={() => setPlayingClipId(null)}
               hidden={hiddenIds.has(clip.id)}
               onToggleHidden={() => toggleHidden(clip.id)}
@@ -631,10 +715,7 @@ export default function ClipToTrack() {
                     barRef={peekBar}
                     onTogglePlay={() => {
                       if (!peekClip) return;
-                      setSelectedClipId(peekClip.id);
-                      setPlayingClipId((p) =>
-                        p === peekClip.id ? null : peekClip.id,
-                      );
+                      toggleInlinePlayback(peekClip.id);
                     }}
                   />
                 </div>
@@ -767,10 +848,16 @@ export default function ClipToTrack() {
             onImmersive={() => setImmersive(true)}
             onSearchFocus={onSearchFocus}
             playingId={playingClipId}
-            onTogglePlay={(id) => {
-              setSelectedClipId(id);
-              setPlayingClipId((p) => (p === id ? null : id));
+            capturePlayback={capturePlayback}
+            prepareCapturePlayback={prepareMapRecording}
+            prepareSpeedometerPlayback={prepareSpeedometerPlayback}
+            pauseCapturePlayback={pauseCapturePlayback}
+            isPlaybackPlaying={(clipId) => {
+              const video = captureVideoFor(clipId);
+              return !!video && !video.paused && !video.ended;
             }}
+            getPlaybackTime={(clipId) => captureVideoFor(clipId)?.currentTime}
+            onTogglePlay={toggleInlinePlayback}
             onStopPlayback={() => setPlayingClipId(null)}
           />
           {immersive && (
@@ -905,6 +992,7 @@ export default function ClipToTrack() {
           />
         ) : (
           <VideoModal
+            key={maxClip.id}
             clip={maxClip}
             layout={isMobile ? 'mobile' : 'desktop'}
             onClose={closeMax}

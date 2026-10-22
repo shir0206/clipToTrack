@@ -8,9 +8,12 @@ import {
 import { createPortal } from 'react-dom';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Clip } from '../../types';
+import type { MapVideoRecorderOptions } from '../../lib/mapCapture/mapVideoRecorder';
+import type { CapturePlayback } from '../../lib/video/usePlaybackReporting';
 import * as maplibregl from 'maplibre-gl';
 import type { GeoJSONSource } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Point } from 'geojson';
+import { fitTrackBounds } from '../../lib/fitTrackBounds';
 import { pointPopupHtml } from '../../lib/pointPopup';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import MapPanel, {
@@ -19,6 +22,12 @@ import MapPanel, {
   type BaseKey,
   type MapOpts,
 } from '../MapPanel/MapPanel';
+import type { CaptureStartPosition } from '../../lib/video/prepareCapturePlayback';
+import MapCapture from '../MapCapture/MapCapture';
+import {
+  RecordingTargetContext,
+  type RecordingTarget,
+} from '../MapCapture/RecordingTargetContext';
 import ElevationProfile from '../ElevationProfile/ElevationProfile';
 import Icon from '../Icon/Icon';
 import { COPYRIGHT_OWNER } from '../../config/copyright';
@@ -30,8 +39,24 @@ import { clipToGeoJson, clipToGpx, download } from '../../lib/exportTrack';
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 /** Imperative handle for per-frame updates that shouldn't re-render React (video playhead). */
+export type MapCaptureSource = Pick<
+  MapVideoRecorderOptions,
+  | 'canvas'
+  | 'subscribeRender'
+  | 'requestRender'
+  | 'setRecordingActive'
+  | 'renderFrame'
+  | 'getPlaybackSeconds'
+>;
+
 export type MapApi = {
-  setPlayhead: (clipId: string, frac: number | null) => void;
+  getCaptureSource: () => MapCaptureSource | null;
+  waitForCaptureFrame: (signal: AbortSignal) => Promise<void>;
+  setPlayhead: (
+    clipId: string,
+    frac: number | null,
+    force?: boolean,
+  ) => void | Promise<void>;
 };
 
 type Props = {
@@ -52,6 +77,20 @@ type Props = {
   /** phone: replaces the Fullscreen API, which iOS only offers for <video> */
   onImmersive?: () => void;
   onSearchFocus?: (focused: boolean) => void;
+  /** Actual playback state for capture; playingId remains the playback command. */
+  capturePlayback?: CapturePlayback;
+  prepareSpeedometerPlayback?: (
+    clipId: string,
+    position: CaptureStartPosition,
+    signal: AbortSignal,
+  ) => Promise<() => Promise<void>>;
+  pauseCapturePlayback?: (clipId: string) => void;
+  isPlaybackPlaying?: (clipId: string) => boolean;
+  getPlaybackTime?: (clipId: string) => number | undefined;
+  prepareCapturePlayback?: (
+    position: CaptureStartPosition,
+    signal: AbortSignal,
+  ) => Promise<() => Promise<void>>;
   playingId?: string | null;
   onTogglePlay?: (id: string) => void;
   onStopPlayback?: () => void;
@@ -256,12 +295,6 @@ const rampExpr = (prop: string, min: number, max: number) => {
   ];
 };
 
-const boundsOf = (coords: [number, number][]) =>
-  coords.reduce(
-    (b, c) => b.extend(c),
-    new maplibregl.LngLatBounds(coords[0], coords[0]),
-  );
-
 const R = 6_371_008.8;
 const rad = (d: number) => (d * Math.PI) / 180;
 const haversine = (a: [number, number], b: [number, number]) => {
@@ -307,15 +340,32 @@ export default function TrackMap({
   onImmersive,
   onSearchFocus,
   playingId = null,
+  capturePlayback = { clipId: null, playing: false },
+  prepareCapturePlayback,
+  getPlaybackTime,
+  isPlaybackPlaying,
+  prepareSpeedometerPlayback,
+  pauseCapturePlayback,
   onTogglePlay,
   onStopPlayback,
 }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const [ready, setReady] = useState(false);
+  const [recordingTarget, setRecordingTarget] = useState<{
+    target: RecordingTarget | null;
+    owner?: string;
+  }>({ target: null });
+  const captureTarget = recordingTarget.target;
+  const [captureHeaderHost, setCaptureHeaderHost] =
+    useState<HTMLDivElement | null>(null);
+  const captureOpen = captureTarget === 'map';
+  const setCaptureOpen = (open: boolean) =>
+    setRecordingTarget({ target: open ? 'map' : null });
   const cb = useRef({ onSelect, onHover, onBackgroundTap });
   const compactRef = useRef(compact);
   const lastHead = useRef(0);
+  const captureActive = useRef(false);
   const data = useRef(clips); // latest clips for handlers registered once
   const coordEl = useRef<HTMLButtonElement>(null);
   const scaleSlot = useRef<HTMLDivElement>(null);
@@ -805,11 +855,67 @@ export default function TrackMap({
   useEffect(() => {
     if (!apiRef) return;
     apiRef.current = {
-      setPlayhead: (clipId, frac) => {
+      getCaptureSource: () => {
+        const m = map.current;
+        if (!m || !m.getSource('playhead')) return null;
+        return {
+          canvas: m.getCanvas(),
+          subscribeRender: (listener) => {
+            m.on('render', listener);
+            return () => {
+              m.off('render', listener);
+            };
+          },
+          requestRender: () => {
+            m.triggerRepaint();
+          },
+          setRecordingActive: (active) => {
+            captureActive.current = active;
+          },
+        };
+      },
+      waitForCaptureFrame: (signal) =>
+        new Promise<void>((resolve, reject) => {
+          const m = map.current;
+          if (!m) {
+            reject(new Error('The map is not ready.'));
+            return;
+          }
+          const cleanup = () => {
+            clearTimeout(timer);
+            m.off('render', done);
+            signal.removeEventListener('abort', aborted);
+          };
+          const done = () => {
+            if (!m.isSourceLoaded('playhead')) return;
+            cleanup();
+            resolve();
+          };
+          const aborted = () => {
+            cleanup();
+            reject(signal.reason);
+          };
+          const timer = setTimeout(() => {
+            cleanup();
+            reject(
+              new Error('Wait for the map to finish loading, then try again.'),
+            );
+          }, 10000);
+          m.on('render', done);
+          signal.addEventListener('abort', aborted, { once: true });
+          if (signal.aborted) aborted();
+          else m.triggerRepaint();
+        }),
+      setPlayhead: (clipId, frac, force = false) => {
         const m = map.current;
         const src = m?.getSource('playhead') as GeoJSONSource | undefined;
         if (!m || !src) return;
-        if (frac !== null && compactRef.current) {
+        if (
+          frac !== null &&
+          compactRef.current &&
+          !captureActive.current &&
+          !force
+        ) {
           const now = performance.now();
           if (now - lastHead.current < PLAYHEAD_MS) return; // throttle on phones
           lastHead.current = now;
@@ -833,10 +939,11 @@ export default function TrackMap({
           a[0] + (b[0] - a[0]) * t,
           a[1] + (b[1] - a[1]) * t,
         ];
-        src.setData(dotFeature(c, clip.color));
+        const updated = src.setData(dotFeature(c, clip.color));
         // same position, as a sample index: the profile charts and the speedometer follow the video
         if (clipId === selIdRef.current) setProbe(Math.round(pos));
         if (followRef.current) m.jumpTo({ center: c });
+        return updated;
       },
     };
     return () => {
@@ -855,11 +962,15 @@ export default function TrackMap({
     const isNew = clips.some((c) => !prevIds.current.has(c.id));
     prevIds.current = new Set(clips.map((c) => c.id));
     if (clips.length && isNew)
-      m.fitBounds(boundsOf(clips.flatMap((c) => c.coordinates)), {
-        padding: compactRef.current ? BASE_PAD : 100,
-        maxZoom: AUTO_MAX_ZOOM,
-        duration: 0,
-      });
+      fitTrackBounds(
+        m,
+        clips.flatMap((c) => c.coordinates),
+        {
+          padding: compactRef.current ? BASE_PAD : 100,
+          maxZoom: AUTO_MAX_ZOOM,
+          duration: 0,
+        },
+      );
     const pc = pinCtl.current;
     if (pc && pc.clipId() && !clips.some((c) => c.id === pc.clipId()))
       pc.unpin();
@@ -969,8 +1080,8 @@ export default function TrackMap({
     const clip = clips.find((c) => c.id === selectedId);
     if (!ready || !m || !clip) return;
     const pad = compact ? BASE_PAD : 120;
-    m.fitBounds(boundsOf(clip.coordinates), {
-      padding: { top: pad, bottom: pad, left: pad, right: pad },
+    fitTrackBounds(m, clip.coordinates, {
+      padding: pad,
       duration: 600,
       maxZoom: AUTO_MAX_ZOOM,
     });
@@ -1018,16 +1129,20 @@ export default function TrackMap({
 
   // ───────── actions ─────────
   const fitAll = () => {
-    if (clips.length)
-      map.current?.fitBounds(boundsOf(clips.flatMap((c) => c.coordinates)), {
-        padding: compact ? BASE_PAD : 100,
-        maxZoom: AUTO_MAX_ZOOM,
-        duration: 500,
-      });
+    if (clips.length && map.current)
+      fitTrackBounds(
+        map.current,
+        clips.flatMap((c) => c.coordinates),
+        {
+          padding: compact ? BASE_PAD : 100,
+          maxZoom: AUTO_MAX_ZOOM,
+          duration: 500,
+        },
+      );
   };
   const fitSelected = () => {
-    if (sel)
-      map.current?.fitBounds(boundsOf(sel.coordinates), {
+    if (sel && map.current)
+      fitTrackBounds(map.current, sel.coordinates, {
         padding: compact ? BASE_PAD : 120,
         maxZoom: AUTO_MAX_ZOOM,
         duration: 500,
@@ -1090,118 +1205,158 @@ export default function TrackMap({
   const unit = opts.color === 'speed' ? 'km/h' : 'm';
 
   return (
-    <div
-      className={`map-column${view.zoom ? '' : ' hides-zoom'}${view.gps ? '' : ' hides-location'}${view.terrain ? '' : ' hides-terrain'}${view.scale ? '' : ' hides-scale'}`}
+    <RecordingTargetContext.Provider
+      value={{
+        target: captureTarget,
+        headerHost: captureHeaderHost,
+        owner: recordingTarget.owner,
+        setTarget: (target, owner) => setRecordingTarget({ target, owner }),
+        getCurrentTime: getPlaybackTime,
+        isPlaying: isPlaybackPlaying,
+        playback: capturePlayback,
+        preparePlayback: prepareSpeedometerPlayback,
+        pausePlayback: pauseCapturePlayback,
+      }}
     >
-      <div className="map-stage">
-        <div ref={el} className="map-canvas" />
-        <MapPanel
-          opts={{ ...opts, profile: profileOn }}
-          set={set}
-          hasClips={clips.length > 0}
-          hasSelected={!!sel}
-          measuring={measuring}
-          onMeasure={() => setMeasuring((v) => !v)}
-          onFitAll={fitAll}
-          onFitSelected={fitSelected}
-          onFullscreen={fullscreen}
-          onExport={exportAs}
-          compact={compact}
-          onSearchFocus={onSearchFocus}
-          onGo={(b) => {
-            const next = map.current?.cameraForBounds(b, {
-              padding: 40,
-              maxZoom: 16,
-            });
-            if (next) map.current?.jumpTo(next);
-          }}
-        />
+      <div
+        className={`map-column${view.zoom ? '' : ' hides-zoom'}${view.gps ? '' : ' hides-location'}${view.terrain ? '' : ' hides-terrain'}${view.scale ? '' : ' hides-scale'}`}
+      >
+        <div
+          ref={setCaptureHeaderHost}
+          className={`map-stage${captureOpen ? ' is-capturing' : ''}`}
+        >
+          <div ref={el} className="map-canvas" />
+          <MapPanel
+            opts={{ ...opts, profile: profileOn }}
+            set={set}
+            hasClips={clips.length > 0}
+            hasSelected={!!sel}
+            measuring={measuring}
+            onMeasure={() => setMeasuring((v) => !v)}
+            onFitAll={fitAll}
+            onFitSelected={fitSelected}
+            onFullscreen={fullscreen}
+            onExport={exportAs}
+            onRecordMap={ready ? () => setCaptureOpen(true) : undefined}
+            compact={compact}
+            onSearchFocus={onSearchFocus}
+            onGo={(b) => {
+              const next = map.current?.cameraForBounds(b, {
+                padding: 40,
+                maxZoom: 16,
+              });
+              if (next) map.current?.jumpTo(next);
+            }}
+          />
 
-        {range && view.legend && (
-          <div
-            className="map-legend"
-            aria-label={`Colour scale: ${opts.color}`}
-          >
-            <span>{range.min.toFixed(0)}</span>
-            <i
-              style={{
-                background: `linear-gradient(90deg, ${RAMP.join(',')})`,
-              }}
+          {captureOpen && (
+            <MapCapture
+              getSource={() => apiRef?.current?.getCaptureSource() ?? null}
+              playback={capturePlayback}
+              preparePlayback={prepareCapturePlayback}
+              clipTitle={
+                clips.find((c) => c.id === capturePlayback.clipId)?.title ??
+                'clip'
+              }
+              hasRoute={
+                !!clips.find(
+                  (c) =>
+                    c.id === capturePlayback.clipId &&
+                    !!c.videoUrl &&
+                    c.coordinates.length > 1,
+                )
+              }
+              insetBottom={compact ? insetBottom : 0}
+              onClose={() => setCaptureOpen(false)}
             />
-            <span>
-              {range.max.toFixed(0)} {unit}
-            </span>
-          </div>
-        )}
+          )}
+          {range && view.legend && (
+            <div
+              className="map-legend"
+              aria-label={`Colour scale: ${opts.color}`}
+            >
+              <span>{range.min.toFixed(0)}</span>
+              <i
+                style={{
+                  background: `linear-gradient(90deg, ${RAMP.join(',')})`,
+                }}
+              />
+              <span>
+                {range.max.toFixed(0)} {unit}
+              </span>
+            </div>
+          )}
 
-        {(measuring || meas.length > 0) && (
-          <div className="measure-bar">
-            <Icon name="ruler" size={14} />
-            <strong>
-              {meas.length > 1
-                ? fmtLen(measured)
-                : compact
-                  ? 'Tap the map to measure'
-                  : 'Click the map to measure'}
-            </strong>
-            <button
-              className="link-button"
-              onClick={() => setMeas((p) => p.slice(0, -1))}
-              disabled={!meas.length}
-            >
-              Undo
-            </button>
-            <button
-              className="link-button"
-              onClick={() => setMeas([])}
-              disabled={!meas.length}
-            >
-              Clear
-            </button>
-            {measuring && (
+          {(measuring || meas.length > 0) && (
+            <div className="measure-bar">
+              <Icon name="ruler" size={14} />
+              <strong>
+                {meas.length > 1
+                  ? fmtLen(measured)
+                  : compact
+                    ? 'Tap the map to measure'
+                    : 'Click the map to measure'}
+              </strong>
               <button
                 className="link-button"
-                onClick={() => setMeasuring(false)}
+                onClick={() => setMeas((p) => p.slice(0, -1))}
+                disabled={!meas.length}
               >
-                Done
+                Undo
               </button>
-            )}
-          </div>
-        )}
-
-        <div
-          className="map-credits"
-          style={compact ? { bottom: insetBottom + 8 } : undefined}
-        >
-          <div className="map-scale-cluster">
-            {view.coords && (
-              <span
-                ref={coordEl}
-                className="map-coordinates"
-                title="Click to copy coordinates"
-                onClick={() =>
-                  lastCoord.current &&
-                  void navigator.clipboard?.writeText(lastCoord.current)
-                }
+              <button
+                className="link-button"
+                onClick={() => setMeas([])}
+                disabled={!meas.length}
               >
-                lat, lon
-              </span>
-            )}
-            <span ref={scaleSlot} className="map-scale-slot" />
+                Clear
+              </button>
+              {measuring && (
+                <button
+                  className="link-button"
+                  onClick={() => setMeasuring(false)}
+                >
+                  Done
+                </button>
+              )}
+            </div>
+          )}
+
+          <div
+            className="map-credits"
+            style={compact ? { bottom: insetBottom + 8 } : undefined}
+          >
+            <div className="map-scale-cluster">
+              {view.coords && (
+                <span
+                  ref={coordEl}
+                  className="map-coordinates"
+                  title="Click to copy coordinates"
+                  onClick={() =>
+                    lastCoord.current &&
+                    void navigator.clipboard?.writeText(lastCoord.current)
+                  }
+                >
+                  lat, lon
+                </span>
+              )}
+              <span ref={scaleSlot} className="map-scale-slot" />
+            </div>
+
+            <span className="map-credit-button">
+              © {COPYRIGHT_OWNER} {new Date().getUTCFullYear()} · ©
+              OpenStreetMap
+            </span>
           </div>
-
-          <span className="map-credit-button">
-            © {COPYRIGHT_OWNER} {new Date().getUTCFullYear()} · © OpenStreetMap
-          </span>
         </div>
-      </div>
 
-      {/* phones: portalled into the sheet (state and probe wiring stay here); never under the map */}
-      {profileHost
-        ? createPortal(profile, profileHost)
-        : compact
-          ? null
-          : profile}
-    </div>
+        {/* phones: portalled into the sheet (state and probe wiring stay here); never under the map */}
+        {profileHost
+          ? createPortal(profile, profileHost)
+          : compact
+            ? null
+            : profile}
+      </div>
+    </RecordingTargetContext.Provider>
   );
 }

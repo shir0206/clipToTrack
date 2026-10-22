@@ -8,6 +8,7 @@ type Props = {
   clip: Clip;
   /** index into clip.samples, driven by the map path (hover / click / video playhead); null = nothing yet */
   probe: number | null;
+  sample?: GpsPoint;
   playback?: {
     playing: boolean;
     onTogglePlay: () => void;
@@ -269,7 +270,7 @@ export function Dial({
  * It has no controls of its own: it shows the sample picked by `probe`, so the route on the map
  * (hover, click, or the video playhead) is the controller.
  */
-export default function SpeedCluster({ clip, probe, playback }: Props) {
+export default function SpeedCluster({ clip, probe, playback, sample }: Props) {
   const samples = clip.samples;
   const last = samples.length - 1;
 
@@ -292,7 +293,7 @@ export default function SpeedCluster({ clip, probe, playback }: Props) {
     String(i * step),
   );
 
-  const p = idx !== null ? samples[Math.min(idx, last)] : undefined;
+  const p = sample ?? (idx !== null ? samples[Math.min(idx, last)] : undefined);
   const v = p ? kmh(p) : undefined;
   const speedFrac = v !== undefined ? v / scale : 0;
 
@@ -379,7 +380,7 @@ export default function SpeedCluster({ clip, probe, playback }: Props) {
             <span>km/h</span>
           </div>
         </div>
-        <div className="gauge-tiles">
+        <div>
           <div className="gauge-tile">
             <span className="tile-icon">
               <Icon name="route" size={20} />
@@ -387,15 +388,6 @@ export default function SpeedCluster({ clip, probe, playback }: Props) {
             <span className="tile-text">
               <em>Distance</em>
               <b>{fin(done) ? `${Math.round(done)} m` : '--'}</b>
-            </span>
-          </div>
-          <div className="gauge-tile">
-            <span className="tile-icon">
-              <Icon name="gauge" size={20} />
-            </span>
-            <span className="tile-text">
-              <em>Max speed</em>
-              <b>{Math.round(stats.maxSpeed)} km/h</b>
             </span>
           </div>
         </div>

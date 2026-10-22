@@ -1,3 +1,4 @@
+import { usePlaybackReporting } from '../../lib/video/usePlaybackReporting';
 import {
   useEffect,
   useMemo,
@@ -92,6 +93,7 @@ export default function VideoModal({
   const mobile = layout === 'mobile';
   const box = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  usePlaybackReporting(videoRef, onPlayingChange, clip.videoUrl);
   const closeRef = useRef(onClose);
   useEffect(() => {
     closeRef.current = onClose;
@@ -201,6 +203,7 @@ export default function VideoModal({
 
   const video = (
     <video
+      data-clip-id={clip.id}
       ref={videoRef}
       className="modal-video"
       src={clip.videoUrl}
@@ -210,13 +213,10 @@ export default function VideoModal({
       onClick={mobile ? undefined : (e) => toggle(e.currentTarget)}
       onPlay={() => {
         setPlaying(true);
-        onPlayingChange?.(true);
       }}
       onPause={() => {
         setPlaying(false);
-        onPlayingChange?.(false);
       }}
-      onEnded={() => onPlayingChange?.(false)}
       onLoadedMetadata={(e) =>
         setT((s) => ({ ...s, dur: e.currentTarget.duration || 0 }))
       }
