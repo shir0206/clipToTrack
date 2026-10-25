@@ -109,6 +109,7 @@ export const namesOf = (list: Project[]) =>
 const DAY = 86_400_000;
 
 export type Project = {
+  locked?: boolean;
   id: string;
   clipIds: string[];
   /** reverse-geocoded place of the first clip; '' = looked up, nothing found; undefined = not looked up yet */
@@ -129,6 +130,7 @@ export type Placement = {
 };
 
 export type ProjectView = {
+  locked?: boolean;
   id: string;
   /** what to display: custom name, else the generated title */
   name: string;
@@ -330,6 +332,7 @@ export function projectViews(
           p.id === UNDATED_ID ? 'Undated' : (p.title ?? 'Project');
         return {
           id: p.id,
+          locked: p.locked,
           name:
             p.name ??
             (place && p.id !== UNDATED_ID

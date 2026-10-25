@@ -3,6 +3,7 @@ import Icon from '../Icon/Icon';
 import { signOutUser } from '../../lib/firebase/auth';
 import { CLOUD_SYNC_ACTIVE } from '../../lib/sync/flags';
 import { wipeThenReload } from '../../lib/sync/wipeLocal';
+import { flushSync } from '../../lib/sync/prefSync';
 import '../playback/PlaybackHelp.css'; // the dialog look (.help-*) is shared with the other small dialogs
 import './Account.css';
 
@@ -36,6 +37,7 @@ export default function SignOutDialog({
   const go = async () => {
     setWorking(true);
     setFailed(false);
+    await flushSync(); // a change made a moment ago must reach the account before the sign-out cuts access
     const ok = await signOutUser();
     if (!ok) {
       setWorking(false);
@@ -55,12 +57,7 @@ export default function SignOutDialog({
         if (!working) onClose();
       }}
     >
-      <div
-        className="help-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ctt-so-title"
-      >
+      <div className="help-dialog" role="dialog" aria-modal="true" aria-labelledby="ctt-so-title">
         <header className="help-header">
           <Icon name="info" size={18} />
           <h2 className="help-title" id="ctt-so-title">
@@ -71,42 +68,27 @@ export default function SignOutDialog({
         {wipeAvailable ? (
           <>
             <p className="help-text">
-              Your clips and settings stay in your account and come back when
-              you sign in again.
+              Your clips and settings stay in your account and come back when you sign in again.
             </p>
             <fieldset className="account-choices">
               <legend className="visually-hidden">This device</legend>
               <label className="help-option">
-                <input
-                  type="radio"
-                  name="so"
-                  checked={wipe}
-                  onChange={() => setWipe(true)}
-                />
-                Remove my clips from this device{' '}
-                <small>(best on a shared computer)</small>
+                <input type="radio" name="so" checked={wipe} onChange={() => setWipe(true)} />
+                Remove my clips from this device <small>(best on a shared computer)</small>
               </label>
               <label className="help-option">
-                <input
-                  type="radio"
-                  name="so"
-                  checked={!wipe}
-                  onChange={() => setWipe(false)}
-                />
+                <input type="radio" name="so" checked={!wipe} onChange={() => setWipe(false)} />
                 Keep a copy on this device
               </label>
             </fieldset>
           </>
         ) : (
-          <p className="help-text">
-            Your clips and settings stay on this device.
-          </p>
+          <p className="help-text">Your clips and settings stay on this device.</p>
         )}
 
         {uploading && (
           <p className="help-alternate" role="note">
-            A video is still being added. Wait for it to finish before signing
-            out.
+            A video is still being added. Wait for it to finish before signing out.
           </p>
         )}
         {failed && (

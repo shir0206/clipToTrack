@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { emitLocalChange } from '../lib/sync/changeBus';
 
 /**
  * "Satellite map by default" preference (Settings → Map). On unless the person turned it off.
@@ -17,7 +18,7 @@ const listeners = new Set<() => void>();
 
 export const satelliteDefault = () => on;
 
-export function setSatelliteDefault(next: boolean) {
+function commitSatelliteDefault(next: boolean) {
   on = next;
   try {
     localStorage.setItem(KEY, next ? '1' : '0');
@@ -26,6 +27,12 @@ export function setSatelliteDefault(next: boolean) {
   }
   listeners.forEach((l) => l());
 }
+
+export const applyRemoteSatelliteDefault = commitSatelliteDefault;
+export const setSatelliteDefault = (next: boolean) => {
+  commitSatelliteDefault(next);
+  emitLocalChange('satellite');
+};
 
 export const useSatelliteDefault = () =>
   useSyncExternalStore(

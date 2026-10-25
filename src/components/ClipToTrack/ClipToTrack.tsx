@@ -14,6 +14,9 @@ import TrackMap, { type MapApi } from '../TrackMap/TrackMap';
 import UploadZone from '../UploadZone/UploadZone';
 import Logo from '../logo/Logo';
 import AccountButton from '../Account/AccountButton';
+import SyncNotice from '../Account/SyncNotice';
+import { useSync } from '../../lib/sync/useSync';
+import { setSortPref, useSortPref } from '../../lib/sortPref';
 import VideoModal from '../VideoModal/VideoModal';
 import VideoWindow, { openVideoWindow } from '../VideoWindow/VideoWindow';
 import Icon, { type IconName } from '../Icon/Icon';
@@ -43,7 +46,6 @@ import './ClipToTrack.ux.css'; // phone type scale, tap sizes, video and telemet
 
 const WIDTH_KEY = 'clip-to-track:panel-width';
 const PROFILE_HEIGHT_KEY = 'clip-to-track:profile-height'; // owned by ElevationProfile
-const SORT_KEY = 'clip-to-track:sort';
 
 type SortKey = 'added' | 'name' | 'date' | 'location' | 'speed';
 const SORTS: [SortKey, string, IconName][] = [
@@ -65,16 +67,7 @@ const value = (
       : k === 'location'
         ? place || undefined // not looked up yet / nothing found: sorts last
         : c.sort[k];
-const loadSort = (): { key: SortKey; dir: 1 | -1 } => {
-  try {
-    const s = JSON.parse(localStorage.getItem(SORT_KEY) ?? '');
-    if (SORTS.some(([k]) => k === s.key))
-      return { key: s.key, dir: s.dir === -1 ? -1 : 1 };
-  } catch {
-    /* default */
-  }
-  return { key: 'added', dir: 1 };
-};
+const DEFAULT_SORT: { key: SortKey; dir: 1 | -1 } = { key: 'added', dir: 1 };
 
 const MIN_W = 320; // card needs room
 const MIN_MAP = 280;
@@ -152,7 +145,12 @@ export default function ClipToTrack() {
   const [maxPlaying, setMaxPlaying] = useState(false); // is the large player (popup / modal) actually playing?
   const [videoWin, setVideoWin] = useState<Window | null>(null); // popup window; null => in-page modal fallback
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set()); // hidden on the map only
-  const [sort, setSort] = useState(loadSort);
+  // the sort order lives in a shared store (it syncs between devices); an unknown key falls back to the default
+  const sortPref = useSortPref();
+  const sort = SORTS.some(([k]) => k === sortPref.key)
+    ? (sortPref as { key: SortKey; dir: 1 | -1 })
+    : DEFAULT_SORT;
+  const setSort = setSortPref;
   const [playbackHelp, setPlaybackHelp] = useState(false); // browser can't draw the video's picture
   const [settingsOpen, setSettingsOpen] = useState(false);
   const mapApi = useRef<MapApi | null>(null);
@@ -165,14 +163,6 @@ export default function ClipToTrack() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const addInput = useRef<HTMLInputElement>(null);
   const beforeSearch = useRef<Snap | null>(null);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SORT_KEY, JSON.stringify(sort));
-    } catch {
-      /* ignore */
-    }
-  }, [sort]);
 
   // Sorting only changes the list order. Clip.index / colour stay tied to upload order, so the map never recolours.
   const sorted = useMemo(
@@ -306,7 +296,7 @@ export default function ClipToTrack() {
       into ?? (projectMode && activeProject !== 'all' ? activeProject : null);
     // the example project is read-only: videos added while it is open go into a brand-new project
     let created: string | null = null;
-    if (target && target === exampleState().projectId) {
+    if (target && projects.views.find((v) => v.id === target)?.locked) {
       target = created = projects.createProject();
     }
     // in parallel with the import: can this browser draw the picture? If not, explain (once) what to approve
@@ -381,6 +371,9 @@ export default function ClipToTrack() {
       setTimeout(() => select(ids[0]), 0);
     },
   });
+
+  // signed in: keep the preferences in step with the account (a guest: this only timestamps local changes)
+  useSync({ onExampleEnabled: example.setEnabled });
 
   // content that is off-screen must not be reachable by Tab or a screen reader
   useEffect(() => {
@@ -488,11 +481,12 @@ export default function ClipToTrack() {
               playing={clip.id === playingClipId}
               nowPlaying={clip.id === maxClipId && maxPlaying}
               layout={isMobile ? 'stacked' : 'row'}
+              canMove={!projects.lockedClips.has(clip.id)}
               onSelect={() => select(clip.id)}
               // touch emulates mouse events and never sends mouseleave: a stuck highlight
               onHover={(h) => !isMobile && setHoveredClipId(h ? clip.id : null)}
               onMove={
-                isMobile && !exampleClipIds.includes(clip.id)
+                isMobile
                   ? () => setPicker({ kind: 'move', clipId: clip.id })
                   : undefined
               }
@@ -506,11 +500,7 @@ export default function ClipToTrack() {
               onToggleHidden={() => toggleHidden(clip.id)}
               onProgress={(f) => onFrac(clip.id, f)}
               onDelete={() => handleDelete(clip.id)}
-              onDragStart={
-                isMobile || exampleClipIds.includes(clip.id)
-                  ? undefined
-                  : () => setDragClipId(clip.id)
-              }
+              onDragStart={isMobile ? undefined : () => setDragClipId(clip.id)}
               onDragEnd={isMobile ? undefined : () => setDragClipId(null)}
               onMaximize={() => openMax(clip)}
             />
@@ -836,6 +826,7 @@ export default function ClipToTrack() {
         />
       )}
 
+      <SyncNotice />
       <ExampleStatus
         status={example.status}
         onRetry={() => example.setEnabled(true)}

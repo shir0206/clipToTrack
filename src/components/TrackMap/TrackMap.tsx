@@ -16,6 +16,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import MapPanel, {
   loadOpts,
   saveOpts,
+  subscribeRemoteOpts,
   type BaseKey,
   type MapOpts,
 } from '../MapPanel/MapPanel';
@@ -341,6 +342,11 @@ export default function TrackMap({
       ...(profile !== undefined && !compact ? { profile } : {}),
     }));
   };
+  // options changed on another device: an open map follows (its own basemap stays as it is)
+  useEffect(
+    () => subscribeRemoteOpts(() => setOpts((o) => ({ ...loadOpts(), base: o.base }))),
+    [],
+  );
   const followRef = useRef(opts.follow);
   const [probe, setProbe] = useState<number | null>(null);
   const [measuring, setMeasuring] = useState(false);

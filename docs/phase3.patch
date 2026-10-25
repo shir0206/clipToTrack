@@ -1,0 +1,2453 @@
+--- a/src/components/MapPanel/MapPanel.tsx
++++ b/src/components/MapPanel/MapPanel.tsx
+@@ -58,17 +58,37 @@
+     /* ignore */
+   }
+ };
++/** what is stored, without the basemap, with keys in a fixed order (so two copies compare equal) */
++const forCompare = (o: MapOpts) =>
++  JSON.stringify(
++    (Object.keys(DEFAULT_OPTS) as (keyof MapOpts)[])
++      .filter((k) => k !== 'base')
++      .map((k) => [k, o[k]]),
++  );
++/**
++ * TrackMap calls this from an effect after every change of its options, including the very first render. Only a
++ * REAL change is stored and reported to sync: a map that merely mounted (or just applied a value from the cloud)
++ * must not look like "the person changed this just now", or an old device would overwrite newer cloud settings.
++ */
+ export const saveOpts = (o: MapOpts) => {
++  if (forCompare(o) === forCompare(loadOpts())) return;
+   writeOpts(o);
+   emitLocalChange('mapOpts');
+ };
+-/**
+- * Map options as they arrived from the cloud. Stored without being reported back (no echo).
+- * TrackMap reads them when it mounts (`useState(loadOpts)`), so a map that is already open picks them up on
+- * the next load; making it follow live is part of Phase 3.
+- */
+-export const applyRemoteMapOpts = (o: Partial<MapOpts>) =>
++
++const remoteListeners = new Set<() => void>();
++/** a map that is already open follows options that arrive from the cloud */
++export const subscribeRemoteOpts = (fn: () => void) => {
++  remoteListeners.add(fn);
++  return () => {
++    remoteListeners.delete(fn);
++  };
++};
++/** Map options as they arrived from the cloud: stored, shown by an open map, never reported back (no echo). */
++export const applyRemoteMapOpts = (o: Partial<MapOpts>) => {
+   writeOpts({ ...DEFAULT_OPTS, ...o });
++  remoteListeners.forEach((fn) => fn());
++};
+ 
+ type Props = {
+   opts: MapOpts;
+--- a/src/components/TrackMap/TrackMap.tsx
++++ b/src/components/TrackMap/TrackMap.tsx
+@@ -16,6 +16,7 @@
+ import MapPanel, {
+   loadOpts,
+   saveOpts,
++  subscribeRemoteOpts,
+   type BaseKey,
+   type MapOpts,
+ } from '../MapPanel/MapPanel';
+@@ -341,6 +342,11 @@
+       ...(profile !== undefined && !compact ? { profile } : {}),
+     }));
+   };
++  // options changed on another device: an open map follows (its own basemap stays as it is)
++  useEffect(
++    () => subscribeRemoteOpts(() => setOpts((o) => ({ ...loadOpts(), base: o.base }))),
++    [],
++  );
+   const followRef = useRef(opts.follow);
+   const [probe, setProbe] = useState<number | null>(null);
+   const [measuring, setMeasuring] = useState(false);
+--- a/src/hooks/useProjects.ts
++++ b/src/hooks/useProjects.ts
+@@ -50,6 +50,7 @@
+ }
+ /** A value that arrived from the cloud: applied like a normal change, but never reported back (no echo). */
+ export const applyRemoteProjectMode = commitProjectMode;
++export const getProjectMode = () => projectModeOn;
+ export const useProjectMode = () =>
+   useSyncExternalStore(
+     (cb) => {
+--- a/src/components/ClipToTrack/ClipToTrack.tsx
++++ b/src/components/ClipToTrack/ClipToTrack.tsx
+@@ -14,6 +14,9 @@
+ import UploadZone from '../UploadZone/UploadZone';
+ import Logo from '../logo/Logo';
+ import AccountButton from '../Account/AccountButton';
++import SyncNotice from '../Account/SyncNotice';
++import { useSync } from '../../lib/sync/useSync';
++import { setSortPref, useSortPref } from '../../lib/sortPref';
+ import VideoModal from '../VideoModal/VideoModal';
+ import VideoWindow, { openVideoWindow } from '../VideoWindow/VideoWindow';
+ import Icon, { type IconName } from '../Icon/Icon';
+@@ -43,7 +46,6 @@
+ 
+ const WIDTH_KEY = 'clip-to-track:panel-width';
+ const PROFILE_HEIGHT_KEY = 'clip-to-track:profile-height'; // owned by ElevationProfile
+-const SORT_KEY = 'clip-to-track:sort';
+ 
+ type SortKey = 'added' | 'name' | 'date' | 'location' | 'speed';
+ const SORTS: [SortKey, string, IconName][] = [
+@@ -65,16 +67,7 @@
+       : k === 'location'
+         ? place || undefined // not looked up yet / nothing found: sorts last
+         : c.sort[k];
+-const loadSort = (): { key: SortKey; dir: 1 | -1 } => {
+-  try {
+-    const s = JSON.parse(localStorage.getItem(SORT_KEY) ?? '');
+-    if (SORTS.some(([k]) => k === s.key))
+-      return { key: s.key, dir: s.dir === -1 ? -1 : 1 };
+-  } catch {
+-    /* default */
+-  }
+-  return { key: 'added', dir: 1 };
+-};
++const DEFAULT_SORT: { key: SortKey; dir: 1 | -1 } = { key: 'added', dir: 1 };
+ 
+ const MIN_W = 320; // card needs room
+ const MIN_MAP = 280;
+@@ -152,7 +145,12 @@
+   const [maxPlaying, setMaxPlaying] = useState(false); // is the large player (popup / modal) actually playing?
+   const [videoWin, setVideoWin] = useState<Window | null>(null); // popup window; null => in-page modal fallback
+   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set()); // hidden on the map only
+-  const [sort, setSort] = useState(loadSort);
++  // the sort order lives in a shared store (it syncs between devices); an unknown key falls back to the default
++  const sortPref = useSortPref();
++  const sort = SORTS.some(([k]) => k === sortPref.key)
++    ? (sortPref as { key: SortKey; dir: 1 | -1 })
++    : DEFAULT_SORT;
++  const setSort = setSortPref;
+   const [playbackHelp, setPlaybackHelp] = useState(false); // browser can't draw the video's picture
+   const [settingsOpen, setSettingsOpen] = useState(false);
+   const mapApi = useRef<MapApi | null>(null);
+@@ -166,14 +164,6 @@
+   const addInput = useRef<HTMLInputElement>(null);
+   const beforeSearch = useRef<Snap | null>(null);
+ 
+-  useEffect(() => {
+-    try {
+-      localStorage.setItem(SORT_KEY, JSON.stringify(sort));
+-    } catch {
+-      /* ignore */
+-    }
+-  }, [sort]);
+-
+   // Sorting only changes the list order. Clip.index / colour stay tied to upload order, so the map never recolours.
+   const sorted = useMemo(
+     () =>
+@@ -382,6 +372,9 @@
+     },
+   });
+ 
++  // signed in: keep the preferences in step with the account (a guest: this only timestamps local changes)
++  useSync({ onExampleEnabled: example.setEnabled });
++
+   // content that is off-screen must not be reachable by Tab or a screen reader
+   useEffect(() => {
+     bodyRef.current?.toggleAttribute('inert', collapsed);
+@@ -833,6 +826,7 @@
+         />
+       )}
+ 
++      <SyncNotice />
+       <ExampleStatus
+         status={example.status}
+         onRetry={() => example.setEnabled(true)}
+--- a/src/components/Account/SignOutDialog.tsx
++++ b/src/components/Account/SignOutDialog.tsx
+@@ -3,6 +3,7 @@
+ import { signOutUser } from '../../lib/firebase/auth';
+ import { CLOUD_SYNC_ACTIVE } from '../../lib/sync/flags';
+ import { wipeThenReload } from '../../lib/sync/wipeLocal';
++import { flushSync } from '../../lib/sync/prefSync';
+ import '../playback/PlaybackHelp.css'; // the dialog look (.help-*) is shared with the other small dialogs
+ import './Account.css';
+ 
+@@ -36,6 +37,7 @@
+   const go = async () => {
+     setWorking(true);
+     setFailed(false);
++    await flushSync(); // a change made a moment ago must reach the account before the sign-out cuts access
+     const ok = await signOutUser();
+     if (!ok) {
+       setWorking(false);
+--- a/src/components/Account/AccountSection.tsx
++++ b/src/components/Account/AccountSection.tsx
+@@ -1,12 +1,29 @@
+ import { useEffect, useState } from 'react';
+ import { clearAuthError, signInWithGoogle, useAuth } from '../../lib/firebase/auth';
+-import { CLOUD_SYNC_ACTIVE } from '../../lib/sync/flags';
++import { CLOUD_SYNC_ACTIVE, PREFS_SYNC_ACTIVE } from '../../lib/sync/flags';
++import { useSyncStatus } from '../../lib/sync/prefSync';
+ import SignOutDialog from './SignOutDialog';
+ import './Account.css';
+ 
++function hint(signedIn: boolean, sync: ReturnType<typeof useSyncStatus>): string {
++  if (!signedIn)
++    return CLOUD_SYNC_ACTIVE
++      ? 'Keep your clips and settings on all your devices. Without an account everything stays on this device.'
++      : PREFS_SYNC_ACTIVE
++        ? 'Keep your settings on all your devices. Your clips stay on this device.'
++        : 'Everything stays on this device.';
++  if (!PREFS_SYNC_ACTIVE) return 'Signed in. Everything is still stored on this device.';
++  if (sync === 'paused') return 'Cloud sync is paused for now. Your changes are kept on this device.';
++  if (sync === 'error') return 'Couldn’t reach your account just now. Your changes are kept on this device and will be sent when you change something.';
++  return CLOUD_SYNC_ACTIVE
++    ? 'Your clips and settings are saved to your account.'
++    : 'Your settings are saved to your account. Your clips stay on this device.';
++}
++
+ /** The "Account" block of the Settings dialog. Renders nothing when accounts are not configured. */
+ export default function AccountSection({ uploading = false }: { uploading?: boolean }) {
+   const auth = useAuth();
++  const sync = useSyncStatus();
+   const [asking, setAsking] = useState(false);
+   useEffect(() => () => clearAuthError(), []);
+ 
+@@ -22,13 +39,7 @@
+         <span>
+           <b className="settings-label">{signedIn ? (auth.user?.email ?? 'Signed in') : 'Sign in with Google'}</b>
+           <small className="settings-hint">
+-            {signedIn
+-              ? CLOUD_SYNC_ACTIVE
+-                ? 'Your clips and settings are saved to your account.'
+-                : 'Signed in. Syncing between devices is not switched on yet: everything is still stored on this device.'
+-              : CLOUD_SYNC_ACTIVE
+-                ? 'Keep your clips and settings on all your devices. Without an account everything stays on this device.'
+-                : 'Everything stays on this device. Signing in is the first step towards syncing between devices.'}
++            {hint(signedIn, sync)}
+           </small>
+           {auth.error && (
+             <small className="settings-warning" role="alert">
+--- a/src/lib/sync/flags.ts
++++ b/src/lib/sync/flags.ts
+@@ -1,6 +1,9 @@
++/** Preferences (settings, map options, sort order…) sync to the signed-in account. Phase 3. */
++export const PREFS_SYNC_ACTIVE = true;
++
+ /**
+- * Is cloud sync actually running? Until Phases 3 and 4 land this is false, and the account UI is honest about it:
+- * signing in does not move any data yet, so signing out must NOT wipe this device (nothing is in the cloud to
+- * come back from). Phase 3/4 flips this to true (or derives it from the sync engine's state).
++ * Clips and projects sync too. Phase 4 flips this. Until then it is false, and signing out must NOT wipe this
++ * device: the clips are not in the cloud, so wiping would destroy the only copy. (Preferences alone are not a
++ * reason to wipe: losing them costs nothing, but a person who signs out expects their clips to still be there.)
+  */
+ export const CLOUD_SYNC_ACTIVE = false;
+--- a/src/lib/sync/syncKeys.ts
++++ b/src/lib/sync/syncKeys.ts
+@@ -6,6 +6,7 @@
+  *   data    clips / projects / place names; synced per document (Phase 4)
+  *   partial only part of the value is synced (see `note`)
+  *   device  stays on this device (a phone and a desktop want different values)
++ *   meta    sync bookkeeping of this device; never synced, but wiped with the data it describes
+  *   removed no longer used; safe to delete
+  */
+ const P = 'clip-to-track:';
+@@ -20,7 +21,7 @@
+   | 'mapOpts'
+   | 'sort';
+ 
+-export type KeyScope = 'pref' | 'data' | 'partial' | 'device' | 'removed';
++export type KeyScope = 'pref' | 'data' | 'partial' | 'device' | 'meta' | 'removed';
+ 
+ type Entry = { scope: KeyScope; field?: SyncField; note?: string };
+ 
+@@ -58,6 +59,12 @@
+   [`${P}panel-width`]: { scope: 'device' },
+   [`${P}profile-height`]: { scope: 'device' },
+ 
++  // ── sync bookkeeping (when this device changed what, which accounts it has met) ──
++  [`${P}sync-meta:v1`]: {
++    scope: 'meta',
++    note: 'wiped on sign-out: after a wipe the defaults must not look like fresh edits',
++  },
++
+   // ── retired ──
+   [`${P}example-upload-auto:v1`]: {
+     scope: 'removed',
+--- a/src/lib/sync/wipeLocal.ts
++++ b/src/lib/sync/wipeLocal.ts
+@@ -1,7 +1,8 @@
+ import { KEY_REGISTRY } from './syncKeys';
+ 
+ /**
+- * Removes this person's synced data from the browser: preferences and clip / project data.
++ * Removes this person's synced data from the browser: preferences, clip / project data, and this device's sync
++ * bookkeeping (it describes that data: left behind, the defaults of a wiped browser would look like fresh edits).
+  * Kept on purpose: per-device layout state, the example project's own bookkeeping (it re-installs itself), and
+  * any key this app does not own.
+  * Returns the keys it removed.
+@@ -9,7 +10,7 @@
+ export function wipeSyncedLocalData(): string[] {
+   const removed: string[] = [];
+   for (const [key, entry] of Object.entries(KEY_REGISTRY)) {
+-    if (entry.scope !== 'pref' && entry.scope !== 'data') continue;
++    if (entry.scope !== 'pref' && entry.scope !== 'data' && entry.scope !== 'meta') continue;
+     try {
+       if (localStorage.getItem(key) !== null) removed.push(key);
+       localStorage.removeItem(key);
+--- a/src/components/Account/Account.test.tsx
++++ b/src/components/Account/Account.test.tsx
+@@ -7,6 +7,14 @@
+   signIn: vi.fn(),
+   signOut: vi.fn(async () => true),
+   clear: vi.fn(),
++  sync: 'live' as string,
++  flush: vi.fn(async () => {}),
++  order: [] as string[],
++}));
++vi.mock('../../lib/sync/prefSync', async (orig) => ({
++  ...(await orig<typeof import('../../lib/sync/prefSync')>()),
++  useSyncStatus: () => h.sync,
++  flushSync: h.flush,
+ }));
+ vi.mock('../../lib/firebase/auth', () => ({
+   useAuth: () => h.auth,
+@@ -31,6 +39,9 @@
+   h.signIn.mockClear();
+   h.signOut.mockReset().mockResolvedValue(true);
+   h.clear.mockClear();
++  h.sync = 'live';
++  h.order.length = 0;
++  h.flush.mockReset().mockImplementation(async () => void h.order.push('flush'));
+   localStorage.clear();
+ });
+ 
+@@ -169,6 +180,14 @@
+     expect(localStorage.getItem('clip-to-track:clips:v1')).toBe('[1]');
+   });
+ 
++  it('lets the last change leave BEFORE signing out (the sign-out cuts access)', async () => {
++    h.signOut.mockImplementation(async () => (h.order.push('signOut'), true));
++    render(<SignOutDialog onClose={vi.fn()} />);
++    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
++    await waitFor(() => expect(h.signOut).toHaveBeenCalled());
++    expect(h.order).toEqual(['flush', 'signOut']);
++  });
++
+   it('blocks signing out while a video is being added', () => {
+     render(<SignOutDialog wipeAvailable uploading onClose={vi.fn()} />);
+     expect(screen.getByRole('button', { name: 'Sign out' })).toBeDisabled();
+@@ -222,10 +241,10 @@
+     expect(projectsSection()).not.toHaveClass('has-divider');
+   });
+ 
+-  it('guest: a Sign in action, honest that nothing syncs yet; Projects gets its divider', () => {
++  it('guest: a Sign in action, honest that only settings sync; Projects gets its divider', () => {
+     settings();
+     const section = screen.getByRole('heading', { name: 'Account' }).closest('section')!;
+-    expect(within(section).getByText(/Everything stays on this device/)).toBeInTheDocument();
++    expect(within(section).getByText(/Keep your settings on all your devices. Your clips stay on this device/)).toBeInTheDocument();
+     fireEvent.click(within(section).getByRole('button', { name: 'Sign in' }));
+     expect(h.signIn).toHaveBeenCalledTimes(1);
+     expect(projectsSection()).toHaveClass('has-divider');
+@@ -236,11 +255,25 @@
+     settings();
+     const section = screen.getByRole('heading', { name: 'Account' }).closest('section')!;
+     expect(within(section).getByText('ada@example.com')).toBeInTheDocument();
+-    expect(within(section).getByText(/not switched on yet/)).toBeInTheDocument();
++    expect(within(section).getByText(/Your settings are saved to your account. Your clips stay on this device/)).toBeInTheDocument();
+     fireEvent.click(within(section).getByRole('button', { name: /Sign out/ }));
+     expect(screen.getByRole('dialog', { name: 'Sign out?' })).toBeInTheDocument();
+   });
+ 
++  it('signed in while the kill switch is on: says sync is paused', () => {
++    h.auth = signedIn();
++    h.sync = 'paused';
++    render(<AccountSection />);
++    expect(screen.getByText(/Cloud sync is paused for now/)).toBeInTheDocument();
++  });
++
++  it('signed in but the account cannot be reached: says changes stay on this device', () => {
++    h.auth = signedIn();
++    h.sync = 'error';
++    render(<AccountSection />);
++    expect(screen.getByText(/Couldn.t reach your account just now/)).toBeInTheDocument();
++  });
++
+   it('shows a sign-in error inside the section', () => {
+     h.auth = state({ error: 'Sign-in failed. Please try again.' });
+     render(<AccountSection />);
+--- a/src/lib/sync/syncKeys.test.ts
++++ b/src/lib/sync/syncKeys.test.ts
+@@ -34,6 +34,11 @@
+     expect(scopeOf('clip-to-track:example')).toBe('partial');
+   });
+ 
++  it('the sync bookkeeping is never synced, but is wiped with the data it describes', () => {
++    expect(scopeOf('clip-to-track:sync-meta:v1')).toBe('meta');
++    expect(isSyncedKey('clip-to-track:sync-meta:v1')).toBe(false);
++  });
++
+   it('knows the retired dialog key, and treats it as not synced', () => {
+     expect(scopeOf('clip-to-track:example-upload-auto:v1')).toBe('removed');
+     expect(isSyncedKey('clip-to-track:example-upload-auto:v1')).toBe(false);
+--- a/src/lib/sync/wipeLocal.test.ts
++++ b/src/lib/sync/wipeLocal.test.ts
+@@ -27,6 +27,13 @@
+     expect(localStorage.getItem('some-other-app:key')).toBe('keep me');
+   });
+ 
++  it('also removes this device’s sync bookkeeping (a wiped browser must not look like fresh edits)', () => {
++    seed();
++    localStorage.setItem(`${P}sync-meta:v1`, '{"t":{"satellite":5},"linked":["u1"]}');
++    expect(wipeSyncedLocalData()).toContain(`${P}sync-meta:v1`);
++    expect(localStorage.getItem(`${P}sync-meta:v1`)).toBeNull();
++  });
++
+   it('does nothing (and does not throw) on an empty browser', () => {
+     expect(wipeSyncedLocalData()).toEqual([]);
+   });
+--- /dev/null
++++ b/src/lib/sortPref.ts
+@@ -0,0 +1,58 @@
++import { useSyncExternalStore } from 'react';
++import { emitLocalChange } from './sync/changeBus';
++
++/**
++ * The clip list's sort order, as a small shared store (it used to be plain state in ClipToTrack, which sync
++ * cannot reach). The sort KEYS belong to ClipToTrack; this store only checks the shape, and the list falls
++ * back to its default when a key is unknown (e.g. one that arrives from a newer version of the app).
++ */
++export type SortPref = { key: string; dir: 1 | -1 };
++
++const KEY = 'clip-to-track:sort';
++const DEFAULT: SortPref = { key: 'added', dir: 1 };
++
++export const isSortPref = (v: unknown): v is SortPref =>
++  !!v &&
++  typeof v === 'object' &&
++  typeof (v as SortPref).key === 'string' &&
++  ((v as SortPref).dir === 1 || (v as SortPref).dir === -1);
++
++const read = (): SortPref => {
++  try {
++    const s: unknown = JSON.parse(localStorage.getItem(KEY) ?? '');
++    if (isSortPref(s)) return { key: s.key, dir: s.dir };
++  } catch {
++    /* default */
++  }
++  return DEFAULT;
++};
++
++let state = read();
++const listeners = new Set<() => void>();
++const subscribe = (fn: () => void) => {
++  listeners.add(fn);
++  return () => {
++    listeners.delete(fn);
++  };
++};
++
++function write(next: SortPref) {
++  state = { key: next.key, dir: next.dir };
++  try {
++    localStorage.setItem(KEY, JSON.stringify(state));
++  } catch {
++    /* ignore */
++  }
++  listeners.forEach((l) => l());
++}
++
++export const getSortPref = () => state;
++/** the person picked a sort order: also reported to cloud sync */
++export function setSortPref(next: SortPref) {
++  write(next);
++  emitLocalChange('sort');
++}
++/** a value from the cloud: applied like a normal change, but never reported back (no echo) */
++export const applyRemoteSortPref = (next: SortPref) => isSortPref(next) && write(next);
++
++export const useSortPref = () => useSyncExternalStore(subscribe, getSortPref, () => DEFAULT);
+--- /dev/null
++++ b/src/lib/sync/prefAdapters.ts
+@@ -0,0 +1,83 @@
++import type { SyncField } from './syncKeys';
++import { applyRemoteSettings, DEFAULT_SETTINGS, getSettings, type AppSettings } from '../settings';
++import { applyRemoteSatelliteDefault, satelliteDefault } from '../../config/mapDefault';
++import { applyRemoteProjectMode, getProjectMode } from '../../hooks/useProjects';
++import { applyRemoteExampleEnabled, exampleState } from '../../components/ExampleProject/exampleProject';
++import { applyRemotePlaybackHelpDismissed, playbackHelpDismissed } from '../../components/playback/PlaybackHelp';
++import { applyRemoteMapOpts, DEFAULT_OPTS, loadOpts, type MapOpts } from '../../components/MapPanel/MapPanel';
++import { applyRemoteSortPref, getSortPref, isSortPref } from '../sortPref';
++
++/** How the sync engine reads and writes one preference. */
++export type Adapter = {
++  get(): unknown;
++  /** only ever called with a value that passed `valid` (the cloud is not trusted) */
++  apply(value: unknown): void;
++  valid(value: unknown): boolean;
++};
++
++const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
++const isObject = (v: unknown): v is Record<string, unknown> =>
++  !!v && typeof v === 'object' && !Array.isArray(v);
++
++// ───────── settings: { view: { search: boolean, … } } ─────────
++const VIEW_KEYS = Object.keys(DEFAULT_SETTINGS.view) as (keyof AppSettings['view'])[];
++const cleanSettings = (v: unknown): AppSettings => {
++  const view = isObject(v) && isObject(v.view) ? v.view : {};
++  return {
++    view: Object.fromEntries(
++      VIEW_KEYS.map((k) => [k, isBool(view[k]) ? view[k] : DEFAULT_SETTINGS.view[k]]),
++    ) as AppSettings['view'],
++  };
++};
++
++// ───────── map options (everything except the basemap, which follows the satellite default) ─────────
++const COLORS = ['route', 'speed', 'altitude'];
++const POINTS = ['off', 'auto', 'all'];
++const cleanMapOpts = (v: Record<string, unknown>): Partial<MapOpts> => {
++  const out: Record<string, unknown> = {};
++  for (const k of Object.keys(DEFAULT_OPTS) as (keyof MapOpts)[]) {
++    if (k === 'base' || !(k in v)) continue;
++    const ok =
++      k === 'color' ? COLORS.includes(v[k] as string)
++      : k === 'points' ? POINTS.includes(v[k] as string)
++      : isBool(v[k]);
++    if (ok) out[k] = v[k];
++  }
++  return out as Partial<MapOpts>;
++};
++
++/** "the example project is switched on": the app decides how to add / remove its clips (see useSync) */
++let exampleHandler: ((on: boolean) => void) | null = null;
++export const setExampleEnabledHandler = (fn: ((on: boolean) => void) | null) => {
++  exampleHandler = fn;
++};
++
++export const prefAdapters: Record<SyncField, Adapter> = {
++  settings: {
++    get: () => getSettings(),
++    apply: (v) => applyRemoteSettings(cleanSettings(v)),
++    valid: (v) => isObject(v) && isObject(v.view),
++  },
++  satellite: { get: satelliteDefault, apply: (v) => applyRemoteSatelliteDefault(v as boolean), valid: isBool },
++  projectMode: { get: getProjectMode, apply: (v) => applyRemoteProjectMode(v as boolean), valid: isBool },
++  exampleEnabled: {
++    get: () => exampleState().enabled,
++    apply: (v) => (exampleHandler ?? applyRemoteExampleEnabled)(v as boolean),
++    valid: isBool,
++  },
++  playbackHelp: {
++    get: playbackHelpDismissed,
++    apply: (v) => applyRemotePlaybackHelpDismissed(v as boolean),
++    valid: isBool,
++  },
++  mapOpts: {
++    get: () => {
++      const opts: Partial<MapOpts> = { ...loadOpts() };
++      delete opts.base; // the basemap follows each device's satellite default
++      return opts;
++    },
++    apply: (v) => applyRemoteMapOpts(cleanMapOpts(v as Record<string, unknown>)),
++    valid: isObject,
++  },
++  sort: { get: getSortPref, apply: (v) => applyRemoteSortPref(v as never), valid: isSortPref },
++};
+--- /dev/null
++++ b/src/lib/sync/prefSync.ts
+@@ -0,0 +1,320 @@
++import { useSyncExternalStore } from 'react';
++import { onLocalChange } from './changeBus';
++import { PREF_KEY, type SyncField } from './syncKeys';
++import { prefAdapters, type Adapter } from './prefAdapters';
++
++/**
++ * Keeps the small synced preferences (settings, map options, sort order…) in step with
++ * users/{uid}/prefs/main, one field at a time.
++ *
++ * WHO WINS (each field has a value `v` and the time `t` the person changed it):
++ *  - first time this device meets this account: the cloud wins for every field it has (a stranger's defaults, or
++ *    a guest's old choices, must not overwrite the account); local choices fill the fields the cloud lacks
++ *  - afterwards: the newer `t` wins, a tie goes to the cloud
++ *  - a change made here is sent after a short pause, only the fields that changed
++ *  - a value that came from the cloud is never sent back, and a "change" to a value the cloud already has is
++ *    ignored (a map that re-saves what it just applied must not look like a new edit)
++ * Clocks of different devices are trusted as they are: a device whose clock is far off can win wrongly.
++ */
++export type CloudField = { v: unknown; t: number };
++export type CloudPrefs = Partial<Record<SyncField, CloudField>>;
++
++/** The cloud side. The real one is firestorePrefs.ts; tests pass a fake. */
++export interface PrefsBackend {
++  /** null = the document does not exist yet */
++  watchPrefs(onData: (fields: CloudPrefs | null) => void, onError: (e: unknown) => void): () => void;
++  /** the kill switch (config/global.cloudEnabled); a missing document means enabled */
++  watchEnabled(onValue: (enabled: boolean) => void): () => void;
++  write(patch: CloudPrefs): Promise<void>;
++}
++
++export type SyncStatus =
++  | 'off' // not signed in, or sync not switched on
++  | 'connecting'
++  | 'live'
++  | 'paused' // the kill switch is on
++  | 'error';
++
++type Meta = { t: Partial<Record<SyncField, number>>; linked: string[] };
++type Store = Pick<Storage, 'getItem' | 'setItem'>;
++
++export type Options = {
++  adapters: Record<SyncField, Adapter>;
++  loadBackend: (uid: string) => Promise<PrefsBackend>;
++  /** how this device hears about changes the person makes (default: the shared change bus) */
++  onLocal?: (cb: (field: SyncField) => void) => () => void;
++  storage?: Store;
++  now?: () => number;
++  /** pause before a change is sent, so ten quick toggles make one write */
++  flushMs?: number;
++};
++
++export const META_KEY = 'clip-to-track:sync-meta:v1';
++
++const sortKeys = (v: unknown): unknown =>
++  Array.isArray(v)
++    ? v.map(sortKeys)
++    : v && typeof v === 'object'
++      ? Object.fromEntries(
++          Object.keys(v)
++            .sort()
++            .map((k) => [k, sortKeys((v as Record<string, unknown>)[k])]),
++        )
++      : v;
++/** the same text for equal values, whatever the key order */
++export const stable = (v: unknown) => JSON.stringify(sortKeys(v));
++/** plain JSON only (Firestore rejects `undefined`) */
++const clean = (v: unknown): unknown => JSON.parse(JSON.stringify(v));
++
++const FIELDS = Object.keys(PREF_KEY) as SyncField[];
++
++export function createPrefSync(o: Options) {
++  const adapters = o.adapters;
++  const now = o.now ?? Date.now;
++  const flushMs = o.flushMs ?? 1500;
++  const storage: Store | undefined = o.storage ?? (typeof localStorage === 'undefined' ? undefined : localStorage);
++  const listen = o.onLocal ?? onLocalChange;
++
++  // ───────── this device's bookkeeping ─────────
++  const loadMeta = (): Meta => {
++    try {
++      const m = JSON.parse(storage?.getItem(META_KEY) ?? '{}');
++      return {
++        t: m && typeof m.t === 'object' && m.t ? m.t : {},
++        linked: Array.isArray(m?.linked) ? m.linked.filter((x: unknown) => typeof x === 'string') : [],
++      };
++    } catch {
++      return { t: {}, linked: [] };
++    }
++  };
++  let meta = loadMeta();
++  const saveMeta = () => {
++    try {
++      storage?.setItem(META_KEY, JSON.stringify(meta));
++    } catch {
++      /* ignore */
++    }
++  };
++
++  // ───────── status ─────────
++  let status: SyncStatus = 'off';
++  const listeners = new Set<() => void>();
++  const setStatus = (s: SyncStatus) => {
++    if (s === status) return;
++    status = s;
++    listeners.forEach((l) => l());
++  };
++
++  // ───────── connection state ─────────
++  let uid: string | null = null;
++  let backend: PrefsBackend | null = null;
++  let generation = 0; // bumped on disconnect: late async results from an old connection are dropped
++  let reconciled = false;
++  let paused = false;
++  let applying = false;
++  let timer: ReturnType<typeof setTimeout> | null = null;
++  let inflight: Promise<void> = Promise.resolve();
++  let enabledOff: (() => void) | null = null;
++  let prefsOff: (() => void) | null = null;
++  const synced = new Map<SyncField, string>(); // last value known to be in the cloud (as `stable` text)
++  const pending = new Set<SyncField>();
++
++  const valid = (f: SyncField, c: CloudPrefs[SyncField]): c is CloudField =>
++    !!c && typeof c.t === 'number' && Number.isFinite(c.t) && c.v !== undefined && adapters[f].valid(c.v);
++
++  /** The cloud's value becomes ours. */
++  const takeCloud = (f: SyncField, c: CloudField) => {
++    synced.set(f, stable(c.v));
++    meta.t[f] = c.t;
++    if (stable(adapters[f].get()) === stable(c.v)) return;
++    applying = true; // changes the store reports while we apply are not the person's
++    try {
++      adapters[f].apply(clean(c.v));
++    } finally {
++      applying = false;
++    }
++  };
++
++  const send = (patch: CloudPrefs): Promise<void> => {
++    if (!backend) return Promise.resolve();
++    const b = backend;
++    const gen = generation;
++    for (const [f, c] of Object.entries(patch) as [SyncField, CloudField][]) synced.set(f, stable(c.v));
++    const p = b
++      .write(patch)
++      .then(() => {
++        if (gen === generation && status === 'error') setStatus('live');
++      })
++      .catch(() => {
++        if (gen !== generation) return;
++        // forget them, so the next change of those fields tries again
++        for (const f of Object.keys(patch) as SyncField[]) synced.delete(f);
++        setStatus('error');
++      });
++    inflight = p;
++    return p;
++  };
++
++  const schedule = () => {
++    timer ??= setTimeout(() => {
++      timer = null;
++      void flush();
++    }, flushMs);
++  };
++
++  /** Sends what changed. Resolves when the write is done (or at once if there is nothing to send). */
++  const flush = (): Promise<void> => {
++    if (timer) {
++      clearTimeout(timer);
++      timer = null;
++    }
++    if (!backend || !reconciled || paused || !pending.size) return inflight;
++    const patch: CloudPrefs = {};
++    for (const f of pending) {
++      const v = clean(adapters[f].get());
++      if (stable(v) !== synced.get(f)) patch[f] = { v, t: meta.t[f] ?? now() };
++    }
++    pending.clear();
++    return Object.keys(patch).length ? send(patch) : inflight;
++  };
++
++  /** The person changed something on this device. */
++  const localChanged = (f: SyncField) => {
++    if (applying || !adapters[f]) return;
++    const cur = stable(adapters[f].get());
++    if (synced.get(f) === cur) return; // the cloud already has exactly this: nothing to record or send
++    meta.t[f] = now();
++    saveMeta();
++    if (reconciled && !paused) {
++      pending.add(f);
++      schedule();
++    }
++  };
++
++  /** First snapshot of a connection: decide field by field. */
++  const reconcile = (data: CloudPrefs | null) => {
++    const wasLinked = !!uid && meta.linked.includes(uid);
++    const patch: CloudPrefs = {};
++    for (const f of FIELDS) {
++      const c = valid(f, data?.[f]) ? data![f]! : undefined;
++      const lt = meta.t[f];
++      if (c && (!wasLinked || lt === undefined || c.t >= lt)) {
++        takeCloud(f, c); // first meeting, no local choice, or the cloud is at least as new
++      } else if (c) {
++        // we changed it more recently than the cloud has it
++        if (stable(adapters[f].get()) === stable(c.v)) synced.set(f, stable(c.v));
++        else patch[f] = { v: clean(adapters[f].get()), t: lt! };
++      } else if (lt !== undefined) {
++        patch[f] = { v: clean(adapters[f].get()), t: lt }; // the cloud lacks it: fill it from here
++      }
++    }
++    if (uid && !wasLinked) meta.linked = [...meta.linked, uid];
++    saveMeta();
++    reconciled = true;
++    if (Object.keys(patch).length) void send(patch);
++  };
++
++  /** Later snapshots: only real changes made elsewhere. */
++  const follow = (data: CloudPrefs | null) => {
++    if (!data) return;
++    for (const f of FIELDS) {
++      const c = valid(f, data[f]) ? data[f]! : undefined;
++      if (!c || stable(c.v) === synced.get(f)) continue; // ours coming back, or unchanged
++      if (c.t > (meta.t[f] ?? 0)) takeCloud(f, c); // an older value does not beat what we changed
++    }
++  };
++
++  const startPrefs = (gen: number) => {
++    if (prefsOff || !backend) return;
++    prefsOff = backend.watchPrefs(
++      (data) => {
++        if (gen !== generation) return;
++        if (!reconciled) reconcile(data);
++        else follow(data);
++        if (!paused) setStatus('live');
++      },
++      () => gen === generation && setStatus('error'),
++    );
++  };
++  const stopPrefs = () => {
++    prefsOff?.();
++    prefsOff = null;
++    reconciled = false;
++    synced.clear();
++    pending.clear();
++    if (timer) {
++      clearTimeout(timer);
++      timer = null;
++    }
++  };
++
++  // ───────── public ─────────
++  const disconnect = () => {
++    generation++;
++    enabledOff?.();
++    enabledOff = null;
++    stopPrefs();
++    backend = null;
++    uid = null;
++    paused = false;
++    setStatus('off');
++  };
++
++  const connect = async (user: string) => {
++    if (uid === user) return;
++    disconnect();
++    uid = user;
++    const gen = generation;
++    setStatus('connecting');
++    let b: PrefsBackend;
++    try {
++      b = await o.loadBackend(user);
++    } catch {
++      if (gen === generation) setStatus('error');
++      return;
++    }
++    if (gen !== generation) return;
++    backend = b;
++    // the kill switch decides whether the prefs document is read at all
++    enabledOff = b.watchEnabled((enabled) => {
++      if (gen !== generation) return;
++      if (enabled) {
++        paused = false;
++        if (status === 'paused') setStatus('connecting');
++        startPrefs(gen);
++      } else {
++        paused = true;
++        stopPrefs();
++        setStatus('paused');
++      }
++    });
++  };
++
++  return {
++    /** start hearing about the person's changes (also as a guest: it timestamps them). Returns the stop function. */
++    trackLocal: () => listen(localChanged),
++    connect,
++    disconnect,
++    flush,
++    getStatus: () => status,
++    subscribe: (cb: () => void) => {
++      listeners.add(cb);
++      return () => {
++        listeners.delete(cb);
++      };
++    },
++  };
++}
++
++// ───────── the app's one engine ─────────
++export const prefSync = createPrefSync({
++  adapters: prefAdapters,
++  loadBackend: (uid) => import('./firestorePrefs').then((m) => m.createFirestorePrefsBackend(uid)),
++});
++
++export const useSyncStatus = (): SyncStatus =>
++  useSyncExternalStore(prefSync.subscribe, prefSync.getStatus, () => 'off');
++
++/** Best effort, never longer than `ms`: lets a change made a moment ago leave before the person signs out. */
++export const flushSync = (ms = 3000): Promise<void> =>
++  Promise.race([prefSync.flush(), new Promise<void>((r) => setTimeout(r, ms))]);
+--- /dev/null
++++ b/src/lib/sync/firestorePrefs.ts
+@@ -0,0 +1,47 @@
++import type { CloudPrefs, PrefsBackend } from './prefSync';
++import { PREF_KEY, type SyncField } from './syncKeys';
++
++const FIELDS = Object.keys(PREF_KEY) as SyncField[];
++
++/** Only entries shaped { v, t: number } for fields this version knows. (The engine checks the values themselves.) */
++const parse = (f: unknown): CloudPrefs => {
++  const out: CloudPrefs = {};
++  if (!f || typeof f !== 'object') return out;
++  for (const k of FIELDS) {
++    const e = (f as Record<string, unknown>)[k] as { v?: unknown; t?: unknown } | undefined;
++    if (e && typeof e.t === 'number') out[k] = { v: e.v, t: e.t };
++  }
++  return out;
++};
++
++/**
++ * Preferences of one person: users/{uid}/prefs/main  →  { f: { <field>: { v, t } }, updatedAt }
++ * and the kill switch: config/global  →  { cloudEnabled }.   Firebase is imported lazily.
++ */
++export async function createFirestorePrefsBackend(uid: string): Promise<PrefsBackend> {
++  const [{ getDb }, fs] = await Promise.all([import('../firebase/firestore'), import('firebase/firestore')]);
++  const db = await getDb();
++  const prefs = fs.doc(db, 'users', uid, 'prefs', 'main');
++  const global = fs.doc(db, 'config', 'global');
++
++  return {
++    watchPrefs: (onData, onError) =>
++      fs.onSnapshot(prefs, (snap) => onData(snap.exists() ? parse(snap.data()?.f) : null), onError),
++
++    // a missing document, or one we cannot read, means "enabled": the switch only ever turns sync OFF
++    watchEnabled: (onValue) =>
++      fs.onSnapshot(
++        global,
++        (snap) => onValue(snap.exists() ? snap.data()?.cloudEnabled !== false : true),
++        () => onValue(true),
++      ),
++
++    // mergeFields replaces exactly the listed fields (a settings object is replaced, not merged key by key)
++    write: (patch) =>
++      fs.setDoc(
++        prefs,
++        { f: patch, updatedAt: fs.serverTimestamp() },
++        { mergeFields: [...Object.keys(patch).map((k) => `f.${k}`), 'updatedAt'] },
++      ),
++  };
++}
+--- /dev/null
++++ b/src/lib/sync/useSync.ts
+@@ -0,0 +1,49 @@
++import { useEffect, useRef } from 'react';
++import { useAuth } from '../firebase/auth';
++import { PREFS_SYNC_ACTIVE } from './flags';
++import { applyRemoteExampleEnabled } from '../../components/ExampleProject/exampleProject';
++import { setExampleEnabledHandler } from './prefAdapters';
++import { prefSync, useSyncStatus, type SyncStatus } from './prefSync';
++
++type Args = {
++  /**
++   * What to do when the account says the example project is switched on / off. Pass useExampleProject's
++   * `setEnabled`: it adds or removes the example clips (a bare flag change would leave them behind).
++   */
++  onExampleEnabled?: (on: boolean) => void;
++};
++
++/**
++ * Mount once, in the App. Always timestamps the person's changes (a guest's too, so that signing in later knows
++ * which choices are theirs); while signed in, keeps the preferences in step with the account.
++ */
++export function useSync({ onExampleEnabled }: Args = {}): SyncStatus {
++  const auth = useAuth();
++  const latest = useRef(onExampleEnabled);
++  useEffect(() => {
++    latest.current = onExampleEnabled;
++  });
++
++  useEffect(() => {
++    setExampleEnabledHandler((on) => (latest.current ?? applyRemoteExampleEnabled)(on));
++    return () => setExampleEnabledHandler(null);
++  }, []);
++
++  useEffect(() => prefSync.trackLocal(), []);
++
++  const uid = PREFS_SYNC_ACTIVE && auth.status === 'user' ? auth.user!.uid : null;
++  useEffect(() => {
++    if (!uid) return;
++    void prefSync.connect(uid);
++    return () => prefSync.disconnect();
++  }, [uid]);
++
++  // a change made a moment ago must leave before the tab goes away
++  useEffect(() => {
++    const out = () => document.visibilityState === 'hidden' && void prefSync.flush();
++    document.addEventListener('visibilitychange', out);
++    return () => document.removeEventListener('visibilitychange', out);
++  }, []);
++
++  return useSyncStatus();
++}
+--- /dev/null
++++ b/src/lib/firebase/firestore.ts
+@@ -0,0 +1,31 @@
++import type { Firestore } from 'firebase/firestore';
++import { getFirebaseApp, useEmulators } from './app';
++
++let db: Promise<Firestore> | null = null;
++
++/**
++ * Firestore with an on-disk cache: the app reads from it first (instant, works offline), writes made offline are
++ * kept and sent later, and a restart only downloads what changed. Loaded lazily, like the rest of Firebase.
++ */
++export function getDb(): Promise<Firestore> {
++  db ??= (async () => {
++    const [app, fs] = await Promise.all([getFirebaseApp(), import('firebase/firestore')]);
++    let d: Firestore;
++    try {
++      d = fs.initializeFirestore(app, {
++        localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }),
++      });
++    } catch {
++      d = fs.getFirestore(app); // already started
++    }
++    if (useEmulators()) {
++      try {
++        fs.connectFirestoreEmulator(d, '127.0.0.1', 8080);
++      } catch {
++        /* already connected */
++      }
++    }
++    return d;
++  })();
++  return db;
++}
+--- /dev/null
++++ b/src/components/Account/SyncNotice.tsx
+@@ -0,0 +1,24 @@
++import { useState } from 'react';
++import Icon from '../Icon/Icon';
++import { useSyncStatus } from '../../lib/sync/prefSync';
++
++/** Toast while the developer's kill switch has cloud sync paused. Nothing else about sync is shown here. */
++export default function SyncNotice() {
++  const status = useSyncStatus();
++  const [dismissed, setDismissed] = useState(false);
++  if (status !== 'paused' || dismissed) return null;
++  return (
++    <div className="ctt-toast" role="status">
++      <span className="ctt-toast-ico">
++        <Icon name="info" size={16} />
++      </span>
++      <div className="ctt-toast-body">
++        <strong>Cloud sync is paused</strong>
++        <p>Your changes are kept on this device and will sync when it is back.</p>
++      </div>
++      <button className="ctt-btn" aria-label="Dismiss" onClick={() => setDismissed(true)}>
++        <Icon name="close" size={13} />
++      </button>
++    </div>
++  );
++}
+--- /dev/null
++++ b/src/test/fakeCloud.ts
+@@ -0,0 +1,139 @@
++import type { CloudPrefs, Options, PrefsBackend } from '../lib/sync/prefSync';
++import { createPrefSync } from '../lib/sync/prefSync';
++import { PREF_KEY, type SyncField } from '../lib/sync/syncKeys';
++import type { Adapter } from '../lib/sync/prefAdapters';
++
++const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
++export const FIELDS = Object.keys(PREF_KEY) as SyncField[];
++
++/**
++ * One account's cloud, in memory: a prefs document, the kill switch, and an on/off line. Writes made while
++ * "offline" are kept by the device (like Firestore's cache) and reach the cloud when the line comes back.
++ */
++export function fakeCloud(initial: CloudPrefs | null = null) {
++  let doc: CloudPrefs | null = clone(initial);
++  let enabled = true;
++  let online = true;
++  const prefsWatchers = new Set<(d: CloudPrefs | null) => void>();
++  const enabledWatchers = new Set<(e: boolean) => void>();
++  const held: { patch: CloudPrefs; done: () => void }[] = [];
++  const log = { writes: [] as CloudPrefs[], prefsListens: 0, enabledListens: 0 };
++
++  const tellAll = () => prefsWatchers.forEach((w) => w(clone(doc)));
++  const merge = (patch: CloudPrefs) => {
++    doc = { ...(doc ?? {}), ...clone(patch) };
++  };
++
++  const backend = (opts: { failWrites?: () => boolean } = {}): PrefsBackend => ({
++    watchPrefs(cb) {
++      log.prefsListens++;
++      prefsWatchers.add(cb);
++      queueMicrotask(() => online && prefsWatchers.has(cb) && cb(clone(doc)));
++      return () => prefsWatchers.delete(cb);
++    },
++    watchEnabled(cb) {
++      log.enabledListens++;
++      enabledWatchers.add(cb);
++      queueMicrotask(() => enabledWatchers.has(cb) && cb(enabled));
++      return () => enabledWatchers.delete(cb);
++    },
++    write(patch) {
++      log.writes.push(clone(patch));
++      if (opts.failWrites?.()) return Promise.reject(new Error('permission-denied'));
++      if (!online) return new Promise<void>((done) => held.push({ patch, done }));
++      merge(patch);
++      tellAll();
++      return Promise.resolve();
++    },
++  });
++
++  return {
++    backend,
++    log,
++    get doc() {
++      return clone(doc);
++    },
++    setEnabled(e: boolean) {
++      enabled = e;
++      enabledWatchers.forEach((w) => w(e));
++    },
++    goOffline() {
++      online = false;
++    },
++    goOnline() {
++      online = true;
++      for (const h of held.splice(0)) {
++        merge(h.patch);
++        h.done();
++      }
++      tellAll();
++    },
++    /** another client changed the document directly */
++    external(patch: CloudPrefs) {
++      merge(patch);
++      tellAll();
++    },
++  };
++}
++
++/** One device: its own values, its own change bus, its own bookkeeping storage, one sync engine. */
++export function device(
++  cloud: ReturnType<typeof fakeCloud>,
++  init: Partial<Record<SyncField, unknown>> = {},
++  o: { now?: () => number; backendOpts?: Parameters<ReturnType<typeof fakeCloud>['backend']>[0]; echoOnApply?: boolean; storage?: Map<string, string> } = {},
++) {
++  const values: Record<string, unknown> = { ...init };
++  const subs = new Set<(f: SyncField) => void>();
++  const emit = (f: SyncField) => subs.forEach((s) => s(f));
++  const applied: [SyncField, unknown][] = [];
++  const store = o.storage ?? new Map<string, string>();
++
++  const adapters = Object.fromEntries(
++    FIELDS.map((f): [SyncField, Adapter] => [
++      f,
++      {
++        get: () => clone(values[f]),
++        apply: (v) => {
++          applied.push([f, clone(v)]);
++          values[f] = clone(v);
++          // some stores re-save what they just applied (the map does, from an effect): it must not echo
++          if (o.echoOnApply) queueMicrotask(() => emit(f));
++        },
++        valid: (v) => v !== null && v !== undefined,
++      },
++    ]),
++  ) as Record<SyncField, Adapter>;
++
++  const options: Options = {
++    adapters,
++    loadBackend: async () => cloud.backend(o.backendOpts),
++    onLocal: (cb) => {
++      subs.add(cb);
++      return () => subs.delete(cb);
++    },
++    storage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => void store.set(k, v) },
++    now: o.now,
++    flushMs: 1500,
++  };
++  const engine = createPrefSync(options);
++  const stop = engine.trackLocal();
++
++  return {
++    engine,
++    adapters,
++    values,
++    applied,
++    store,
++    stop,
++    /** the person changes a preference on this device */
++    person(f: SyncField, v: unknown) {
++      values[f] = clone(v);
++      emit(f);
++    },
++  };
++}
++
++/** let queued microtasks run (snapshots, resolved writes) */
++export const settle = async () => {
++  for (let i = 0; i < 8; i++) await Promise.resolve();
++};
+--- /dev/null
++++ b/src/lib/sync/prefSync.test.ts
+@@ -0,0 +1,560 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { createPrefSync, META_KEY, stable } from './prefSync';
++import { device, fakeCloud, settle } from '../../test/fakeCloud';
++
++let clock = 1000;
++const now = () => clock;
++beforeEach(() => {
++  clock = 1000;
++  vi.useFakeTimers();
++});
++afterEach(() => vi.useRealTimers());
++
++const debounce = () => vi.advanceTimersByTimeAsync(1600);
++const connect = async (d: ReturnType<typeof device>, uid = 'u1') => {
++  await d.engine.connect(uid);
++  await settle();
++};
++const field = (v: unknown, t: number) => ({ v, t });
++
++// ───────── P3-T1: who wins ─────────
++describe('first time this device meets the account', () => {
++  it('the cloud wins for every field it has, even over a newer guest choice', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    const d = device(cloud, { satellite: false }, { now });
++    d.person('satellite', false); // the guest chose this at t=1000, newer than the cloud's 100
++    await connect(d);
++    expect(d.values.satellite).toBe(true);
++    expect(cloud.log.writes).toEqual([]);
++  });
++
++  it('a guest choice fills a field the cloud lacks', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    const d = device(cloud, { sort: { key: 'name', dir: 1 } }, { now });
++    d.person('sort', { key: 'name', dir: 1 });
++    await connect(d);
++    expect(cloud.doc!.sort).toEqual(field({ key: 'name', dir: 1 }, 1000));
++  });
++
++  it('a field nobody ever changed is not written (defaults are not choices)', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, { satellite: true, projectMode: true }, { now });
++    await connect(d);
++    expect(cloud.log.writes).toEqual([]);
++    expect(d.engine.getStatus()).toBe('live');
++  });
++
++  it('with no local choice the cloud value is applied', async () => {
++    const cloud = fakeCloud({ projectMode: field(false, 50) });
++    const d = device(cloud, { projectMode: true }, { now });
++    await connect(d);
++    expect(d.values.projectMode).toBe(false);
++  });
++
++  it('a cloud value equal to the local one is not "applied"', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 50) });
++    const d = device(cloud, { satellite: true }, { now });
++    await connect(d);
++    expect(d.applied).toEqual([]);
++  });
++});
++
++describe('a device that already knows the account: the newer change wins', () => {
++  /** connect once so the device is "linked", then disconnect and let the test set the scene */
++  const linked = async (cloudDoc: Parameters<typeof fakeCloud>[0], init = {}) => {
++    const cloud = fakeCloud(cloudDoc);
++    const d = device(cloud, init, { now });
++    await connect(d);
++    d.engine.disconnect();
++    cloud.log.writes.length = 0;
++    return { cloud, d };
++  };
++
++  it('cloud newer → applied', async () => {
++    const { cloud, d } = await linked({ satellite: field(true, 100) }, { satellite: true });
++    clock = 2000;
++    d.person('satellite', false); // local change at t=2000
++    cloud.external({ satellite: field(true, 3000) }); // another device, later
++    await connect(d);
++    expect(d.values.satellite).toBe(true);
++    expect(cloud.log.writes).toEqual([]);
++  });
++
++  it('local newer → pushed, with the time of the change (not of the push)', async () => {
++    const { cloud, d } = await linked({ satellite: field(true, 100) }, { satellite: true });
++    clock = 2000;
++    d.person('satellite', false);
++    clock = 9000; // connects much later
++    await connect(d);
++    expect(cloud.doc!.satellite).toEqual(field(false, 2000));
++    expect(d.values.satellite).toBe(false);
++  });
++
++  it('a tie goes to the cloud', async () => {
++    const { cloud, d } = await linked({ satellite: field(true, 100) }, { satellite: true });
++    clock = 2000;
++    d.person('satellite', false);
++    cloud.external({ satellite: field(true, 2000) });
++    await connect(d);
++    expect(d.values.satellite).toBe(true);
++  });
++
++  it('local newer but already equal to the cloud: nothing is written', async () => {
++    const { cloud, d } = await linked({ satellite: field(true, 100) }, { satellite: true });
++    clock = 2000;
++    d.person('satellite', false);
++    d.person('satellite', true);
++    await connect(d);
++    expect(cloud.log.writes).toEqual([]);
++  });
++});
++
++// ───────── sending ─────────
++describe('sending local changes', () => {
++  it('P3-T2: one change writes one field, nothing else', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100), sort: field({ key: 'added', dir: 1 }, 100) });
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    clock = 2000;
++    d.person('satellite', false);
++    clock = 9000; // the pause ends much later: the field carries the time of the CHANGE
++    await debounce();
++    expect(cloud.log.writes).toEqual([{ satellite: field(false, 2000) }]);
++    expect(cloud.doc!.sort).toEqual(field({ key: 'added', dir: 1 }, 100)); // untouched
++  });
++
++  it('P3-T4: ten quick changes make one write, with the final value', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    for (let i = 0; i < 10; i++) {
++      clock += 10;
++      d.person('satellite', i % 2 === 0);
++      await vi.advanceTimersByTimeAsync(100);
++    }
++    expect(cloud.log.writes).toHaveLength(0); // still inside the pause
++    await debounce();
++    expect(cloud.log.writes).toHaveLength(1);
++    expect(cloud.log.writes[0].satellite!.v).toBe(false);
++  });
++
++  it('changes to different fields in one pause go out together', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    d.person('satellite', false);
++    d.person('projectMode', false);
++    await debounce();
++    expect(cloud.log.writes).toHaveLength(1);
++    expect(Object.keys(cloud.log.writes[0]).sort()).toEqual(['projectMode', 'satellite']);
++  });
++
++  it('a change that ends equal to the cloud is not written', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    const d = device(cloud, { satellite: true }, { now });
++    await connect(d);
++    d.person('satellite', false);
++    d.person('satellite', true);
++    await debounce();
++    expect(cloud.log.writes).toEqual([]);
++  });
++
++  it('flush() sends at once and resolves when the write is done', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    d.person('satellite', false);
++    await d.engine.flush();
++    expect(cloud.doc!.satellite!.v).toBe(false);
++    await vi.advanceTimersByTimeAsync(5000);
++    expect(cloud.log.writes).toHaveLength(1); // the timer did not send it a second time
++  });
++
++  it('flush() with nothing to send resolves', async () => {
++    const d = device(fakeCloud(null), {}, { now });
++    await expect(d.engine.flush()).resolves.toBeUndefined();
++  });
++});
++
++// ───────── receiving ─────────
++describe('receiving changes from the cloud', () => {
++  it('P3-T3: applies them and writes nothing back', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    cloud.external({ satellite: field(false, 5000) });
++    await debounce();
++    expect(d.values.satellite).toBe(false);
++    expect(cloud.log.writes).toEqual([]);
++  });
++
++  it('a store that re-saves what it just applied does not echo, and does not look like a fresh edit', async () => {
++    const cloud = fakeCloud({ mapOpts: field({ arrows: false }, 100) });
++    const d = device(cloud, {}, { now, echoOnApply: true });
++    clock = 5000; // "now" when the value arrives, and when the store re-saves it
++    await connect(d);
++    await debounce();
++    expect(cloud.log.writes).toEqual([]); // no echo write
++
++    // Had the echo stamped t=5000 on the field, this genuine change (made elsewhere at t=300) would look older
++    // than a local edit and be ignored.
++    cloud.external({ mapOpts: field({ arrows: true }, 300) });
++    await settle();
++    expect(d.values.mapOpts).toEqual({ arrows: true });
++  });
++
++  it('a store that changes the value while applying it (sanitising) and reports it at once is not an edit', async () => {
++    const cloud = fakeCloud({ satellite: field('weird', 100) });
++    const d = device(cloud, {}, { now });
++    d.adapters.satellite.apply = (v) => {
++      d.person('satellite', v === 'weird' ? true : v); // stores "true" instead, and reports the change right away
++    };
++    clock = 5000;
++    await connect(d);
++    await debounce();
++    expect(d.values.satellite).toBe(true);
++    expect(cloud.log.writes).toEqual([]); // the sanitised value is not sent back
++    expect(JSON.parse(d.store.get(META_KEY)!).t.satellite).toBe(100); // and it did not stamp the time
++  });
++
++  it('an older cloud value does not beat a change made here', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    clock = 3000;
++    d.person('satellite', false); // pending, not sent yet
++    cloud.external({ satellite: field(true, 2000) }); // older than our change
++    await settle();
++    expect(d.values.satellite).toBe(false);
++    await debounce();
++    expect(cloud.doc!.satellite).toEqual(field(false, 3000));
++  });
++
++  it('ignores fields this version does not know and values that fail validation', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    (cloud as unknown as { external: (p: unknown) => void }).external({ bogus: field(1, 1), projectMode: field(null, 5) });
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    expect(d.values.bogus).toBeUndefined();
++    expect(d.values.projectMode).toBeUndefined(); // null fails the (test) validator
++    expect(d.values.satellite).toBe(true);
++  });
++
++  it('ignores entries without a numeric time', async () => {
++    const cloud = fakeCloud(null);
++    (cloud as unknown as { external: (p: unknown) => void }).external({ satellite: { v: true } });
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    expect(d.applied).toEqual([]);
++  });
++});
++
++// ───────── P3-T5: two devices ─────────
++describe('two devices, one account', () => {
++  it('a change on A reaches B, and the exchange ends (no ping-pong)', async () => {
++    const cloud = fakeCloud(null);
++    const A = device(cloud, { satellite: true }, { now });
++    const B = device(cloud, { satellite: true }, { now, echoOnApply: true });
++    await connect(A);
++    await connect(B);
++
++    clock = 2000;
++    A.person('satellite', false);
++    await debounce();
++    await settle();
++    expect(B.values.satellite).toBe(false);
++
++    await debounce();
++    await vi.advanceTimersByTimeAsync(10_000);
++    expect(cloud.log.writes).toHaveLength(1);
++  });
++
++  it('different fields changed on both devices at once: both survive', async () => {
++    const cloud = fakeCloud(null);
++    const A = device(cloud, {}, { now });
++    const B = device(cloud, {}, { now });
++    await connect(A);
++    await connect(B);
++    clock = 2000;
++    A.person('satellite', false);
++    B.person('projectMode', false);
++    await debounce();
++    await settle();
++    expect(cloud.doc!.satellite!.v).toBe(false);
++    expect(cloud.doc!.projectMode!.v).toBe(false);
++    expect(A.values.projectMode).toBe(false);
++    expect(B.values.satellite).toBe(false);
++  });
++
++  it('the same field changed on both: the later change wins on both', async () => {
++    const cloud = fakeCloud(null);
++    const A = device(cloud, {}, { now });
++    const B = device(cloud, {}, { now });
++    await connect(A);
++    await connect(B);
++    clock = 2000;
++    A.person('sort', { key: 'name', dir: 1 });
++    clock = 2500;
++    B.person('sort', { key: 'date', dir: -1 });
++    await debounce();
++    await settle();
++    await debounce();
++    expect(A.values.sort).toEqual({ key: 'date', dir: -1 });
++    expect(B.values.sort).toEqual({ key: 'date', dir: -1 });
++  });
++
++  it('a brand-new device gets the account settings, the old device keeps its own', async () => {
++    const cloud = fakeCloud(null);
++    const A = device(cloud, {}, { now });
++    await connect(A);
++    clock = 2000;
++    A.person('satellite', false);
++    A.person('sort', { key: 'name', dir: -1 });
++    await debounce();
++
++    const phone = device(cloud, { satellite: true, sort: { key: 'added', dir: 1 } }, { now });
++    await connect(phone);
++    expect(phone.values.satellite).toBe(false);
++    expect(phone.values.sort).toEqual({ key: 'name', dir: -1 });
++  });
++});
++
++// ───────── P3-T7: offline ─────────
++describe('offline', () => {
++  it('changes made offline reach the other device when the line is back', async () => {
++    const cloud = fakeCloud(null);
++    const A = device(cloud, {}, { now });
++    const B = device(cloud, {}, { now });
++    await connect(A);
++    await connect(B);
++
++    cloud.goOffline();
++    clock = 2000;
++    A.person('satellite', false);
++    clock = 2100;
++    A.person('projectMode', false);
++    await debounce();
++    expect(B.values.satellite).toBeUndefined(); // nothing arrived yet
++
++    cloud.goOnline();
++    await settle();
++    expect(B.values.satellite).toBe(false);
++    expect(B.values.projectMode).toBe(false);
++  });
++
++  it('an offline change on A and a different one on B both survive', async () => {
++    const cloud = fakeCloud(null);
++    const A = device(cloud, {}, { now });
++    const B = device(cloud, {}, { now });
++    await connect(A);
++    await connect(B);
++    cloud.goOffline();
++    clock = 2000;
++    A.person('satellite', false);
++    await debounce();
++    cloud.goOnline(); // A's change lands
++    clock = 3000;
++    cloud.external({ sort: field({ key: 'name', dir: 1 }, 3000) });
++    await settle();
++    expect(A.values.sort).toEqual({ key: 'name', dir: 1 });
++    expect(B.values.satellite).toBe(false);
++  });
++});
++
++// ───────── P3-T8: the kill switch ─────────
++describe('kill switch (config/global.cloudEnabled)', () => {
++  it('off from the start: the prefs document is never read, nothing is written', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    cloud.setEnabled(false);
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    d.person('projectMode', false);
++    await debounce();
++    expect(cloud.log.prefsListens).toBe(0);
++    expect(cloud.log.writes).toEqual([]);
++    expect(d.values.satellite).toBeUndefined();
++    expect(d.engine.getStatus()).toBe('paused');
++  });
++
++  it('switched off during a session: stops reading and writing, and says so', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    cloud.setEnabled(false);
++    d.person('satellite', false);
++    await debounce();
++    cloud.external({ sort: field({ key: 'name', dir: 1 }, 9000) });
++    await settle();
++    expect(cloud.log.writes).toEqual([]);
++    expect(d.values.sort).toBeUndefined();
++    expect(d.engine.getStatus()).toBe('paused');
++  });
++
++  it('switched back on: it reconnects, and what was changed meanwhile is sent', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    await connect(d); // links the account
++    cloud.setEnabled(false);
++    clock = 2000;
++    d.person('satellite', false);
++    cloud.setEnabled(true);
++    await settle();
++    expect(d.engine.getStatus()).toBe('live');
++    expect(cloud.doc!.satellite).toEqual(field(false, 2000));
++  });
++
++  it('a missing kill-switch document means enabled', async () => {
++    const d = device(fakeCloud(null), {}, { now });
++    await connect(d);
++    expect(d.engine.getStatus()).toBe('live');
++  });
++});
++
++// ───────── failures and lifecycle ─────────
++describe('failures', () => {
++  it('a rejected write sets the error state, and the next change tries again', async () => {
++    const cloud = fakeCloud(null);
++    let fail = true;
++    const d = device(cloud, {}, { now, backendOpts: { failWrites: () => fail } });
++    await connect(d);
++    d.person('satellite', false);
++    await debounce();
++    await settle();
++    expect(d.engine.getStatus()).toBe('error');
++    expect(cloud.doc).toBeNull();
++
++    fail = false;
++    clock = 3000;
++    d.person('satellite', false); // same value again counts: the cloud never got it
++    await debounce();
++    await settle();
++    expect(cloud.doc!.satellite!.v).toBe(false);
++    expect(d.engine.getStatus()).toBe('live');
++  });
++
++  it('loading the backend fails: error state, and the app goes on', async () => {
++    const d = device(fakeCloud(null), {}, { now });
++    const eng = createPrefSync({
++      adapters: d.adapters,
++      loadBackend: async () => {
++        throw new Error('offline');
++      },
++      onLocal: () => () => {},
++      storage: { getItem: () => null, setItem: () => {} },
++    });
++    await eng.connect('u1');
++    expect(eng.getStatus()).toBe('error');
++  });
++
++  it('a snapshot error sets the error state', async () => {
++    const cloud = fakeCloud(null);
++    const real = cloud.backend;
++    cloud.backend = (o) => ({ ...real(o), watchPrefs: (_ok, err) => (queueMicrotask(() => err(new Error('denied'))), () => {}) });
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    expect(d.engine.getStatus()).toBe('error');
++  });
++});
++
++describe('lifecycle', () => {
++  it('disconnect stops everything: no more changes applied, no pending write sent, status off', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    d.person('satellite', false);
++    d.engine.disconnect();
++    await debounce();
++    cloud.external({ sort: field({ key: 'name', dir: 1 }, 9000) });
++    await settle();
++    expect(cloud.log.writes).toEqual([]);
++    expect(d.values.sort).toBeUndefined();
++    expect(d.engine.getStatus()).toBe('off');
++  });
++
++  it('connecting twice as the same person does nothing the second time', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    await connect(d);
++    await connect(d);
++    expect(cloud.log.prefsListens).toBe(1);
++  });
++
++  it('switching person drops the first connection, and a slow first load cannot take over', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    const d = device(cloud, {}, { now });
++    let release: () => void = () => {};
++    const slow = new Promise<void>((r) => (release = r));
++    const eng = createPrefSync({
++      adapters: d.adapters,
++      loadBackend: async () => (await slow, cloud.backend()),
++      onLocal: () => () => {},
++      storage: { getItem: () => null, setItem: () => {} },
++    });
++    const first = eng.connect('u1');
++    eng.disconnect();
++    release();
++    await first;
++    await settle();
++    expect(cloud.log.prefsListens).toBe(0); // the stale connection never started listening
++    expect(cloud.log.enabledListens).toBe(0); // …not even for the kill switch
++    expect(eng.getStatus()).toBe('off');
++  });
++});
++
++// ───────── bookkeeping ─────────
++describe('this device’s bookkeeping', () => {
++  it('records the time of the person’s changes even as a guest, and keeps it in storage', async () => {
++    const cloud = fakeCloud(null);
++    const d = device(cloud, {}, { now });
++    clock = 4321;
++    d.person('satellite', false);
++    expect(JSON.parse(d.store.get(META_KEY)!).t.satellite).toBe(4321);
++  });
++
++  it('remembers which accounts it has met: a restart treats the account as known', async () => {
++    const cloud = fakeCloud({ satellite: field(true, 100) });
++    const store = new Map<string, string>();
++    const first = device(cloud, {}, { now, storage: store });
++    await connect(first);
++    first.engine.disconnect();
++    first.stop();
++    expect(JSON.parse(store.get(META_KEY)!).linked).toEqual(['u1']);
++
++    // new page load, same storage: a local change newer than the cloud now wins
++    const again = device(cloud, { satellite: true }, { now, storage: store });
++    clock = 5000;
++    again.person('satellite', false);
++    await connect(again);
++    expect(cloud.doc!.satellite).toEqual(field(false, 5000));
++  });
++
++  it('survives damaged bookkeeping', async () => {
++    const store = new Map([[META_KEY, '{"t": "nonsense", "linked": [1, "u1"]']]);
++    const d = device(fakeCloud(null), {}, { now, storage: store });
++    await connect(d);
++    expect(d.engine.getStatus()).toBe('live');
++  });
++
++  it('a second account on the same device: the cloud wins as on a first meeting', async () => {
++    const cloudA = fakeCloud({ satellite: field(true, 100) });
++    const cloudB = fakeCloud({ satellite: field(false, 50) });
++    const store = new Map<string, string>();
++    const d1 = device(cloudA, {}, { now, storage: store });
++    await connect(d1, 'alice');
++    d1.engine.disconnect();
++    d1.stop();
++
++    const d2 = device(cloudB, { satellite: true }, { now, storage: store });
++    clock = 9000;
++    d2.person('satellite', true);
++    await connect(d2, 'bob');
++    expect(d2.values.satellite).toBe(false); // bob's account decides
++  });
++});
++
++describe('stable()', () => {
++  it('is the same for equal values whatever the key order', () => {
++    expect(stable({ a: 1, b: { c: 2, d: [1, { y: 1, x: 2 }] } })).toBe(stable({ b: { d: [1, { x: 2, y: 1 }], c: 2 }, a: 1 }));
++    expect(stable({ a: 1 })).not.toBe(stable({ a: 2 }));
++  });
++});
+--- /dev/null
++++ b/src/lib/sync/prefAdapters.test.ts
+@@ -0,0 +1,194 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { createPrefSync } from './prefSync';
++import { prefAdapters, setExampleEnabledHandler } from './prefAdapters';
++import { fakeCloud, settle } from '../../test/fakeCloud';
++import { applyRemoteSettings, DEFAULT_SETTINGS, getSettings, setView } from '../settings';
++import { applyRemoteSatelliteDefault, satelliteDefault, setSatelliteDefault } from '../../config/mapDefault';
++import { applyRemoteProjectMode, getProjectMode, setProjectMode } from '../../hooks/useProjects';
++import { exampleState, setExampleState } from '../../components/ExampleProject/exampleProject';
++import { applyRemoteMapOpts, DEFAULT_OPTS, loadOpts, saveOpts } from '../../components/MapPanel/MapPanel';
++import { applyRemotePlaybackHelpDismissed, playbackHelpDismissed } from '../../components/playback/PlaybackHelp';
++import { applyRemoteSortPref, getSortPref, setSortPref } from '../sortPref';
++
++let clock = 1000;
++beforeEach(() => {
++  clock = 1000;
++  vi.useFakeTimers();
++});
++afterEach(() => {
++  vi.useRealTimers();
++  setExampleEnabledHandler(null);
++  applyRemoteSettings(DEFAULT_SETTINGS);
++  applyRemoteSatelliteDefault(true);
++  applyRemoteProjectMode(true);
++  applyRemoteMapOpts({});
++  applyRemoteSortPref({ key: 'added', dir: 1 });
++  applyRemotePlaybackHelpDismissed(false);
++  setExampleState({ enabled: true, projectId: null, clipIds: [], videos: {} });
++});
++
++/** the real engine on the real stores (and the real change bus), against an in-memory cloud */
++function app(doc: Parameters<typeof fakeCloud>[0] = null) {
++  const cloud = fakeCloud(doc);
++  const engine = createPrefSync({
++    adapters: prefAdapters,
++    loadBackend: async () => cloud.backend(),
++    storage: { getItem: () => null, setItem: () => {} },
++    now: () => clock,
++  });
++  const stop = engine.trackLocal();
++  const go = async () => {
++    await engine.connect('u1');
++    await settle();
++  };
++  return { cloud, engine, stop, go };
++}
++const f = (v: unknown, t: number) => ({ v, t });
++const debounce = () => vi.advanceTimersByTimeAsync(1600);
++
++describe('the person changes a real store → it is sent', () => {
++  it('settings, satellite, project mode, sort and map options each become one field', async () => {
++    const a = app();
++    await a.go();
++    clock = 2000;
++    setView({ search: false });
++    setSatelliteDefault(false);
++    setProjectMode(false);
++    setSortPref({ key: 'name', dir: -1 });
++    saveOpts({ ...DEFAULT_OPTS, arrows: !DEFAULT_OPTS.arrows });
++    await debounce();
++
++    const doc = a.cloud.doc!;
++    expect(Object.keys(doc).sort()).toEqual(['mapOpts', 'projectMode', 'satellite', 'settings', 'sort']);
++    expect((doc.settings!.v as { view: { search: boolean } }).view.search).toBe(false);
++    expect(doc.satellite!.v).toBe(false);
++    expect(doc.projectMode!.v).toBe(false);
++    expect(doc.sort!.v).toEqual({ key: 'name', dir: -1 });
++    expect(doc.mapOpts!.v).not.toHaveProperty('base'); // the basemap stays per device
++    expect(a.cloud.log.writes).toHaveLength(1);
++  });
++
++  it('the example "enabled" flag is sent, and nothing else about the example', async () => {
++    const a = app();
++    await a.go();
++    setExampleState({ projectId: 'ex', clipIds: ['e1'], videos: { e1: 'u' } }); // device-only
++    setExampleState({ enabled: false });
++    await debounce();
++    expect(a.cloud.doc).toEqual({ exampleEnabled: f(false, 1000) });
++  });
++
++  it('"don’t show the playback help again" is read from its real key', () => {
++    applyRemotePlaybackHelpDismissed(true);
++    expect(prefAdapters.playbackHelp.get()).toBe(true);
++  });
++});
++
++describe('a value from the cloud → the real store shows it, and nothing is sent back', () => {
++  it('applies every preference', async () => {
++    const a = app({
++      settings: f({ view: { ...DEFAULT_SETTINGS.view, coords: false } }, 10),
++      satellite: f(false, 10),
++      projectMode: f(false, 10),
++      sort: f({ key: 'date', dir: -1 }, 10),
++      mapOpts: f({ arrows: true }, 10),
++      playbackHelp: f(true, 10),
++    });
++    await a.go();
++    expect(getSettings().view.coords).toBe(false);
++    expect(satelliteDefault()).toBe(false);
++    expect(getProjectMode()).toBe(false);
++    expect(getSortPref()).toEqual({ key: 'date', dir: -1 });
++    expect(loadOpts().arrows).toBe(true);
++    expect(playbackHelpDismissed()).toBe(true);
++    await debounce();
++    expect(a.cloud.log.writes).toEqual([]);
++  });
++
++  it('a map that re-saves its options after applying them does not echo', async () => {
++    const a = app({ mapOpts: f({ arrows: true }, 10) });
++    await a.go();
++    // TrackMap's effect: saveOpts(opts) after every options change
++    saveOpts(loadOpts());
++    await debounce();
++    expect(a.cloud.log.writes).toEqual([]);
++  });
++});
++
++describe('the cloud is not trusted', () => {
++  it('settings: unknown keys dropped, non-boolean values replaced by the default', async () => {
++    const a = app({ settings: f({ view: { search: 'yes', coords: false, hacked: true } }, 10) });
++    await a.go();
++    const view = getSettings().view as Record<string, unknown>;
++    expect(view.search).toBe(DEFAULT_SETTINGS.view.search);
++    expect(view.coords).toBe(false);
++    expect(view).not.toHaveProperty('hacked');
++  });
++
++  it('settings: a value that is not an object with `view` is ignored', async () => {
++    const a = app({ settings: f('boom', 10) });
++    await a.go();
++    expect(getSettings()).toEqual(DEFAULT_SETTINGS);
++  });
++
++  it('map options: only known keys with the right type are taken', async () => {
++    const a = app({ mapOpts: f({ color: 'rainbow', points: 'all', arrows: 'x', evil: 1, base: 'topo' }, 10) });
++    await a.go();
++    const o = loadOpts();
++    expect(o.color).toBe(DEFAULT_OPTS.color); // invalid colour ignored
++    expect(o.points).toBe('all'); // valid one taken
++    expect(o.arrows).toBe(DEFAULT_OPTS.arrows);
++    expect(o).not.toHaveProperty('evil');
++    expect(JSON.parse(localStorage.getItem('clip-to-track:map-opts:v4')!).base).toBeUndefined();
++  });
++
++  it('booleans must be booleans; a sort needs a key and a direction of 1 or -1', async () => {
++    const a = app({ satellite: f('false', 10), projectMode: f(1, 10), sort: f({ key: 'x', dir: 5 }, 10) });
++    await a.go();
++    expect(satelliteDefault()).toBe(true);
++    expect(getProjectMode()).toBe(true);
++    expect(getSortPref()).toEqual({ key: 'added', dir: 1 });
++  });
++});
++
++describe('the example project follows the account', () => {
++  it('uses the app’s handler (which adds / removes the example clips), not a bare flag change', async () => {
++    const handler = vi.fn();
++    setExampleEnabledHandler(handler);
++    const a = app({ exampleEnabled: f(false, 10) });
++    await a.go();
++    expect(handler).toHaveBeenCalledWith(false);
++    expect(exampleState().enabled).toBe(true); // only the handler decides
++  });
++
++  it('a handler that itself reports a change (like useExampleProject.setEnabled) does not echo', async () => {
++    setExampleEnabledHandler((on) => setExampleState({ enabled: on }));
++    const a = app({ exampleEnabled: f(false, 10) });
++    await a.go();
++    expect(exampleState().enabled).toBe(false);
++    await debounce();
++    expect(a.cloud.log.writes).toEqual([]);
++  });
++
++  it('without a handler the flag is simply flipped', async () => {
++    const a = app({ exampleEnabled: f(false, 10) });
++    await a.go();
++    expect(exampleState().enabled).toBe(false);
++  });
++});
++
++describe('without an account', () => {
++  it('a guest’s changes are only timestamped, nothing is sent anywhere', async () => {
++    const cloud = fakeCloud(null);
++    const engine = createPrefSync({
++      adapters: prefAdapters,
++      loadBackend: async () => cloud.backend(),
++      storage: { getItem: () => null, setItem: () => {} },
++      now: () => clock,
++    });
++    engine.trackLocal();
++    setView({ search: false });
++    await debounce();
++    expect(cloud.log.writes).toEqual([]);
++    expect(engine.getStatus()).toBe('off');
++  });
++});
+--- /dev/null
++++ b/src/lib/sync/useSync.test.tsx
+@@ -0,0 +1,121 @@
++import { renderHook } from '@testing-library/react';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import type { AuthState } from '../firebase/auth';
++
++const h = vi.hoisted(() => ({
++  auth: {} as AuthState,
++  status: 'off' as string,
++  engine: {
++    trackLocal: vi.fn(() => vi.fn()),
++    connect: vi.fn(async () => {}),
++    disconnect: vi.fn(),
++    flush: vi.fn(async () => {}),
++  },
++}));
++vi.mock('../firebase/auth', () => ({ useAuth: () => h.auth }));
++vi.mock('./prefSync', () => ({ prefSync: h.engine, useSyncStatus: () => h.status }));
++
++import { useSync } from './useSync';
++import { prefAdapters } from './prefAdapters';
++import { exampleState, setExampleState } from '../../components/ExampleProject/exampleProject';
++
++const user = (uid = 'u1'): AuthState => ({
++  status: 'user', user: { uid, email: 'a@b.c', name: null, photoURL: null }, error: null, available: true, signingIn: false,
++});
++const guest = (status: AuthState['status'] = 'guest'): AuthState => ({
++  status, user: null, error: null, available: true, signingIn: false,
++});
++
++beforeEach(() => {
++  h.auth = guest();
++  h.status = 'off';
++  Object.values(h.engine).forEach((m) => m.mockClear());
++  setExampleState({ enabled: true });
++});
++
++describe('useSync', () => {
++  it('a guest: local changes are timestamped, nothing connects', () => {
++    renderHook(() => useSync());
++    expect(h.engine.trackLocal).toHaveBeenCalledTimes(1);
++    expect(h.engine.connect).not.toHaveBeenCalled();
++  });
++
++  it('while a saved session is being restored: no connection yet', () => {
++    h.auth = guest('loading');
++    renderHook(() => useSync());
++    expect(h.engine.connect).not.toHaveBeenCalled();
++  });
++
++  it('signed in: connects with the person’s uid', () => {
++    h.auth = user('abc');
++    renderHook(() => useSync());
++    expect(h.engine.connect).toHaveBeenCalledWith('abc');
++  });
++
++  it('signing out disconnects', () => {
++    h.auth = user();
++    const { rerender } = renderHook(() => useSync());
++    h.auth = guest();
++    rerender();
++    expect(h.engine.disconnect).toHaveBeenCalled();
++  });
++
++  it('a different person reconnects; re-rendering as the same person does not', () => {
++    h.auth = user('a');
++    const { rerender } = renderHook(() => useSync());
++    rerender();
++    expect(h.engine.connect).toHaveBeenCalledTimes(1);
++    h.auth = user('b');
++    rerender();
++    expect(h.engine.disconnect).toHaveBeenCalledTimes(1);
++    expect(h.engine.connect).toHaveBeenLastCalledWith('b');
++  });
++
++  it('unmounting disconnects and stops tracking', () => {
++    const stop = vi.fn();
++    h.engine.trackLocal.mockReturnValueOnce(stop);
++    h.auth = user();
++    const { unmount } = renderHook(() => useSync());
++    unmount();
++    expect(h.engine.disconnect).toHaveBeenCalled();
++    expect(stop).toHaveBeenCalled();
++  });
++
++  it('returns the sync status', () => {
++    h.status = 'live';
++    expect(renderHook(() => useSync()).result.current).toBe('live');
++  });
++
++  it('sends pending changes when the tab is hidden, not when it is shown', () => {
++    renderHook(() => useSync());
++    const set = (v: DocumentVisibilityState) => Object.defineProperty(document, 'visibilityState', { value: v, configurable: true });
++    set('visible');
++    document.dispatchEvent(new Event('visibilitychange'));
++    expect(h.engine.flush).not.toHaveBeenCalled();
++    set('hidden');
++    document.dispatchEvent(new Event('visibilitychange'));
++    expect(h.engine.flush).toHaveBeenCalledTimes(1);
++    set('visible');
++  });
++});
++
++describe('the example project handler', () => {
++  it('a remote "enabled" goes to the app’s handler, and always to the newest one', () => {
++    const first = vi.fn();
++    const second = vi.fn();
++    const { rerender } = renderHook(({ cb }) => useSync({ onExampleEnabled: cb }), { initialProps: { cb: first } });
++    rerender({ cb: second });
++    prefAdapters.exampleEnabled.apply(false);
++    expect(second).toHaveBeenCalledWith(false);
++    expect(first).not.toHaveBeenCalled();
++  });
++
++  it('after unmount, or with no handler, the flag is simply flipped', () => {
++    const cb = vi.fn();
++    const { unmount } = renderHook(() => useSync({ onExampleEnabled: cb }));
++    unmount();
++    prefAdapters.exampleEnabled.apply(false);
++    expect(cb).not.toHaveBeenCalled();
++    expect(exampleState().enabled).toBe(false);
++  });
++});
+--- /dev/null
++++ b/src/lib/sync/firestorePrefs.test.ts
+@@ -0,0 +1,81 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++
++const fs = vi.hoisted(() => {
++  const handlers: Record<string, { ok: (s: unknown) => void; err: (e: unknown) => void }> = {};
++  return {
++    handlers,
++    doc: vi.fn((_db: unknown, ...path: string[]) => ({ path: path.join('/') })),
++    onSnapshot: vi.fn((ref: { path: string }, ok: (s: unknown) => void, err: (e: unknown) => void) => {
++      handlers[ref.path] = { ok, err };
++      return () => delete handlers[ref.path];
++    }),
++    setDoc: vi.fn(async () => {}),
++    serverTimestamp: vi.fn(() => '<server time>'),
++  };
++});
++vi.mock('firebase/firestore', () => fs);
++vi.mock('../firebase/firestore', () => ({ getDb: async () => ({ db: true }) }));
++
++import { createFirestorePrefsBackend } from './firestorePrefs';
++
++afterEach(() => vi.clearAllMocks());
++const snap = (data: unknown, exists = true) => ({ exists: () => exists, data: () => data });
++
++describe('Firestore prefs backend', () => {
++  it('reads users/{uid}/prefs/main and config/global', async () => {
++    await createFirestorePrefsBackend('u1');
++    expect(fs.doc.mock.calls.map((c) => c.slice(1).join('/'))).toEqual(['users/u1/prefs/main', 'config/global']);
++  });
++
++  it('watchPrefs: parses { f }, drops unknown fields and entries without a numeric time', async () => {
++    const b = await createFirestorePrefsBackend('u1');
++    const onData = vi.fn();
++    b.watchPrefs(onData, vi.fn());
++    fs.handlers['users/u1/prefs/main'].ok(
++      snap({ f: { satellite: { v: true, t: 5 }, bogus: { v: 1, t: 1 }, sort: { v: 'x', t: 'late' }, mapOpts: 'nope' } }),
++    );
++    expect(onData).toHaveBeenCalledWith({ satellite: { v: true, t: 5 } });
++  });
++
++  it('watchPrefs: a missing document is null; a listener error is passed on', async () => {
++    const b = await createFirestorePrefsBackend('u1');
++    const onData = vi.fn();
++    const onErr = vi.fn();
++    b.watchPrefs(onData, onErr);
++    fs.handlers['users/u1/prefs/main'].ok(snap(undefined, false));
++    expect(onData).toHaveBeenCalledWith(null);
++    const e = new Error('denied');
++    fs.handlers['users/u1/prefs/main'].err(e);
++    expect(onErr).toHaveBeenCalledWith(e);
++  });
++
++  it('kill switch: only an explicit `cloudEnabled: false` turns sync off', async () => {
++    const b = await createFirestorePrefsBackend('u1');
++    const on = vi.fn();
++    b.watchEnabled(on);
++    const h = fs.handlers['config/global'];
++    h.ok(snap({ cloudEnabled: false }));
++    h.ok(snap({ cloudEnabled: true }));
++    h.ok(snap({}));
++    h.ok(snap(undefined, false));
++    h.err(new Error('offline'));
++    expect(on.mock.calls.map((c) => c[0])).toEqual([false, true, true, true, true]);
++  });
++
++  it('write: replaces exactly the listed fields (mergeFields) and stamps the server time', async () => {
++    const b = await createFirestorePrefsBackend('u1');
++    const patch = { satellite: { v: false, t: 9 }, sort: { v: { key: 'a', dir: 1 as const }, t: 8 } };
++    await b.write(patch);
++    expect(fs.setDoc).toHaveBeenCalledWith(
++      { path: 'users/u1/prefs/main' },
++      { f: patch, updatedAt: '<server time>' },
++      { mergeFields: ['f.satellite', 'f.sort', 'updatedAt'] },
++    );
++  });
++
++  it('write: a failure reaches the caller', async () => {
++    const b = await createFirestorePrefsBackend('u1');
++    fs.setDoc.mockRejectedValueOnce(new Error('permission-denied'));
++    await expect(b.write({ satellite: { v: true, t: 1 } })).rejects.toThrow('permission-denied');
++  });
++});
+--- /dev/null
++++ b/src/lib/sortPref.test.tsx
+@@ -0,0 +1,44 @@
++import { act, renderHook } from '@testing-library/react';
++import { afterEach, describe, expect, it } from 'vitest';
++import { applyRemoteSortPref, getSortPref, isSortPref, setSortPref, useSortPref } from './sortPref';
++import { onLocalChange } from './sync/changeBus';
++import type { SyncField } from './sync/syncKeys';
++
++afterEach(() => applyRemoteSortPref({ key: 'added', dir: 1 }));
++
++describe('sort preference store', () => {
++  it('validates the shape', () => {
++    expect(isSortPref({ key: 'name', dir: 1 })).toBe(true);
++    expect(isSortPref({ key: 'name', dir: -1 })).toBe(true);
++    for (const bad of [null, 'x', {}, { key: 1, dir: 1 }, { key: 'a', dir: 0 }, { key: 'a', dir: 2 }])
++      expect(isSortPref(bad), JSON.stringify(bad)).toBe(false);
++  });
++
++  it('a change by the person updates the hook, is stored, and is reported', () => {
++    const heard: SyncField[] = [];
++    const off = onLocalChange((f) => heard.push(f));
++    const { result } = renderHook(() => useSortPref());
++    act(() => setSortPref({ key: 'name', dir: -1 }));
++    expect(result.current).toEqual({ key: 'name', dir: -1 });
++    expect(JSON.parse(localStorage.getItem('clip-to-track:sort')!)).toEqual({ key: 'name', dir: -1 });
++    expect(heard).toEqual(['sort']);
++    off();
++  });
++
++  it('a value from the cloud updates the hook and the store but is not reported', () => {
++    const heard: SyncField[] = [];
++    const off = onLocalChange((f) => heard.push(f));
++    const { result } = renderHook(() => useSortPref());
++    act(() => {
++      applyRemoteSortPref({ key: 'date', dir: 1 });
++    });
++    expect(result.current).toEqual({ key: 'date', dir: 1 });
++    expect(heard).toEqual([]);
++    off();
++  });
++
++  it('refuses an invalid remote value', () => {
++    applyRemoteSortPref({ key: 'zzz', dir: 9 } as never);
++    expect(getSortPref()).toEqual({ key: 'added', dir: 1 });
++  });
++});
+--- /dev/null
++++ b/src/components/MapPanel/mapOpts.test.ts
+@@ -0,0 +1,70 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { applyRemoteMapOpts, DEFAULT_OPTS, loadOpts, saveOpts, subscribeRemoteOpts } from './MapPanel';
++import { onLocalChange } from '../../lib/sync/changeBus';
++import type { SyncField } from '../../lib/sync/syncKeys';
++
++const KEY = 'clip-to-track:map-opts:v4';
++const listen = () => {
++  const heard: SyncField[] = [];
++  return { heard, off: onLocalChange((f) => heard.push(f)) };
++};
++afterEach(() => applyRemoteMapOpts({}));
++
++describe('saveOpts only reports a REAL change', () => {
++  it('the save TrackMap makes on mount (same options) is silent and writes nothing', () => {
++    localStorage.clear();
++    const { heard, off } = listen();
++    saveOpts(loadOpts());
++    expect(heard).toEqual([]);
++    expect(localStorage.getItem(KEY)).toBeNull();
++    off();
++  });
++
++  it('a different basemap alone is not a change (the basemap is per device)', () => {
++    const { heard, off } = listen();
++    saveOpts({ ...loadOpts(), base: loadOpts().base === 'satellite' ? 'topo' : 'satellite' } as never);
++    expect(heard).toEqual([]);
++    off();
++  });
++
++  it('a changed option is stored and reported', () => {
++    const { heard, off } = listen();
++    saveOpts({ ...loadOpts(), arrows: !loadOpts().arrows });
++    expect(heard).toEqual(['mapOpts']);
++    expect(JSON.parse(localStorage.getItem(KEY)!).arrows).toBe(!DEFAULT_OPTS.arrows);
++    off();
++  });
++
++  it('saving the same changed options again is silent', () => {
++    saveOpts({ ...loadOpts(), arrows: !DEFAULT_OPTS.arrows });
++    const { heard, off } = listen();
++    saveOpts(loadOpts());
++    expect(heard).toEqual([]);
++    off();
++  });
++});
++
++describe('options from the cloud', () => {
++  it('are stored, not reported, and an open map is told', () => {
++    const { heard, off } = listen();
++    const open = vi.fn();
++    const unsub = subscribeRemoteOpts(open);
++    applyRemoteMapOpts({ arrows: !DEFAULT_OPTS.arrows });
++    expect(open).toHaveBeenCalledTimes(1);
++    expect(loadOpts().arrows).toBe(!DEFAULT_OPTS.arrows);
++    expect(heard).toEqual([]);
++
++    unsub();
++    applyRemoteMapOpts({});
++    expect(open).toHaveBeenCalledTimes(1);
++    off();
++  });
++
++  it('the store is written BEFORE the map is told (the map re-reads it)', () => {
++    let seen: boolean | undefined;
++    const unsub = subscribeRemoteOpts(() => (seen = loadOpts().arrows));
++    applyRemoteMapOpts({ arrows: !DEFAULT_OPTS.arrows });
++    expect(seen).toBe(!DEFAULT_OPTS.arrows);
++    unsub();
++  });
++});
+--- /dev/null
++++ b/src/components/Account/SyncNotice.test.tsx
+@@ -0,0 +1,25 @@
++import { fireEvent, render, screen } from '@testing-library/react';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++const h = vi.hoisted(() => ({ status: 'off' as string }));
++vi.mock('../../lib/sync/prefSync', () => ({ useSyncStatus: () => h.status }));
++
++import SyncNotice from './SyncNotice';
++
++beforeEach(() => (h.status = 'off'));
++
++describe('SyncNotice (kill switch)', () => {
++  it.each(['off', 'connecting', 'live', 'error'])('shows nothing while %s', (s) => {
++    h.status = s;
++    const { container } = render(<SyncNotice />);
++    expect(container).toBeEmptyDOMElement();
++  });
++
++  it('while paused: says so, and can be dismissed', () => {
++    h.status = 'paused';
++    render(<SyncNotice />);
++    expect(screen.getByRole('status')).toHaveTextContent(/Cloud sync is paused/);
++    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
++    expect(screen.queryByRole('status')).toBeNull();
++  });
++});
+--- /dev/null
++++ b/firestore.rules
+@@ -0,0 +1,36 @@
++rules_version = '2';
++
++service cloud.firestore {
++  match /databases/{database}/documents {
++
++    function signedInAs(uid) {
++      return request.auth != null && request.auth.uid == uid;
++    }
++
++    // The preferences document may hold only these fields (a new synced preference needs a line here).
++    function validPrefs(d) {
++      return d.keys().hasOnly(['f', 'updatedAt'])
++        && d.f is map
++        && d.f.keys().hasOnly(['settings', 'satellite', 'projectMode', 'exampleEnabled', 'playbackHelp', 'mapOpts', 'sort'])
++        && (!('updatedAt' in d) || d.updatedAt is timestamp);
++    }
++
++    // The developer's kill switch ({ cloudEnabled: false } pauses cloud sync in every client).
++    // Anyone may read it; nobody can change it from the app: edit it in the Firebase console.
++    match /config/global {
++      allow read: if true;
++      allow write: if false;
++    }
++
++    // One preferences document per person, only for that person.
++    match /users/{uid}/prefs/main {
++      allow read, delete: if signedInAs(uid);
++      allow create, update: if signedInAs(uid) && validPrefs(request.resource.data);
++    }
++
++    // Everything else is closed. (Phase 4 adds users/{uid}/clips and users/{uid}/projects.)
++    match /{document=**} {
++      allow read, write: if false;
++    }
++  }
++}
+--- /dev/null
++++ b/vitest.rules.config.ts
+@@ -0,0 +1,11 @@
++import { defineConfig } from 'vitest/config';
++
++/** Security-rules tests. They need the Firestore emulator: `npm run test:rules` starts it for you. */
++export default defineConfig({
++  test: {
++    environment: 'node',
++    include: ['rules-tests/**/*.rules.test.ts'],
++    testTimeout: 20_000,
++    fileParallelism: false,
++  },
++});
+--- /dev/null
++++ b/rules-tests/prefs.rules.test.ts
+@@ -0,0 +1,86 @@
++import { readFileSync } from 'node:fs';
++import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
++import {
++  assertFails,
++  assertSucceeds,
++  initializeTestEnvironment,
++  type RulesTestEnvironment,
++} from '@firebase/rules-unit-testing';
++import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
++
++/**
++ * Run with:  firebase emulators:exec --only firestore "vitest run --config vitest.rules.config.ts"
++ * (package.json:  "test:rules": that command)
++ */
++let env: RulesTestEnvironment;
++
++beforeAll(async () => {
++  const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080').split(':');
++  env = await initializeTestEnvironment({
++    projectId: 'demo-clip-to-track',
++    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host, port: Number(port) },
++  });
++});
++afterAll(() => env.cleanup());
++beforeEach(() => env.clearFirestore());
++
++const alice = () => env.authenticatedContext('alice').firestore();
++const bob = () => env.authenticatedContext('bob').firestore();
++const anon = () => env.unauthenticatedContext().firestore();
++const prefs = (db: ReturnType<typeof alice>, uid = 'alice') => doc(db, 'users', uid, 'prefs', 'main');
++const valid = () => ({ f: { satellite: { v: false, t: 5 }, sort: { v: { key: 'name', dir: 1 }, t: 6 } }, updatedAt: serverTimestamp() });
++
++describe('users/{uid}/prefs/main', () => {
++  it('the owner can create, read, update and delete it', async () => {
++    await assertSucceeds(setDoc(prefs(alice()), valid()));
++    await assertSucceeds(getDoc(prefs(alice())));
++    await assertSucceeds(setDoc(prefs(alice()), valid(), { mergeFields: ['f.satellite', 'updatedAt'] }));
++    await assertSucceeds(deleteDoc(prefs(alice())));
++  });
++
++  it('another signed-in person can neither read nor write it', async () => {
++    await assertSucceeds(setDoc(prefs(alice()), valid()));
++    await assertFails(getDoc(prefs(bob(), 'alice')));
++    await assertFails(setDoc(prefs(bob(), 'alice'), valid()));
++    await assertFails(deleteDoc(prefs(bob(), 'alice')));
++  });
++
++  it('a signed-out visitor can neither read nor write it', async () => {
++    await assertFails(getDoc(prefs(anon())));
++    await assertFails(setDoc(prefs(anon()), valid()));
++  });
++
++  it('rejects an unknown preference field', async () => {
++    await assertFails(setDoc(prefs(alice()), { f: { evil: { v: 1, t: 1 } }, updatedAt: serverTimestamp() }));
++  });
++
++  it('rejects an unknown top-level field', async () => {
++    await assertFails(setDoc(prefs(alice()), { ...valid(), extra: 'x' }));
++  });
++
++  it('rejects `f` that is not a map, and an `updatedAt` that is not a timestamp', async () => {
++    await assertFails(setDoc(prefs(alice()), { f: 'nope', updatedAt: serverTimestamp() }));
++    await assertFails(setDoc(prefs(alice()), { f: {}, updatedAt: 'yesterday' }));
++  });
++});
++
++describe('config/global (the kill switch)', () => {
++  it('anyone can read it, nobody can write it from the app', async () => {
++    await assertSucceeds(getDoc(doc(anon(), 'config', 'global')));
++    await assertSucceeds(getDoc(doc(alice(), 'config', 'global')));
++    await assertFails(setDoc(doc(alice(), 'config', 'global'), { cloudEnabled: false }));
++    await assertFails(setDoc(doc(anon(), 'config', 'global'), { cloudEnabled: false }));
++  });
++
++  it('other documents in config are closed', async () => {
++    await assertFails(getDoc(doc(alice(), 'config', 'secrets')));
++  });
++});
++
++describe('everything else is closed', () => {
++  it('own clips / projects are not open yet (Phase 4), and neither is anything made up', async () => {
++    await assertFails(setDoc(doc(alice(), 'users', 'alice', 'clips', 'c1'), { x: 1 }));
++    await assertFails(getDoc(doc(alice(), 'users', 'alice')));
++    await assertFails(setDoc(doc(alice(), 'whatever', 'x'), { x: 1 }));
++  });
++});
+--- a/firebase.json
++++ b/firebase.json
+@@ -1,6 +1,8 @@
+ {
++  "firestore": { "rules": "firestore.rules" },
+   "emulators": {
+     "auth": { "port": 9099 },
++    "firestore": { "port": 8080 },
+     "ui": { "enabled": true }
+   }
+ }

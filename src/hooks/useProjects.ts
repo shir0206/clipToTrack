@@ -18,6 +18,8 @@ import {
   type Placement,
   type Project,
 } from '../lib/projects';
+import { emitLocalChange } from '../lib/sync/changeBus';
+import { exampleState } from '../components/ExampleProject/exampleProject';
 
 const KEY = 'clip-to-track:projects:v1';
 const PLACES_KEY = 'clip-to-track:clip-places:v1';
@@ -33,7 +35,7 @@ let projectModeOn = (() => {
   }
 })();
 const modeListeners = new Set<() => void>();
-export function setProjectMode(on: boolean) {
+function commitProjectMode(on: boolean) {
   projectModeOn = on;
   try {
     localStorage.setItem(MODE_KEY, on ? '1' : '0');
@@ -42,6 +44,13 @@ export function setProjectMode(on: boolean) {
   }
   modeListeners.forEach((l) => l());
 }
+export function setProjectMode(on: boolean) {
+  commitProjectMode(on);
+  emitLocalChange('projectMode');
+}
+/** A value that arrived from the cloud: applied like a normal change, but never reported back (no echo). */
+export const applyRemoteProjectMode = commitProjectMode;
+export const getProjectMode = () => projectModeOn;
 export const useProjectMode = () =>
   useSyncExternalStore(
     (cb) => {
@@ -57,12 +66,29 @@ export const useProjectMode = () =>
 function load(): Project[] {
   try {
     const arr: unknown = JSON.parse(localStorage.getItem(KEY) ?? '[]');
-    return Array.isArray(arr)
+    const list = Array.isArray(arr)
       ? (arr as Project[]).filter((p) => p && p.id && Array.isArray(p.clipIds))
       : [];
+    return lockExample(list);
   } catch {
     return [];
   }
+}
+
+/**
+ * Projects saved before the example became read-only: lock it now. If the person had already put clips of
+ * their own into it, it stays an ordinary project (they keep control of what is theirs).
+ */
+function lockExample(list: Project[]): Project[] {
+  const { projectId, clipIds } = exampleState();
+  if (!projectId) return list;
+  return list.map((p) =>
+    p.id === projectId &&
+    !p.locked &&
+    p.clipIds.every((id) => clipIds.includes(id))
+      ? { ...p, locked: true }
+      : p,
+  );
 }
 
 function loadPlaces(): Record<string, string> {
@@ -168,8 +194,18 @@ export function useProjects(clips: Clip[]) {
     [projects],
   );
 
+  /** ids of the clips that live in a read-only project (they cannot be dragged or moved) */
+  const lockedClips = useMemo(
+    () =>
+      new Set(projects.filter((p) => p.locked).flatMap((p) => p.clipIds)),
+    [projects],
+  );
+
   /** Move a clip to another project, or to a brand-new one ('new'). */
   const moveClip = (clipId: string, target: string | 'new') => {
+    // the example is read-only: nothing moves into it or out of it (the UI hides these paths; this is the safety net)
+    const locked = new Set(projects.filter((p) => p.locked).map((p) => p.id));
+    if (locked.has(projectOf.get(clipId) ?? '') || locked.has(target)) return;
     const rest = projects.map((p) => ({
       ...p,
       clipIds: p.clipIds.filter((id) => id !== clipId),
@@ -205,6 +241,12 @@ export function useProjects(clips: Clip[]) {
     const moving = new Set(clipIds);
     setProjects((ps) => {
       if (!ps.some((p) => p.id === target)) return ps;
+      // the example is read-only: nothing is added to it, and its own clips are never taken out of it
+      if (ps.some((p) => p.id === target && p.locked)) return ps;
+      const frozen = new Set(ps.filter((p) => p.locked).flatMap((p) => p.clipIds));
+      const ids = clipIds.filter((id) => !frozen.has(id));
+      if (!ids.length) return ps;
+      const going = new Set(ids);
       return ps
         .map((p) =>
           p.id === target
@@ -212,10 +254,10 @@ export function useProjects(clips: Clip[]) {
                 ...p,
                 clipIds: [
                   ...p.clipIds,
-                  ...clipIds.filter((id) => !p.clipIds.includes(id)),
+                  ...ids.filter((id) => !p.clipIds.includes(id)),
                 ],
               }
-            : { ...p, clipIds: p.clipIds.filter((id) => !moving.has(id)) },
+            : { ...p, clipIds: p.clipIds.filter((id) => !going.has(id)) },
         )
         .filter((p) => p.clipIds.length || p.manual);
     });
@@ -229,9 +271,11 @@ export function useProjects(clips: Clip[]) {
   /** '' (or the generated name) resets to the generated name. */
   const rename = (id: string, name: string) =>
     setProjects((ps) =>
-      ps.map((p) =>
-        p.id === id ? { ...p, name: name.trim() || undefined } : p,
-      ),
+      ps.some((p) => p.id === id && p.locked) // the example keeps its name
+        ? ps
+        : ps.map((p) =>
+            p.id === id ? { ...p, name: name.trim() || undefined } : p,
+          ),
     );
 
   const dismissNotice = useCallback(() => setNotice(null), []);
@@ -243,6 +287,36 @@ export function useProjects(clips: Clip[]) {
       ...ps,
       { id, clipIds: [], manual: true, title: suggestName(namesOf(projects)) },
     ]);
+    return id;
+  };
+
+  /**
+   * Creates the read-only example project in ONE update: named, filled, locked. The clips are taken out of
+   * whatever project the automatic grouping may have put them in first. Returns its id.
+   */
+  const createLockedProject = (name: string, clipIds: string[]) => {
+    const id = `manual-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const going = new Set(clipIds);
+    setProjects((ps) => [
+      ...ps
+        .map((p) => ({
+          ...p,
+          clipIds: p.clipIds.filter((c) => !going.has(c)),
+        }))
+        .filter((p) => p.clipIds.length || p.manual),
+      {
+        id,
+        clipIds,
+        manual: true,
+        locked: true,
+        title: pickTitle(id, namesOf(ps)),
+        name: name.trim() || undefined,
+      },
+    ]);
+    setNotice((n) => {
+      const rest = n?.filter((x) => !going.has(x.clipId));
+      return rest?.length ? rest : null;
+    });
     return id;
   };
 
@@ -266,6 +340,8 @@ export function useProjects(clips: Clip[]) {
     adopt,
     rename,
     createProject,
+    createLockedProject,
+    lockedClips,
     removeProject,
   };
 }

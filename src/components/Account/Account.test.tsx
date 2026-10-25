@@ -1,14 +1,5 @@
-// @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest';
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthState } from '../../lib/firebase/auth';
 
 const h = vi.hoisted(() => ({
@@ -16,6 +7,14 @@ const h = vi.hoisted(() => ({
   signIn: vi.fn(),
   signOut: vi.fn(async () => true),
   clear: vi.fn(),
+  sync: 'live' as string,
+  flush: vi.fn(async () => {}),
+  order: [] as string[],
+}));
+vi.mock('../../lib/sync/prefSync', async (orig) => ({
+  ...(await orig<typeof import('../../lib/sync/prefSync')>()),
+  useSyncStatus: () => h.sync,
+  flushSync: h.flush,
 }));
 vi.mock('../../lib/firebase/auth', () => ({
   useAuth: () => h.auth,
@@ -29,29 +28,20 @@ import AccountSection from './AccountSection';
 import SignOutDialog from './SignOutDialog';
 import Settings from '../Settings/Settings';
 
-const ada = {
-  uid: 'u1',
-  email: 'ada@example.com',
-  name: 'Ada Lovelace',
-  photoURL: null,
-};
-afterEach(cleanup);
+const ada = { uid: 'u1', email: 'ada@example.com', name: 'Ada Lovelace', photoURL: null };
 const state = (p: Partial<AuthState> = {}): AuthState => ({
-  status: 'guest',
-  user: null,
-  error: null,
-  available: true,
-  signingIn: false,
-  ...p,
+  status: 'guest', user: null, error: null, available: true, signingIn: false, ...p,
 });
-const signedIn = (p: Partial<AuthState> = {}) =>
-  state({ status: 'user', user: ada, ...p });
+const signedIn = (p: Partial<AuthState> = {}) => state({ status: 'user', user: ada, ...p });
 
 beforeEach(() => {
   h.auth = state();
   h.signIn.mockClear();
   h.signOut.mockReset().mockResolvedValue(true);
   h.clear.mockClear();
+  h.sync = 'live';
+  h.order.length = 0;
+  h.flush.mockReset().mockImplementation(async () => void h.order.push('flush'));
   localStorage.clear();
 });
 
@@ -82,13 +72,9 @@ describe('AccountButton', () => {
   });
 
   it('guest: a failed sign-in is explained next to the button', () => {
-    h.auth = state({
-      error: "Couldn't reach Google. Check your connection and try again.",
-    });
+    h.auth = state({ error: "Couldn't reach Google. Check your connection and try again." });
     render(<AccountButton />);
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /Couldn.t reach Google/,
-    );
+    expect(screen.getByRole('alert')).toHaveTextContent(/Couldn.t reach Google/);
   });
 
   // P2-T8
@@ -100,21 +86,15 @@ describe('AccountButton', () => {
   it('phone header: a signed-in person still gets the avatar', () => {
     h.auth = signedIn();
     render(<AccountButton compact />);
-    expect(
-      screen.getByRole('button', { name: /ada@example.com/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ada@example.com/ })).toBeInTheDocument();
   });
 
   it('signed in: avatar shows the initial when there is no photo, the photo when there is one', () => {
     h.auth = signedIn();
     const { unmount } = render(<AccountButton />);
-    expect(
-      screen.getByRole('button', { name: /Account: ada@example.com/ }),
-    ).toHaveTextContent('A');
+    expect(screen.getByRole('button', { name: /Account: ada@example.com/ })).toHaveTextContent('A');
     unmount();
-    h.auth = signedIn({
-      user: { ...ada, photoURL: 'https://example.com/a.jpg' },
-    });
+    h.auth = signedIn({ user: { ...ada, photoURL: 'https://example.com/a.jpg' } });
     render(<AccountButton />);
     const img = document.querySelector('img')!;
     expect(img).toHaveAttribute('src', 'https://example.com/a.jpg');
@@ -145,9 +125,7 @@ describe('AccountButton', () => {
     fireEvent.click(screen.getByRole('button', { name: /Account:/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Sign out/ }));
     const dialog = screen.getByRole('dialog', { name: 'Sign out?' });
-    expect(
-      within(dialog).getByRole('button', { name: 'Sign out' }),
-    ).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Sign out' })).toBeDisabled();
   });
 });
 
@@ -164,9 +142,7 @@ describe('SignOutDialog', () => {
     const onClose = vi.fn();
     const reload = vi.fn();
     render(<SignOutDialog onClose={onClose} reload={reload} />);
-    expect(
-      screen.getByText('Your clips and settings stay on this device.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Your clips and settings stay on this device.')).toBeInTheDocument();
     expect(screen.queryByRole('radio')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
@@ -181,9 +157,7 @@ describe('SignOutDialog', () => {
     seed();
     const reload = vi.fn();
     render(<SignOutDialog wipeAvailable onClose={vi.fn()} reload={reload} />);
-    expect(
-      screen.getByRole('radio', { name: /Remove my clips/ }),
-    ).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Remove my clips/ })).toBeChecked();
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
@@ -206,6 +180,14 @@ describe('SignOutDialog', () => {
     expect(localStorage.getItem('clip-to-track:clips:v1')).toBe('[1]');
   });
 
+  it('lets the last change leave BEFORE signing out (the sign-out cuts access)', async () => {
+    h.signOut.mockImplementation(async () => (h.order.push('signOut'), true));
+    render(<SignOutDialog onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(h.signOut).toHaveBeenCalled());
+    expect(h.order).toEqual(['flush', 'signOut']);
+  });
+
   it('blocks signing out while a video is being added', () => {
     render(<SignOutDialog wipeAvailable uploading onClose={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeDisabled();
@@ -221,9 +203,7 @@ describe('SignOutDialog', () => {
     const onClose = vi.fn();
     render(<SignOutDialog wipeAvailable onClose={onClose} reload={reload} />);
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      /Couldn.t sign out/,
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn.t sign out/);
     expect(reload).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(localStorage.getItem('clip-to-track:clips:v1')).toBe('[1]');
@@ -248,18 +228,11 @@ describe('Settings → Account', () => {
   const settings = () =>
     render(
       <Settings
-        onClose={vi.fn()}
-        clipCount={0}
-        layoutIsDefault
-        onResetLayout={vi.fn()}
-        onClearClips={vi.fn()}
-        exampleOn
-        exampleBusy={false}
-        onExampleChange={vi.fn()}
+        onClose={vi.fn()} clipCount={0} layoutIsDefault onResetLayout={vi.fn()} onClearClips={vi.fn()}
+        exampleOn exampleBusy={false} onExampleChange={vi.fn()}
       />,
     );
-  const projectsSection = () =>
-    screen.getByRole('heading', { name: 'Projects' }).closest('section')!;
+  const projectsSection = () => screen.getByRole('heading', { name: 'Projects' }).closest('section')!;
 
   it('accounts not configured: no Account block, and Projects stays first without a divider', () => {
     h.auth = state({ available: false });
@@ -268,14 +241,10 @@ describe('Settings → Account', () => {
     expect(projectsSection()).not.toHaveClass('has-divider');
   });
 
-  it('guest: a Sign in action, honest that nothing syncs yet; Projects gets its divider', () => {
+  it('guest: a Sign in action, honest that only settings sync; Projects gets its divider', () => {
     settings();
-    const section = screen
-      .getByRole('heading', { name: 'Account' })
-      .closest('section')!;
-    expect(
-      within(section).getByText(/Everything stays on this device/),
-    ).toBeInTheDocument();
+    const section = screen.getByRole('heading', { name: 'Account' }).closest('section')!;
+    expect(within(section).getByText(/Keep your settings on all your devices. Your clips stay on this device/)).toBeInTheDocument();
     fireEvent.click(within(section).getByRole('button', { name: 'Sign in' }));
     expect(h.signIn).toHaveBeenCalledTimes(1);
     expect(projectsSection()).toHaveClass('has-divider');
@@ -284,17 +253,25 @@ describe('Settings → Account', () => {
   it('signed in: shows the email and a Sign out… action', () => {
     h.auth = signedIn();
     settings();
-    const section = screen
-      .getByRole('heading', { name: 'Account' })
-      .closest('section')!;
+    const section = screen.getByRole('heading', { name: 'Account' }).closest('section')!;
     expect(within(section).getByText('ada@example.com')).toBeInTheDocument();
-    expect(
-      within(section).getByText(/not switched on yet/),
-    ).toBeInTheDocument();
+    expect(within(section).getByText(/Your settings are saved to your account. Your clips stay on this device/)).toBeInTheDocument();
     fireEvent.click(within(section).getByRole('button', { name: /Sign out/ }));
-    expect(
-      screen.getByRole('dialog', { name: 'Sign out?' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Sign out?' })).toBeInTheDocument();
+  });
+
+  it('signed in while the kill switch is on: says sync is paused', () => {
+    h.auth = signedIn();
+    h.sync = 'paused';
+    render(<AccountSection />);
+    expect(screen.getByText(/Cloud sync is paused for now/)).toBeInTheDocument();
+  });
+
+  it('signed in but the account cannot be reached: says changes stay on this device', () => {
+    h.auth = signedIn();
+    h.sync = 'error';
+    render(<AccountSection />);
+    expect(screen.getByText(/Couldn.t reach your account just now/)).toBeInTheDocument();
   });
 
   it('shows a sign-in error inside the section', () => {

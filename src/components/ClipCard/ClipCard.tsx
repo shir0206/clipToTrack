@@ -31,6 +31,7 @@ type Props = {
   layout?: 'row' | 'stacked';
   /** phone: opens the "move to project" picker (replaces drag and drop) */
   onMove?: () => void;
+  canMove?: boolean;
   /** phone: opens the playback help dialog from the error message */
   onHelp?: () => void;
   /** phone: lets the person pick the video file again after a reload */
@@ -58,6 +59,7 @@ export default function ClipCard({
   onDragStart,
   onDragEnd,
   layout = 'row',
+  canMove = true,
   onMove,
   onHelp,
   onReAddVideo,
@@ -158,7 +160,7 @@ export default function ClipCard({
       className={`clip-card is-${layout}${selected ? ' is-selected' : ''}${active ? ' is-playing' : ''}${hidden ? ' is-hidden' : ''}`}
       style={clipColorVars(clip.color) as CSSProperties}
       onClick={onSelect}
-      draggable={!!onDragStart && !stacked}
+      draggable={canMove && !!onDragStart && !stacked}
       onDragStart={(e) => {
         e.dataTransfer.setData(CLIP_MIME, clip.id);
         e.dataTransfer.setData('text/plain', clip.title);
@@ -276,7 +278,7 @@ export default function ClipCard({
               >
                 <Icon name="trash" size={14} />
               </button>
-              {stacked && onMove && (
+              {canMove && stacked && onMove && (
                 <button
                   className="icon-button"
                   aria-label={`More actions for ${clip.title}`}

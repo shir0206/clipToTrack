@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { emitLocalChange } from '../../lib/sync/changeBus';
 import type { ClipMetadata } from '../../lib/gopro/clipFromMetadata';
 
 /**
@@ -73,7 +74,9 @@ const subscribe = (fn: () => void) => {
 };
 
 export const exampleState = () => state;
-export const setExampleState = (patch: Partial<ExampleState>) => {
+const commitExampleState = (patch: Partial<ExampleState>, remote = false) => {
+  const changed =
+    patch.enabled !== undefined && patch.enabled !== state.enabled;
   state = { ...state, ...patch };
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
@@ -81,6 +84,7 @@ export const setExampleState = (patch: Partial<ExampleState>) => {
     /* ignore */
   }
   listeners.forEach((fn) => fn());
+  if (changed && !remote) emitLocalChange('exampleEnabled');
 };
 export const useExampleState = () =>
   useSyncExternalStore(subscribe, exampleState, exampleState);
@@ -161,3 +165,8 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     input.click();
   };
 }
+
+export const setExampleState = (patch: Partial<ExampleState>) =>
+  commitExampleState(patch);
+export const applyRemoteExampleEnabled = (enabled: boolean) =>
+  commitExampleState({ enabled }, true);

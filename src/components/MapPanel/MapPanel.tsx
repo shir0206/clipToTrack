@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon, { type IconName } from '../Icon/Icon';
 import { useSettings } from '../../lib/settings';
 import { satelliteDefault } from '../../config/mapDefault';
+import { emitLocalChange } from '../../lib/sync/changeBus';
 
 export type BaseKey = 'streets' | 'topo' | 'satellite';
 export const BASE_LABELS: Record<BaseKey, string> = {
@@ -50,12 +51,43 @@ export const loadOpts = (): MapOpts => {
     return { ...DEFAULT_OPTS, base };
   }
 };
-export const saveOpts = (o: MapOpts) => {
+const writeOpts = (o: MapOpts) => {
   try {
     localStorage.setItem(KEY, JSON.stringify({ ...o, base: undefined })); // undefined is dropped by JSON
   } catch {
     /* ignore */
   }
+};
+/** what is stored, without the basemap, with keys in a fixed order (so two copies compare equal) */
+const forCompare = (o: MapOpts) =>
+  JSON.stringify(
+    (Object.keys(DEFAULT_OPTS) as (keyof MapOpts)[])
+      .filter((k) => k !== 'base')
+      .map((k) => [k, o[k]]),
+  );
+/**
+ * TrackMap calls this from an effect after every change of its options, including the very first render. Only a
+ * REAL change is stored and reported to sync: a map that merely mounted (or just applied a value from the cloud)
+ * must not look like "the person changed this just now", or an old device would overwrite newer cloud settings.
+ */
+export const saveOpts = (o: MapOpts) => {
+  if (forCompare(o) === forCompare(loadOpts())) return;
+  writeOpts(o);
+  emitLocalChange('mapOpts');
+};
+
+const remoteListeners = new Set<() => void>();
+/** a map that is already open follows options that arrive from the cloud */
+export const subscribeRemoteOpts = (fn: () => void) => {
+  remoteListeners.add(fn);
+  return () => {
+    remoteListeners.delete(fn);
+  };
+};
+/** Map options as they arrived from the cloud: stored, shown by an open map, never reported back (no echo). */
+export const applyRemoteMapOpts = (o: Partial<MapOpts>) => {
+  writeOpts({ ...DEFAULT_OPTS, ...o });
+  remoteListeners.forEach((fn) => fn());
 };
 
 type Props = {

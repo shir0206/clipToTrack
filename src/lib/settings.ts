@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { emitLocalChange } from './sync/changeBus';
 
 /** Which parts of the map UI are shown. Everything is on by default. */
 export type ViewSettings = {
@@ -64,7 +65,7 @@ const subscribe = (fn: () => void) => {
 };
 const getSnapshot = () => state;
 
-function commit(next: AppSettings) {
+function commit(next: AppSettings, remote = false) {
   state = next;
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
@@ -72,6 +73,7 @@ function commit(next: AppSettings) {
     /* ignore */
   }
   listeners.forEach((l) => l());
+  if (!remote) emitLocalChange('settings');
 }
 
 export const setView = (patch: Partial<ViewSettings>) =>
@@ -91,3 +93,6 @@ export const resetView = () =>
 
 export const useSettings = () =>
   useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+export const getSettings = () => state;
+export const applyRemoteSettings = (next: AppSettings) => commit(next, true);

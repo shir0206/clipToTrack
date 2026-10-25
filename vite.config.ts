@@ -8,5 +8,9 @@ export default defineConfig({
       deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/asset/**'],
     },
   },
-  test: { include: ['src/**/*.test.{ts,tsx}'], environment: 'node' },
+  test: {
+    include: ['src/**/*.test.{ts,tsx}'],
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+  },
 });

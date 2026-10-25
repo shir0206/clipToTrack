@@ -1,25 +1,12 @@
-// @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { wipeSyncedLocalData, wipeThenReload } from './wipeLocal';
 
 const P = 'clip-to-track:';
-beforeEach(() => localStorage.clear());
-const SYNCED = [
-  'clips:v1',
-  'projects:v1',
-  'clip-places:v1',
-  'settings:v1',
-  'satellite-default:v1',
-  'project-mode:v1',
-  'playback-help-dismissed',
-  'map-opts:v4',
-  'sort',
-];
+const SYNCED = ['clips:v1', 'projects:v1', 'clip-places:v1', 'settings:v1', 'satellite-default:v1', 'project-mode:v1', 'playback-help-dismissed', 'map-opts:v4', 'sort'];
 const DEVICE = ['sheet-snap', 'force-layout', 'panel-width', 'profile-height'];
 
 const seed = () => {
-  for (const k of [...SYNCED, ...DEVICE, 'example'])
-    localStorage.setItem(P + k, 'x');
+  for (const k of [...SYNCED, ...DEVICE, 'example']) localStorage.setItem(P + k, 'x');
   localStorage.setItem('some-other-app:key', 'keep me');
 };
 
@@ -40,6 +27,13 @@ describe('wipeSyncedLocalData', () => {
     expect(localStorage.getItem('some-other-app:key')).toBe('keep me');
   });
 
+  it('also removes this device’s sync bookkeeping (a wiped browser must not look like fresh edits)', () => {
+    seed();
+    localStorage.setItem(`${P}sync-meta:v1`, '{"t":{"satellite":5},"linked":["u1"]}');
+    expect(wipeSyncedLocalData()).toContain(`${P}sync-meta:v1`);
+    expect(localStorage.getItem(`${P}sync-meta:v1`)).toBeNull();
+  });
+
   it('does nothing (and does not throw) on an empty browser', () => {
     expect(wipeSyncedLocalData()).toEqual([]);
   });
@@ -49,9 +43,7 @@ describe('wipeThenReload', () => {
   it('wipes, then reloads', () => {
     seed();
     const order: string[] = [];
-    const reload = vi.fn(() =>
-      order.push(`reload:${localStorage.getItem(`${P}clips:v1`)}`),
-    );
+    const reload = vi.fn(() => order.push(`reload:${localStorage.getItem(`${P}clips:v1`)}`));
     wipeThenReload(reload);
     expect(order).toEqual(['reload:null']); // already wiped when the reload starts
   });

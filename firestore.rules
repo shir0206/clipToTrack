@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // The preferences document may hold only these fields (a new synced preference needs a line here).
+    function validPrefs(d) {
+      return d.keys().hasOnly(['f', 'updatedAt'])
+        && d.f is map
+        && d.f.keys().hasOnly(['settings', 'satellite', 'projectMode', 'exampleEnabled', 'playbackHelp', 'mapOpts', 'sort'])
+        && (!('updatedAt' in d) || d.updatedAt is timestamp);
+    }
+
+    // The developer's kill switch ({ cloudEnabled: false } pauses cloud sync in every client).
+    // Anyone may read it; nobody can change it from the app: edit it in the Firebase console.
+    match /config/global {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // One preferences document per person, only for that person.
+    match /users/{uid}/prefs/main {
+      allow read, delete: if signedInAs(uid);
+      allow create, update: if signedInAs(uid) && validPrefs(request.resource.data);
+    }
+
+    // Everything else is closed. (Phase 4 adds users/{uid}/clips and users/{uid}/projects.)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Icon from '../Icon/Icon';
 import { detectBrowser, type BrowserInfo } from '../../lib/video/videoSupport';
 import './PlaybackHelp.css';
+import { emitLocalChange } from '../../lib/sync/changeBus';
 
 const KEY = 'clip-to-track:playback-help-dismissed';
 export const playbackHelpDismissed = () => {
@@ -124,6 +125,7 @@ export default function PlaybackHelp({ onClose }: { onClose: () => void }) {
     if (never) {
       try {
         localStorage.setItem(KEY, '1');
+        emitLocalChange('playbackHelp');
       } catch {
         /* ignore */
       }
@@ -205,3 +207,11 @@ export default function PlaybackHelp({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
+
+export const applyRemotePlaybackHelpDismissed = (on: boolean) => {
+  try {
+    localStorage.setItem(KEY, on ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+};
