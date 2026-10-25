@@ -1,0 +1,91 @@
+/* Account button (header) + sign-out dialog extras.
+   Colours fall back to system colours; point the variables at your theme tokens. */
+.account {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.account-signin {
+  /* looks like its neighbours in .header-actions when those rules target `button` */
+  white-space: nowrap;
+}
+.account-avatar {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-grid;
+  place-items: center;
+  font-weight: 600;
+  line-height: 1;
+  background: var(
+    --account-avatar-bg,
+    color-mix(in srgb, currentColor 14%, transparent)
+  );
+  color: inherit;
+}
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.account-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 220px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--account-menu-bg, Canvas);
+  color: var(--account-menu-fg, CanvasText);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.account-who {
+  margin: 0 0 6px;
+  padding: 4px 6px 8px;
+  display: grid;
+  gap: 2px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  overflow-wrap: anywhere;
+}
+.account-who span {
+  opacity: 0.7;
+}
+.account-menu button {
+  width: 100%;
+  text-align: left;
+}
+.account-error {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: max-content;
+  max-width: 260px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  background: var(--account-error-bg, #fdecec);
+  color: var(--account-error-fg, #8a1c1c);
+}
+.account-choices {
+  border: 0;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

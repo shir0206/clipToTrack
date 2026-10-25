@@ -13,6 +13,7 @@ import ClipCard from '../ClipCard/ClipCard';
 import TrackMap, { type MapApi } from '../TrackMap/TrackMap';
 import UploadZone from '../UploadZone/UploadZone';
 import Logo from '../logo/Logo';
+import AccountButton from '../Account/AccountButton';
 import VideoModal from '../VideoModal/VideoModal';
 import VideoWindow, { openVideoWindow } from '../VideoWindow/VideoWindow';
 import Icon, { type IconName } from '../Icon/Icon';
@@ -25,7 +26,6 @@ import { probeDecode } from '../../lib/video/videoSupport';
 import { useClips } from '../../hooks/useClips';
 import { useProjectMode, useProjects } from '../../hooks/useProjects';
 import { useExampleProject } from '../ExampleProject/useExampleProject';
-import { useExampleUploadPrompt } from '../ExampleProject/useExampleUploadPrompt';
 import {
   exampleState,
   useExampleState,
@@ -155,11 +155,6 @@ export default function ClipToTrack() {
   const [sort, setSort] = useState(loadSort);
   const [playbackHelp, setPlaybackHelp] = useState(false); // browser can't draw the video's picture
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { ask: askExampleUpload, prompt: examplePrompt } =
-    useExampleUploadPrompt();
-  // after an 'auto' upload: the clip to jump to once the automatic grouping has placed it
-  const landOn = useRef<string[] | null>(null);
-  const [landTick, setLandTick] = useState(0);
   const mapApi = useRef<MapApi | null>(null);
   const [profileHost, setProfileHost] = useState<HTMLDivElement | null>(null); // telemetry portal target (phones)
   const [picker, setPicker] = useState<
@@ -309,10 +304,11 @@ export default function ClipToTrack() {
     // an upload made while a project is open belongs to that project (not to the automatic grouping)
     let target =
       into ?? (projectMode && activeProject !== 'all' ? activeProject : null);
-    // looking at the example project? offer a project of their own first
-    const choice = await askExampleUpload(target);
-    if (choice === 'cancel') return;
-    if (choice === 'auto') target = null; // the automatic grouping places the clips
+    // the example project is read-only: videos added while it is open go into a brand-new project
+    let created: string | null = null;
+    if (target && target === exampleState().projectId) {
+      target = created = projects.createProject();
+    }
     // in parallel with the import: can this browser draw the picture? If not, explain (once) what to approve
     const video = files.find((f) => !/\.json$/i.test(f.name));
     if (video && !playbackHelpDismissed())
@@ -320,13 +316,12 @@ export default function ClipToTrack() {
         (r) => r === 'no-picture' && setPlaybackHelp(true),
       );
     const ids = await addFiles(files);
-    if (!ids.length) return;
-    if (target) projects.adopt(ids, target);
-    if (choice === 'auto') {
-      landOn.current = ids; // handled by the effect below, once the automatic grouping has run
-      setLandTick((t) => t + 1);
+    if (!ids.length) {
+      if (created) projects.removeProject(created); // nothing was added: don't leave an empty project behind
       return;
     }
+    if (target) projects.adopt(ids, target);
+    if (created) setProjectFilter(created); // open the new project
     const firstId = ids[0];
     setSelectedClipId(firstId);
     setTimeout(() => select(firstId), 0); // scroll the new card into view after render
@@ -364,26 +359,6 @@ export default function ClipToTrack() {
     onFrac(id, null);
     remove(id); // -> map layers, pinned bubble and localStorage all follow from `clips`
   };
-
-  // 'auto' upload from the example: open the project the new clips landed in
-  useEffect(() => {
-    const ids = landOn.current;
-    if (!ids?.length || !ids.every((i) => projects.projectOf.has(i))) return;
-    landOn.current = null;
-    // the person chose "New Project": whatever the automatic grouping did, the clips must not stay in the example
-    const exampleId = exampleState().projectId;
-    const stuck = ids.filter((i) => projects.projectOf.get(i) === exampleId);
-    let dest = projects.projectOf.get(ids[0])!;
-    if (stuck.length) {
-      dest = projects.createProject();
-      projects.adopt(stuck, dest);
-    }
-
-    setProjectFilter(dest);
-    setSelectedClipId(ids[0]);
-    setTimeout(() => select(ids[0]), 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projects.projectOf, landTick]);
 
   // a project owns its clips: deleting it removes them too (the UI asks for confirmation first)
   const handleDeleteProject = (id: string) => {
@@ -517,7 +492,7 @@ export default function ClipToTrack() {
               // touch emulates mouse events and never sends mouseleave: a stuck highlight
               onHover={(h) => !isMobile && setHoveredClipId(h ? clip.id : null)}
               onMove={
-                isMobile
+                isMobile && !exampleClipIds.includes(clip.id)
                   ? () => setPicker({ kind: 'move', clipId: clip.id })
                   : undefined
               }
@@ -531,7 +506,11 @@ export default function ClipToTrack() {
               onToggleHidden={() => toggleHidden(clip.id)}
               onProgress={(f) => onFrac(clip.id, f)}
               onDelete={() => handleDelete(clip.id)}
-              onDragStart={isMobile ? undefined : () => setDragClipId(clip.id)}
+              onDragStart={
+                isMobile || exampleClipIds.includes(clip.id)
+                  ? undefined
+                  : () => setDragClipId(clip.id)
+              }
               onDragEnd={isMobile ? undefined : () => setDragClipId(null)}
               onMaximize={() => openMax(clip)}
             />
@@ -583,6 +562,7 @@ export default function ClipToTrack() {
               Projects
             </button>
           )}
+          <AccountButton compact={isMobile} uploading={busy} />
           <button aria-label="Settings" onClick={() => setSettingsOpen(true)}>
             {isMobile ? <Icon name="settings" size={20} /> : 'Settings'}
           </button>
@@ -869,6 +849,7 @@ export default function ClipToTrack() {
           exampleBusy={example.busy}
           onExampleChange={example.setEnabled}
           hideLayout={isMobile}
+          uploading={busy}
           layoutIsDefault={
             panelW === clampW(window.innerWidth * 0.33) &&
             [null, '260'].includes(localStorage.getItem(PROFILE_HEIGHT_KEY)) // 260 = ElevationProfile's DEFAULT_H
@@ -888,8 +869,6 @@ export default function ClipToTrack() {
           }}
         />
       )}
-
-      {examplePrompt}
 
       {playbackHelp && <PlaybackHelp onClose={() => setPlaybackHelp(false)} />}
 

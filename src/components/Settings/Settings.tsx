@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadOpts } from '../MapPanel/MapPanel';
 import Icon from '../Icon/Icon';
+import AccountSection from '../Account/AccountSection';
+import { useAuth } from '../../lib/firebase/auth';
 import { setProjectMode, useProjectMode } from '../../hooks/useProjects';
 import {
   setSatelliteDefault,
@@ -27,6 +29,8 @@ type Props = {
   onExampleChange: (on: boolean) => void;
   /** mobile layouts: panel sizes do not exist, so the Layout section is left out */
   hideLayout?: boolean;
+  /** a video is being added: the Account section will not let the person sign out meanwhile */
+  uploading?: boolean;
 };
 
 const VIEW_ITEMS: [keyof ViewSettings, string, string][] = [
@@ -60,8 +64,12 @@ export default function Settings({
   exampleBusy,
   onExampleChange,
   hideLayout = false,
+  uploading = false,
 }: Props) {
   const { view } = useSettings();
+  const auth = useAuth();
+  // the Account block sits first when accounts are configured; Projects then needs the divider above it
+  const hasAccount = auth.available && auth.status !== 'loading';
   const projectMode = useProjectMode();
   const satellite = useSatelliteDefault();
   const [confirmClear, setConfirmClear] = useState(false);
@@ -105,7 +113,12 @@ export default function Settings({
           </button>
         </div>
 
-        <section className="settings-section" aria-labelledby="set-projects">
+        <AccountSection uploading={uploading} />
+
+        <section
+          className={`settings-section${hasAccount ? ' has-divider' : ''}`}
+          aria-labelledby="set-projects"
+        >
           <h3 className="settings-title" id="set-projects">
             Projects
           </h3>
